@@ -1,5 +1,5 @@
 dependencies:
   idf: ">=5.0"
   quickjs:
-    git: git@github.com:cubicap/quickjs.git
+    git: https://github.com/cubicap/quickjs.git
     version: 342cb23d1b72198c35b0409ccae0428b7ec2b859
