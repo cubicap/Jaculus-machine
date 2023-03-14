@@ -113,6 +113,7 @@ struct ConvTraits<Value> {
     }
 
     static Value to(ContextRef ctx, Value val) {
+        JS_DupValue(ctx, val.getVal());
         return val;
     }
 };
@@ -137,6 +138,7 @@ struct ConvTraits<Object> {
     }
 
     static Value to(ContextRef ctx, Object val) {
+        JS_DupValue(ctx, val.getVal());
         return Value(ctx, val.getVal());
     }
 };
@@ -161,6 +163,7 @@ struct ConvTraits<Function> {
     }
 
     static Value to(ContextRef ctx, Function val) {
+        JS_DupValue(ctx, val.getVal());
         return Value(ctx, val.getVal());
     }
 };
@@ -185,6 +188,7 @@ struct ConvTraits<Array> {
     }
 
     static Value to(ContextRef ctx, Array val) {
+        JS_DupValue(ctx, val.getVal());
         return Value(ctx, val.getVal());
     }
 };
@@ -209,6 +213,7 @@ struct ConvTraits<Promise> {
     }
 
     static Value to(ContextRef ctx, Promise val) {
+        JS_DupValue(ctx, val.getVal());
         return Value(ctx, val.getVal());
     }
 };
@@ -233,6 +238,7 @@ struct ConvTraits<Exception> {
     }
 
     static Value to(ContextRef ctx, Exception val) {
+        JS_DupValue(ctx, val.getVal());
         return Value(ctx, val.getVal());
     }
 };
