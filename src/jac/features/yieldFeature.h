@@ -10,7 +10,6 @@
 template<class Next>
 class YieldFeature : public Next {
 private:
-    std::deque<jac::Function> _resolvers;
     int counter = 0;
 
     static void paralelRunner(YieldFeature* self, jac::Function resolve, std::vector<jac::Object> funcs) {
@@ -34,7 +33,7 @@ private:
             }
         }
         }
-        self->eventLoop_schedule([self, resolve = std::move(resolve), funcs = std::move(funcs)]() mutable {
+        self->scheduleEvent([self, resolve = std::move(resolve), funcs = std::move(funcs)]() mutable {
             paralelRunner(self, std::move(resolve), std::move(funcs));
         });
     }
@@ -47,7 +46,7 @@ private:
 
         auto [promise, resolve, reject] = jac::Promise::create(this->_context);
 
-        this->eventLoop_schedule([this, resolve = std::move(resolve), funcs = std::move(funcs)]() mutable {
+        this->scheduleEvent([this, resolve = std::move(resolve), funcs = std::move(funcs)]() mutable {
             paralelRunner(this, std::move(resolve), std::move(funcs));
         });
 
@@ -60,7 +59,10 @@ public:
 
         this->registerGlobal("_yield", ff.newFunction([this]() {
             auto [promise, resolve, _] = jac::Promise::create(this->_context);
-            _resolvers.emplace_back(resolve);
+            this->scheduleEvent([resolve = std::move(resolve), this]() mutable {
+                counter++;
+                static_cast<jac::Function>(resolve).call<void>();
+            });
             return promise;
         }));
 
@@ -73,11 +75,5 @@ public:
 
     void onEventLoop() {
         Next::onEventLoop();
-        while (!_resolvers.empty()) {
-            auto& resolver = _resolvers.front();
-            resolver.call<void>();
-            _resolvers.pop_front();
-            counter++;
-        }
     }
 };

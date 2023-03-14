@@ -10,7 +10,7 @@
 
 
 template<class Next>
-class AsyncTimersFeature : public Next {
+class TimersFeature : public Next {
 private:
     class Timer {
     private:
@@ -92,7 +92,7 @@ public:
                 auto callback = timer.getCallback();
                 lock.unlock();
 
-                this->eventLoop_schedule(callback);
+                this->scheduleEvent(callback);
             }
         });
 
@@ -113,7 +113,7 @@ public:
         }));
     }
 
-    ~AsyncTimersFeature() {
+    ~TimersFeature() {
         {
             std::scoped_lock lock(_timersMutex);
             _timers = {};

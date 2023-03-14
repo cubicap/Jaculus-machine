@@ -1,7 +1,8 @@
 #include <jac/machine/machine.h>
 #include <jac/features/stdioFeature.h>
-#include <jac/features/asyncEventLoopFeature.h>
-#include <jac/features/asyncTimersFeature.h>
+#include <jac/features/eventLoopFeature.h>
+#include <jac/features/eventQueueFeature.h>
+#include <jac/features/timersFeature.h>
 #include <jac/features/yieldFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/features/filesystemFeature.h>
@@ -12,14 +13,15 @@
 
 using Machine =
     EventLoopTerminal<
-    AsyncTimersFeature<
+    TimersFeature<
     YieldFeature<
-    AsyncEventLoopFeature<
+    EventLoopFeature<
+    EventQueueFeature<
     StdioFeature<
     ModuleLoaderFeature<
     FilesystemFeature<
     jac::MachineBase
->>>>>>>;
+>>>>>>>>;
 
 
 const char* code = R"(
