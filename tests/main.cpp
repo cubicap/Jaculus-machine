@@ -1,4 +1,5 @@
 #include <jac/machine/machine.h>
+#include <jac/features/basicStreamFeature.h>
 #include <jac/features/stdioFeature.h>
 #include <jac/features/eventLoopFeature.h>
 #include <jac/features/eventQueueFeature.h>
@@ -18,10 +19,11 @@ using Machine =
     EventLoopFeature<
     EventQueueFeature<
     StdioFeature<
+    BasicStreamFeature<
     ModuleLoaderFeature<
     FilesystemFeature<
     jac::MachineBase
->>>>>>>>;
+>>>>>>>>>;
 
 
 const char* code = R"(
