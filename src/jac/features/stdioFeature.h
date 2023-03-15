@@ -14,28 +14,9 @@ private:
         std::ostream& _stream;
     public:
         OsWritable(std::ostream& stream): _stream(stream) {}
-        void print(std::vector<jac::ValueConst> args) override {
-            for (auto val : args) {
-                try {
-                    _stream << val.toString() << " ";
-                }
-                catch (...) {
-                    _stream << "[Cannot convert]" << " ";
-                }
-            }
-        }
-
-        void println(std::vector<jac::ValueConst> args) override {
-            print(args);
-            _stream << std::endl;
-        }
 
         void print(std::string str) override {
             _stream << str << std::flush;
-        }
-
-        void println(std::string str) override {
-            _stream << str << std::endl;
         }
     };
 
@@ -78,10 +59,9 @@ public:
             this->stdio.out->println(args);
         }));
 
-        // TODO: reference the same io objects as cpp interface
         auto& module = this->newModule("stdio");
-        module.addExport("stdout", Next::WritableClass::createInstance(this->_context, new OsWritable(std::cout)));
-        module.addExport("stderr", Next::WritableClass::createInstance(this->_context, new OsWritable(std::cerr)));
-        module.addExport("stdin", Next::ReadableClass::createInstance(this->_context, new IsReadable(std::cin)));
+        module.addExport("stdout", Next::WritableClass::createInstance(this->_context, new Next::WritableRef(stdio.out.get())));
+        module.addExport("stderr", Next::WritableClass::createInstance(this->_context, new Next::WritableRef(stdio.err.get())));
+        module.addExport("stdin", Next::ReadableClass::createInstance(this->_context, new Next::ReadableRef(stdio.in.get())));
     }
 };
