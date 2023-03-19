@@ -232,8 +232,7 @@ public:
     template<typename Id>
     void defineProperty(Id id, ValueWrapper<true> value, int flags = JS_PROP_C_W_E) {
         Atom atom = Atom::create(_ctx, id);
-        auto [_, v] = value.loot();
-        JS_DefinePropertyValue(_ctx, _val, atom.get(), v, flags);
+        JS_DefinePropertyValue(_ctx, _val, atom.get(), value.loot().second, flags);
     }
 
     template<typename Id>
