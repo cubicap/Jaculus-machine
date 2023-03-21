@@ -26,6 +26,18 @@ class JSModule {
 public:
     // JSModule() = default;
     JSModule(ContextRef ctx, std::string name);
+    JSModule& operator=(const JSModule&) = delete;
+    JSModule(const JSModule&) = delete;
+    JSModule& operator=(JSModule&& other) {
+        _ctx = other._ctx;
+        _def = other._def;
+        exports = std::move(other.exports);
+        other._def = nullptr;
+        return *this;
+    }
+    JSModule(JSModule&& other): _ctx(other._ctx), _def(other._def), exports(std::move(other.exports)) {
+        other._def = nullptr;
+    }
 
     void addExport(std::string name, Value val);
 

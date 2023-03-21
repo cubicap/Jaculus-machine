@@ -42,9 +42,10 @@ void MachineBase::registerGlobal(std::string name, Value value) {
 
 JSModule& MachineBase::newModule(std::string name) {
     JSModule module(_context, name);
-    _modules.emplace(module.get(), std::move(module));
+    JSModuleDef* def = module.get();
+    _modules.emplace(def, std::move(module));
 
-    return _modules.find(module.get())->second;
+    return _modules.find(def)->second;
 }
 
 JSModule& MachineBase::findModule(JSModuleDef* m) {
