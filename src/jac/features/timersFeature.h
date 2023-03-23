@@ -9,6 +9,17 @@
 #include <thread>
 
 
+template<>
+struct jac::ConvTraits<std::chrono::milliseconds> {
+    static std::chrono::milliseconds from(ContextRef ctx, ValueConst value) {
+        return std::chrono::milliseconds(value.to<int>());
+    }
+
+    static Value to(ContextRef ctx, std::chrono::milliseconds value) {
+        return Value::from(ctx, static_cast<int>(value.count()));
+    }
+};
+
 template<class Next>
 class TimersFeature : public Next {
 private:
@@ -18,11 +29,13 @@ private:
         std::chrono::milliseconds _duration;
         bool _isRepeating = false;
         std::function<void()> _callback;
+        int _id;
     public:
-        Timer(std::chrono::milliseconds duration, std::function<void()> callback, bool isRepeating = false):
+        Timer(std::function<void()> callback, std::chrono::milliseconds duration, int id, bool isRepeating = false):
             _duration(duration),
             _isRepeating(isRepeating),
-            _callback(callback)
+            _callback(callback),
+            _id(id)
         {
             _startTime = std::chrono::steady_clock::now();
         }
@@ -48,6 +61,10 @@ private:
         bool isRepeating() const {
             return _isRepeating;
         }
+
+        int getId() const {
+            return _id;
+        }
     };
 
     std::priority_queue<Timer> _timers;
@@ -56,11 +73,41 @@ private:
     std::thread _timerThread;
     bool _stop = false;
 
-public:
-    void createTimer(std::chrono::milliseconds millis, std::function<void()> func, bool isRepeating) {
+    int nextId = 1;
+
+    int createTimer(std::function<void()> func, std::chrono::milliseconds millis, bool isRepeating) {
         std::lock_guard<std::mutex> lock(_timersMutex);
-        _timers.emplace(millis, func, isRepeating);
+        _timers.emplace(func, millis, nextId++, isRepeating);
         _timersCondition.notify_one();
+        return nextId - 1;
+    }
+
+    void clearTimer(int id) {
+        std::lock_guard<std::mutex> lock(_timersMutex);
+        std::priority_queue<Timer> newTimers;
+        while (!_timers.empty()) {
+            auto timer = _timers.top();
+            _timers.pop();
+            if (timer.getId() != id) {
+                newTimers.push(timer);
+            }
+        }
+    }
+public:
+    int setInterval(std::function<void()> func, std::chrono::milliseconds millis) {
+        return createTimer(func, millis, true);
+    }
+
+    int setTimeout(std::function<void()> func, std::chrono::milliseconds millis) {
+        return createTimer(func, millis, false);
+    }
+
+    void clearInterval(int id) {
+        clearTimer(id);
+    }
+
+    void clearTimeout(int id) {
+        clearTimer(id);
     }
 
     void initialize() {
@@ -98,17 +145,31 @@ public:
 
         jac::FunctionFactory ff(this->_context);
 
-        this->registerGlobal("createTimer", ff.newFunction([this](int millis, jac::Function func, bool isRepeating) {
-            this->createTimer(std::chrono::milliseconds(millis), [func]() {
-                const_cast<jac::Function&>(func).call<void>();
-            }, isRepeating);
+        this->registerGlobal("setInterval", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
+            return setInterval([func]() mutable {
+                func.call<void>();
+            }, millis);
+        }));
+
+        this->registerGlobal("setTimeout", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
+            return setTimeout([func]() mutable {
+                func.call<void>();
+            }, millis);
+        }));
+
+        this->registerGlobal("clearInterval", ff.newFunction([this](int id) {
+            clearInterval(id);
+        }));
+
+        this->registerGlobal("clearTimeout", ff.newFunction([this](int id) {
+            clearTimeout(id);
         }));
 
         this->registerGlobal("sleep", ff.newFunction([this](int millis) {
             auto [promise, resolve, _] = jac::Promise::create(this->_context);
-            this->createTimer(std::chrono::milliseconds(millis), [resolve]() {
+            createTimer([resolve]() {
                 const_cast<jac::Function&>(resolve).call<void>();
-            }, false);
+            }, std::chrono::milliseconds(millis), false);
             return promise;
         }));
     }

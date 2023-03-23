@@ -18,10 +18,10 @@ using Machine =
     YieldFeature<
     EventLoopFeature<
     EventQueueFeature<
-    StdioFeature<
-    BasicStreamFeature<
     ModuleLoaderFeature<
     FilesystemFeature<
+    StdioFeature<
+    BasicStreamFeature<
     jac::MachineBase
 >>>>>>>>>;
 
