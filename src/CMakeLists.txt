@@ -12,7 +12,7 @@ if(NOT ESP_PLATFORM)
     FetchContent_Declare(
         QuickJS
         GIT_REPOSITORY https://github.com/cubicap/quickjs.git
-        GIT_TAG        342cb23d1b72198c35b0409ccae0428b7ec2b859
+        GIT_TAG        669afd182b5707eb8b70104bc942309506033697
     )
 
     FetchContent_MakeAvailable(QuickJS)
