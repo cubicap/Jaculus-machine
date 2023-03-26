@@ -7,6 +7,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <unordered_map>
 
 
 template<>
@@ -27,15 +28,17 @@ private:
     private:
         std::chrono::time_point<std::chrono::steady_clock> _startTime;
         std::chrono::milliseconds _duration;
-        bool _isRepeating = false;
         std::function<void()> _callback;
         int _id;
+        bool _isRepeating = false;
+        bool cancelled = false;
+
     public:
         Timer(std::function<void()> callback, std::chrono::milliseconds duration, int id, bool isRepeating = false):
             _duration(duration),
-            _isRepeating(isRepeating),
             _callback(callback),
-            _id(id)
+            _id(id),
+            _isRepeating(isRepeating)
         {
             _startTime = std::chrono::steady_clock::now();
         }
@@ -46,7 +49,7 @@ private:
 
         void update() {
             if (_isRepeating) {
-                _startTime = getEndTime();
+                _startTime = std::chrono::steady_clock::now();
             }
         }
 
@@ -62,12 +65,28 @@ private:
             return _isRepeating;
         }
 
+        bool isCancelled() const {
+            return cancelled;
+        }
+
         int getId() const {
             return _id;
         }
+
+        void cancel() {
+            cancelled = true;
+        }
     };
 
-    std::priority_queue<Timer> _timers;
+    class CompareTimer {
+    public:
+        bool operator()(const std::shared_ptr<Timer>& a, const std::shared_ptr<Timer>& b) const {
+            return *a < *b;
+        }
+    };
+
+    std::priority_queue<std::shared_ptr<Timer>, std::vector<std::shared_ptr<Timer>>, CompareTimer> _timers;
+    std::unordered_map<int, std::shared_ptr<Timer>> _timersById;
     std::mutex _timersMutex;
     std::condition_variable _timersCondition;
     std::thread _timerThread;
@@ -77,20 +96,19 @@ private:
 
     int createTimer(std::function<void()> func, std::chrono::milliseconds millis, bool isRepeating) {
         std::lock_guard<std::mutex> lock(_timersMutex);
-        _timers.emplace(func, millis, nextId++, isRepeating);
+        auto timer = std::make_shared<Timer>(func, millis, nextId++, isRepeating);
+        _timers.emplace(timer);
+        _timersById[nextId - 1] = std::move(timer);
+
         _timersCondition.notify_one();
         return nextId - 1;
     }
 
     void clearTimer(int id) {
         std::lock_guard<std::mutex> lock(_timersMutex);
-        std::priority_queue<Timer> newTimers;
-        while (!_timers.empty()) {
-            auto timer = _timers.top();
-            _timers.pop();
-            if (timer.getId() != id) {
-                newTimers.push(timer);
-            }
+        auto it = _timersById.find(id);
+        if (it != _timersById.end()) {
+            it->second->cancel();
         }
     }
 public:
@@ -125,21 +143,32 @@ public:
                 }
 
                 auto timer = _timers.top();
-                if (timer.getEndTime() > std::chrono::steady_clock::now()) {
-                    _timersCondition.wait_until(lock, timer.getEndTime());
+
+                if (timer->getEndTime() > std::chrono::steady_clock::now()) {
+                    _timersCondition.wait_until(lock, timer->getEndTime());
                     continue;
                 }
 
                 _timers.pop();
 
-                if (timer.isRepeating()) {
-                    timer.update();
-                    _timers.push(timer);
-                }
-                auto callback = timer.getCallback();
                 lock.unlock();
 
-                this->scheduleEvent(callback);
+                if (timer->isCancelled()) {
+                    continue;
+                }
+
+                this->scheduleEvent([timer, this]() mutable {
+                    if (timer->isCancelled()) {
+                        return;
+                    }
+                    timer->getCallback()();
+
+                    if (timer->isRepeating()) {
+                        timer->update();
+                        _timers.push(timer);
+                        _timersCondition.notify_one();
+                    }
+                });
             }
         });
 
