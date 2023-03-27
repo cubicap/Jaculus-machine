@@ -18,15 +18,15 @@ constexpr bool static_false() {
 template<bool managed>
 class AtomWrapper {
 protected:
-    JSAtom _atom;
     ContextRef _ctx;
+    JSAtom _atom;
 public:
-    AtomWrapper(ContextRef ctx, JSAtom atom) : _atom(atom), _ctx(ctx) {}
+    AtomWrapper(ContextRef ctx, JSAtom atom) : _ctx(ctx), _atom(atom) {}
     AtomWrapper(const AtomWrapper &other):
-        _atom(managed ? JS_DupAtom(_ctx, other._atom) : other._atom),
-        _ctx(other._ctx)
+        _ctx(other._ctx),
+        _atom(managed ? JS_DupAtom(_ctx, other._atom) : other._atom)
     {}
-    AtomWrapper(AtomWrapper &&other) : _atom(other._atom), _ctx(other._ctx) {
+    AtomWrapper(AtomWrapper &&other) : _ctx(other._ctx), _atom(other._atom) {
         other._atom = JS_ATOM_NULL;
         other._ctx = nullptr;
     }
