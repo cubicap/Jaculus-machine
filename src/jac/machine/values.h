@@ -27,21 +27,21 @@ Value toValue(ContextRef ctx, T val);
 template<bool managed>
 class ValueWrapper {
 protected:
-    JSValue _val;
     ContextRef _ctx;
+    JSValue _val;
 public:
-    ValueWrapper(ContextRef ctx, JSValue val) : _val(val), _ctx(ctx) {
+    ValueWrapper(ContextRef ctx, JSValue val) : _ctx(ctx), _val(val) {
         if (JS_IsException(_val)) {
             throw ctx.getException(*this);
         }
     }
     ValueWrapper(const ValueWrapper &other):
-        _val(managed ? JS_DupValue(other._ctx, other._val) : other._val),
-        _ctx(other._ctx)
+        _ctx(other._ctx),
+        _val(managed ? JS_DupValue(_ctx, other._val) : other._val)
     {}
-    ValueWrapper(ValueWrapper &&other) : _val(other._val), _ctx(other._ctx) {
-        other._val = JS_UNDEFINED;
+    ValueWrapper(ValueWrapper &&other) : _ctx(other._ctx), _val(other._val) {
         other._ctx = nullptr;
+        other._val = JS_UNDEFINED;
     }
 
     ValueWrapper& operator=(const ValueWrapper &other) {
@@ -205,29 +205,48 @@ public:
     ObjectWrapper(ContextRef ctx, JSValue val) : ObjectWrapper(ValueWrapper<managed>(ctx, val)) {}
 
     template<typename T = ValueWrapper<true>>
-    T get(std::string name) {
-        ValueWrapper<true> val(_ctx, JS_GetPropertyStr(_ctx, _val, name.c_str()));
+    T get(Atom prop) {
+        ValueWrapper<true> val(_ctx, JS_GetProperty(_ctx, _val, prop.get()));
         return val.to<T>();
     }
 
     template<typename T = ValueWrapper<true>>
+    T get(const std::string& name) {
+        return get<T>(Atom::create(_ctx, name.c_str()));
+    }
+
+    template<typename T = ValueWrapper<true>>
     T get(uint32_t idx) {
-        ValueWrapper<true> val(_ctx, JS_GetPropertyUint32(_ctx, _val, idx));
-        return val.to<T>();
+        return get<T>(Atom::create(_ctx, idx));
     }
 
     template<typename T>
-    void set(std::string name, T val) {
-        JS_SetPropertyStr(_ctx, _val, name.c_str(), toValue(_ctx, val).loot().second);
+    void set(Atom prop, T val) {
+        JS_SetProperty(_ctx, _val, prop.get(), toValue(_ctx, val).loot().second);
+    }
+
+    template<typename T>
+    void set(const std::string& name, T val) {
+        set(Atom::create(_ctx, name.c_str()), val);
     }
 
     template<typename T>
     void set(uint32_t idx, T val) {
-        JS_SetPropertyUint32(_ctx, _val, idx, toValue(_ctx, val).loot().second);
+        set(Atom::create(_ctx, idx), val);
     }
 
     template<typename Res, typename... Args>
-    Res invoke(std::string key, Args... args);
+    Res invoke(Atom prop, Args... args);
+
+    template<typename Res, typename... Args>
+    Res invoke(const std::string& key, Args... args) {
+        return invoke<Res>(Atom::create(_ctx, key.c_str()), args...);
+    }
+
+    template<typename Res, typename... Args>
+    Res invoke(uint32_t idx, Args... args) {
+        return invoke<Res>(Atom::create(_ctx, idx), args...);
+    }
 
     template<typename Id>
     void defineProperty(Id id, ValueWrapper<true> value, int flags = JS_PROP_C_W_E) {
@@ -373,7 +392,7 @@ public:
 
 template<bool managed>
 template<typename Res, typename... Args>
-Res ObjectWrapper<managed>::invoke(std::string key, Args... args) {
+Res ObjectWrapper<managed>::invoke(Atom key, Args... args) {
     return get<FunctionWrapper<true>>(key).template callThis<Res>(*this, args...);
 };
 
