@@ -411,7 +411,7 @@ std::string ExceptionWrapper<managed>::stackTrace() noexcept {
 template<bool managed>
 JSValue ExceptionWrapper<managed>::throwJS() {
     if (!_ctx) {
-        throw std::runtime_error("no value");
+        throw std::runtime_error("no value to throw");
     }
 
     if (_type == Type::Any) {
