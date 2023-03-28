@@ -15,38 +15,33 @@ constexpr bool static_false() {
 };
 
 
-template<bool managed>
-class AtomWrapper {
+class Atom {
 protected:
     ContextRef _ctx;
     JSAtom _atom;
 public:
-    AtomWrapper(ContextRef ctx, JSAtom atom) : _ctx(ctx), _atom(atom) {}
-    AtomWrapper(const AtomWrapper &other):
+    Atom(ContextRef ctx, JSAtom atom) : _ctx(ctx), _atom(atom) {}
+    Atom(const Atom &other):
         _ctx(other._ctx),
-        _atom(managed ? JS_DupAtom(_ctx, other._atom) : other._atom)
+        _atom(JS_DupAtom(_ctx, other._atom))
     {}
-    AtomWrapper(AtomWrapper &&other) : _ctx(other._ctx), _atom(other._atom) {
+    Atom(Atom &&other) : _ctx(other._ctx), _atom(other._atom) {
         other._atom = JS_ATOM_NULL;
         other._ctx = nullptr;
     }
 
-    AtomWrapper& operator=(const AtomWrapper &other) {
-        if (managed) {
-            if (_ctx) {
-                JS_FreeAtom(_ctx, _atom);
-            }
-            _atom = JS_DupAtom(_ctx, other._atom);
+    Atom& operator=(const Atom &other) {
+        if (_ctx) {
+            JS_FreeAtom(_ctx, _atom);
         }
-        else {
-            _atom = other._atom;
-        }
+        _atom = JS_DupAtom(_ctx, other._atom);
         _ctx = other._ctx;
+
         return *this;
     }
 
-    AtomWrapper& operator=(AtomWrapper &&other) {
-        if (managed && _ctx) {
+    Atom& operator=(Atom &&other) {
+        if (_ctx) {
             JS_FreeAtom(_ctx, _atom);
         }
         _atom = other._atom;
@@ -56,12 +51,8 @@ public:
         return *this;
     }
 
-    operator AtomWrapper<false>() const {
-        return AtomWrapper<false>(_ctx, _atom);
-    }
-
-    ~AtomWrapper() {
-        if (managed && _ctx) {
+    ~Atom() {
+        if (_ctx) {
             JS_FreeAtom(_ctx, _atom);
         }
     }
@@ -86,27 +77,23 @@ public:
         return &_atom;
     }
 
-    static AtomWrapper<true> create(ContextRef ctx, uint32_t value) {
-        return AtomWrapper<true>(ctx, JS_NewAtomUInt32(ctx, value));
+    static Atom create(ContextRef ctx, uint32_t value) {
+        return Atom(ctx, JS_NewAtomUInt32(ctx, value));
     }
 
-    static AtomWrapper<true> create(ContextRef ctx, const char* value) {
-        return AtomWrapper<true>(ctx, JS_NewAtom(ctx, value));
+    static Atom create(ContextRef ctx, const char* value) {
+        return Atom(ctx, JS_NewAtom(ctx, value));
     }
 
-    static AtomWrapper<true> create(ContextRef ctx, std::string value) {
+    static Atom create(ContextRef ctx, std::string value) {
         return create(ctx, value.c_str());
     }
 
-    friend std::ostream& operator<<(std::ostream& os, AtomWrapper& val) {
+    friend std::ostream& operator<<(std::ostream& os, Atom& val) {
         os << val.toString();
         return os;
     }
 };
-
-
-using Atom = AtomWrapper<true>;
-using AtomConst = AtomWrapper<false>;
 
 
 }  // namespace jac
