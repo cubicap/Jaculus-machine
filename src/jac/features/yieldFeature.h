@@ -22,10 +22,10 @@ private:
         auto it = funcs.begin();
         while (it != funcs.end()) {
             auto& func = *it;
-            auto next = func.get<jac::ValueConst>("next");
-            auto result = next.to<jac::FunctionConst>().callThis<jac::Value>(func);
+            auto next = func.get<jac::ValueWeak>("next");
+            auto result = next.to<jac::FunctionWeak>().callThis<jac::Value>(func);
 
-            auto obj = result.to<jac::ObjectConst>();
+            auto obj = result.to<jac::ObjectWeak>();
             if (obj.get<bool>("done")) {
                 it = funcs.erase(it);
             } else {
@@ -38,7 +38,7 @@ private:
         });
     }
 
-    jac::Promise runParalel(std::vector<jac::ValueConst> args) {
+    jac::Promise runParalel(std::vector<jac::ValueWeak> args) {
         std::vector<jac::Object> funcs;
         for (auto& arg : args) {
             funcs.emplace_back(arg.to<jac::Object>());

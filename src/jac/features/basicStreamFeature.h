@@ -19,7 +19,7 @@ public:
             print(str + "\n");
         }
 
-        virtual void print(std::vector<jac::ValueConst> args) {
+        virtual void print(std::vector<jac::ValueWeak> args) {
             for (auto val : args) {
                 try {
                     print(val.to<std::string>() + " ");
@@ -30,7 +30,7 @@ public:
             }
         }
 
-        virtual void println(std::vector<jac::ValueConst> args) {
+        virtual void println(std::vector<jac::ValueWeak> args) {
             print(args);
             print("\n");
         }
@@ -40,8 +40,8 @@ public:
 
     struct WritableProtoBuilder : public jac::ProtoBuilder::Opaque<Writable>, public jac::ProtoBuilder::Properties {
         static void addProperties(jac::ContextRef ctx, jac::Object proto) {
-            addMethodMemberVariadic<void(Writable::*)(std::vector<jac::ValueConst>), &Writable::print>(ctx, proto, "print");
-            addMethodMemberVariadic<void(Writable::*)(std::vector<jac::ValueConst>), &Writable::println>(ctx, proto, "println");
+            addMethodMemberVariadic<void(Writable::*)(std::vector<jac::ValueWeak>), &Writable::print>(ctx, proto, "print");
+            addMethodMemberVariadic<void(Writable::*)(std::vector<jac::ValueWeak>), &Writable::println>(ctx, proto, "println");
         }
     };
 
@@ -72,7 +72,7 @@ public:
             _ptr->println(str);
         }
 
-        void print(std::vector<jac::ValueConst> args) override {
+        void print(std::vector<jac::ValueWeak> args) override {
             for (auto val : args) {
                 try {
                     _ptr->print(val.to<std::string>() + " ");
@@ -83,7 +83,7 @@ public:
             }
         }
 
-        void println(std::vector<jac::ValueConst> args) override {
+        void println(std::vector<jac::ValueWeak> args) override {
             _ptr->print(args);
             _ptr->print("\n");
         }

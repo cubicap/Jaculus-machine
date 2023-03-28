@@ -4,7 +4,7 @@
 namespace jac {
 
 
-Exception ContextRef::getException(ValueConst val) {
+Exception ContextRef::getException(ValueWeak val) {
     try {
         return Exception(_ctx, JS_GetException(_ctx));
     }

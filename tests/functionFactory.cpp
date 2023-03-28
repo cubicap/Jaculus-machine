@@ -81,17 +81,17 @@ TEST_CASE("New function variadic", "[functionFactory]") {
     jac::FunctionFactory ff(machine._context);
 
     SECTION("void(args)") {
-        auto f = ff.newFunctionVariadic([](std::vector<jac::ValueConst> args) {});
+        auto f = ff.newFunctionVariadic([](std::vector<jac::ValueWeak> args) {});
         REQUIRE_NOTHROW(f.call<void>());
     }
 
     SECTION("int(args) - count") {
-        auto f = ff.newFunctionVariadic([](std::vector<jac::ValueConst> args) { return static_cast<int>(args.size()); });
+        auto f = ff.newFunctionVariadic([](std::vector<jac::ValueWeak> args) { return static_cast<int>(args.size()); });
         REQUIRE(f.call<int>(1, 2, 3) == 3);
     }
 
     SECTION("int(args) - values") {
-        auto f = ff.newFunctionVariadic([](std::vector<jac::ValueConst> args) {
+        auto f = ff.newFunctionVariadic([](std::vector<jac::ValueWeak> args) {
             int sum = 0;
             for (auto& arg : args) {
                 sum += arg.to<int>();
@@ -115,7 +115,7 @@ TEST_CASE("New function this", "[functionFactory]") {
     jac::FunctionFactory ff(machine._context);
 
     SECTION("void(void)") {
-        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueConst thisValue) {
+        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue) {
             thisValue.to<jac::Object>().set("test", jac::Value::from(ctx, 42));
         });
         auto obj = jac::Object::create(machine._context);
@@ -125,7 +125,7 @@ TEST_CASE("New function this", "[functionFactory]") {
     }
 
     SECTION("int(void)") {
-        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueConst thisValue) {
+        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue) {
             return thisValue.to<jac::Object>().get<int>("test");
         });
         auto obj = jac::Object::create(machine._context);
@@ -135,7 +135,7 @@ TEST_CASE("New function this", "[functionFactory]") {
     }
 
     SECTION("int(int)") {
-        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueConst thisValue, int a) {
+        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue, int a) {
             auto obj = thisValue.to<jac::Object>();
             obj.set("test", obj.get<int>("test") + a);
             return obj.get<int>("test");
@@ -148,7 +148,7 @@ TEST_CASE("New function this", "[functionFactory]") {
     }
 
     SECTION("int(int, int)") {
-        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueConst thisValue, int a, int b) {
+        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue, int a, int b) {
             auto obj = thisValue.to<jac::Object>();
             obj.set("test", (obj.get<int>("test") + a) * b);
             return obj.get<int>("test") * 10;
@@ -174,7 +174,7 @@ TEST_CASE("New function this variadic", "[functionFactory]") {
     jac::FunctionFactory ff(machine._context);
 
     SECTION("void(args)") {
-        auto f = ff.newFunctionThisVariadic([](jac::ContextRef ctx, jac::ValueConst thisValue, std::vector<jac::ValueConst> argv) {
+        auto f = ff.newFunctionThisVariadic([](jac::ContextRef ctx, jac::ValueWeak thisValue, std::vector<jac::ValueWeak> argv) {
             auto obj = thisValue.to<jac::Object>();
             obj.set("test", jac::Value::from(ctx, static_cast<int>(argv.size())));
         });
@@ -185,7 +185,7 @@ TEST_CASE("New function this variadic", "[functionFactory]") {
     }
 
     SECTION("string(args)") {
-        auto f = ff.newFunctionThisVariadic([](jac::ContextRef ctx, jac::ValueConst thisValue, std::vector<jac::ValueConst> argv) {
+        auto f = ff.newFunctionThisVariadic([](jac::ContextRef ctx, jac::ValueWeak thisValue, std::vector<jac::ValueWeak> argv) {
             auto obj = thisValue.to<jac::Object>();
             std::string result = obj.get<std::string>("prefix");
             for (auto& arg : argv) {

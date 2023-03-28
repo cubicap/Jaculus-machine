@@ -23,13 +23,13 @@ class FunctionFactory {
     inline Function newFunctionHelper(Func& func, std::function<Res(Args...)>);
 
     template<typename Func, typename Res>
-    inline Function newFunctionVariadicHelper(Func& func, std::function<Res(std::vector<ValueConst>)>);
+    inline Function newFunctionVariadicHelper(Func& func, std::function<Res(std::vector<ValueWeak>)>);
 
     template<typename Func, typename Res, typename... Args>
-    inline Function newFunctionThisHelper(Func& func, std::function<Res(ContextRef, ValueConst, Args...)>);
+    inline Function newFunctionThisHelper(Func& func, std::function<Res(ContextRef, ValueWeak, Args...)>);
 
     template<typename Func, typename Res>
-    inline Function newFunctionThisVariadicHelper(Func& func, std::function<Res(ContextRef, ValueConst, std::vector<ValueConst>)>);
+    inline Function newFunctionThisVariadicHelper(Func& func, std::function<Res(ContextRef, ValueWeak, std::vector<ValueWeak>)>);
 public:
     FunctionFactory(ContextRef context) : _context(context) {}
 
@@ -54,7 +54,7 @@ public:
      * @brief Wraps a C++ function into a javascript function object
      *
      * The expected signature of the function object is
-     * Res(std::vector<ValueConst>). The vector will contain all
+     * Res(std::vector<ValueWeak>). The vector will contain all
      * arguments passed to the function. The return value of the
      * function is automatically converted from a javascript value.
      * Exceptions thrown within the function are automatically
@@ -86,7 +86,7 @@ inline Function FunctionFactory::newFunctionHelper(Func& func, std::function<Res
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueConst func_obj, ValueConst this_val, std::vector<ValueConst> args) {
+        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
             Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
             return processCall<Func, Res, Args...>(ctx, this_val, args, *ptr);
         }
@@ -99,11 +99,11 @@ inline Function FunctionFactory::newFunctionHelper(Func& func, std::function<Res
 }
 
 template<class Func, typename Res>
-Function FunctionFactory::newFunctionVariadicHelper(Func& func, std::function<Res(std::vector<ValueConst>)>) {
+Function FunctionFactory::newFunctionVariadicHelper(Func& func, std::function<Res(std::vector<ValueWeak>)>) {
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueConst func_obj, ValueConst this_val, std::vector<ValueConst> args) {
+        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
             Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
             return processCallVariadic<Func, Res>(ctx, this_val, args, *ptr);
         }
@@ -116,11 +116,11 @@ Function FunctionFactory::newFunctionVariadicHelper(Func& func, std::function<Re
 }
 
 template<typename Func, typename Res, typename... Args>
-Function FunctionFactory::newFunctionThisHelper(Func& func, std::function<Res(ContextRef, ValueConst, Args...)>) {
+Function FunctionFactory::newFunctionThisHelper(Func& func, std::function<Res(ContextRef, ValueWeak, Args...)>) {
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueConst func_obj, ValueConst this_val, std::vector<ValueConst> args) {
+        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
             Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
             return processCallThis<Func, Res, Args...>(ctx, this_val, args, *ptr);
         }
@@ -133,11 +133,11 @@ Function FunctionFactory::newFunctionThisHelper(Func& func, std::function<Res(Co
 }
 
 template<typename Func, typename Res>
-Function FunctionFactory::newFunctionThisVariadicHelper(Func& func, std::function<Res(ContextRef, ValueConst, std::vector<ValueConst>)>) {
+Function FunctionFactory::newFunctionThisVariadicHelper(Func& func, std::function<Res(ContextRef, ValueWeak, std::vector<ValueWeak>)>) {
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueConst func_obj, ValueConst this_val, std::vector<ValueConst> args) {
+        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
             Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
             return processCallThisVariadic<Func, Res>(ctx, this_val, args, *ptr);
         }

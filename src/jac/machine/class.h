@@ -70,7 +70,7 @@ namespace ProtoBuilder {
         using OpaqueType = T;
         static inline JSClassID classId;
 
-        static T* constructOpaque(ContextRef ctx, std::vector<ValueConst> args) {
+        static T* constructOpaque(ContextRef ctx, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be instantiated");
         }
 
@@ -79,7 +79,7 @@ namespace ProtoBuilder {
         }
 
 
-        static T* getOpaque(ContextRef ctx, ValueConst this_val) {
+        static T* getOpaque(ContextRef ctx, ValueWeak this_val) {
             T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val.getVal(), classId));
             if (!ptr) {
                 throw Exception::create(ctx, Exception::Type::TypeError, "Invalid opaque data");
@@ -88,7 +88,7 @@ namespace ProtoBuilder {
         }
 
         template<typename Sgn, Sgn member>
-        static Value callMember(ContextRef ctx, ValueConst func_obj, ValueConst this_val, std::vector<ValueConst> argv) {
+        static Value callMember(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> argv) {
             const SgnUnwrap Unwrap_(member);
 
             return [&]<typename Res, typename... Args>(SgnUnwrap<Res(Args...)>) {
@@ -113,7 +113,7 @@ namespace ProtoBuilder {
             };
             SetRaw set = [](JSContext* ctx_, JSValueConst this_val, JSValueConst val) -> JSValue {
                 T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val, classId));
-                ptr->*member = ValueConst(ctx_, val).to<U>();
+                ptr->*member = ValueWeak(ctx_, val).to<U>();
                 return JS_UNDEFINED;
             };
 
@@ -160,7 +160,7 @@ namespace ProtoBuilder {
                 MethodRaw func = [](JSContext* ctx_, JSValueConst this_val, int argc, JSValueConst* argv) -> JSValue {
                     T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val, classId));
 
-                    auto f = [ptr](std::vector<ValueConst> args) -> Res {
+                    auto f = [ptr](std::vector<ValueWeak> args) -> Res {
                         return (ptr->*member)(args);
                     };
 
@@ -182,11 +182,11 @@ namespace ProtoBuilder {
             return false;
         }
 
-        static Value callFunction(ContextRef ctx, ValueConst func_obj, ValueConst this_val, std::vector<ValueConst> args) {
+        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a function");
         }
 
-        static Value callConstructor(ContextRef ctx, ValueConst func_obj, ValueConst target, std::vector<ValueConst> args) {
+        static Value callConstructor(ContextRef ctx, ValueWeak func_obj, ValueWeak target, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a constructor");
         }
     };
@@ -226,9 +226,9 @@ class Class {
             }
 
             if constexpr (is_base_of_template_v<ProtoBuilder::Opaque, Builder>) {
-                std::vector<ValueConst> args;
+                std::vector<ValueWeak> args;
                 for (int i = 0; i < argc; i++) {
-                    args.push_back(ValueConst(ctx, argv[i]));
+                    args.push_back(ValueWeak(ctx, argv[i]));
                 }
                 auto instance = Builder::constructOpaque(ctx, args);
                 JS_SetOpaque(obj.getVal(), instance);
@@ -264,17 +264,17 @@ public:
 
         if constexpr (std::is_base_of_v<ProtoBuilder::Callable, Builder>) {
             call = [](JSContext* ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst* argv, int flags) noexcept -> JSValue {
-                std::vector<ValueConst> args;
+                std::vector<ValueWeak> args;
                 args.reserve(argc);
                 for (int i = 0; i < argc; i++) {
-                    args.push_back(ValueConst(ctx, argv[i]));
+                    args.push_back(ValueWeak(ctx, argv[i]));
                 }
 
                 return propagateExceptions(ctx, [&]() -> JSValue {
                     if (flags & JS_CALL_FLAG_CONSTRUCTOR) {
-                        return Builder::callConstructor(ctx, ValueConst(ctx, func_obj), ValueConst(ctx, this_val), args).loot().second;
+                        return Builder::callConstructor(ctx, ValueWeak(ctx, func_obj), ValueWeak(ctx, this_val), args).loot().second;
                     } else {
-                        return Builder::callFunction(ctx, ValueConst(ctx, func_obj), ValueConst(ctx, this_val), args).loot().second;
+                        return Builder::callFunction(ctx, ValueWeak(ctx, func_obj), ValueWeak(ctx, this_val), args).loot().second;
                     }
 
                     return JS_UNDEFINED;

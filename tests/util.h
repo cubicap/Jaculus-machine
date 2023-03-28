@@ -21,7 +21,7 @@ public:
         Next::initialize();
         jac::FunctionFactory ff(this->_context);
 
-        this->registerGlobal("report", ff.newFunction([this](jac::ValueConst val) {
+        this->registerGlobal("report", ff.newFunction([this](jac::ValueWeak val) {
             this->report(val.to<std::string>());
         }));
     }

@@ -42,7 +42,7 @@ inline JSValue processCallRaw(ContextRef ctx, JSValueConst this_val, int argc, J
 }
 
 template<typename Func, typename Res, typename... Args>
-inline Value processCall(ContextRef ctx, ValueConst this_val, std::vector<ValueConst> argv, Func& f) {
+inline Value processCall(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
     std::tuple<Args...> args = convertArgs<Args...>(ctx, argv, std::make_index_sequence<sizeof...(Args)>());
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -56,9 +56,9 @@ inline Value processCall(ContextRef ctx, ValueConst this_val, std::vector<ValueC
 
 template<typename Func, typename Res>
 inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst this_val, int argc, JSValueConst* argv, Func& f) {
-    std::vector<ValueConst> args;
+    std::vector<ValueWeak> args;
     for (int i = 0; i < argc; i++) {
-        args.push_back(ValueConst(ctx, argv[i]));
+        args.push_back(ValueWeak(ctx, argv[i]));
     }
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -71,7 +71,7 @@ inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst this_val, int
 }
 
 template<typename Func, typename Res>
-inline Value processCallVariadic(ContextRef ctx, ValueConst this_val, std::vector<ValueConst> argv, Func& f) {
+inline Value processCallVariadic(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
     if constexpr (std::is_same_v<Res, void>) {
         f(argv);
         return Value::undefined(ctx);
@@ -82,7 +82,7 @@ inline Value processCallVariadic(ContextRef ctx, ValueConst this_val, std::vecto
 }
 
 template<typename Func, typename Res, typename... Args>
-inline Value processCallThis(ContextRef ctx, ValueConst this_val, std::vector<ValueConst> argv, Func& f) {
+inline Value processCallThis(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
     std::tuple<Args...> args = convertArgs<Args...>(ctx, argv, std::make_index_sequence<sizeof...(Args)>());
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -95,7 +95,7 @@ inline Value processCallThis(ContextRef ctx, ValueConst this_val, std::vector<Va
 }
 
 template<typename Func, typename Res>
-inline Value processCallThisVariadic(ContextRef ctx, ValueConst this_val, std::vector<ValueConst> argv, Func& f) {
+inline Value processCallThisVariadic(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
 
     if constexpr (std::is_same_v<Res, void>) {
         f(ctx, this_val, argv);
@@ -107,7 +107,7 @@ inline Value processCallThisVariadic(ContextRef ctx, ValueConst this_val, std::v
 }
 
 template<typename... Args, std::size_t... Is>
-constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, std::vector<ValueConst> argv, std::index_sequence<Is...>) {
+constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, std::vector<ValueWeak> argv, std::index_sequence<Is...>) {
     if (argv.size() != sizeof...(Args)) {
         throw Exception::create(ctx, Exception::Type::TypeError, "invalid number of arguments");
     }
@@ -121,7 +121,7 @@ constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, JSValu
         throw Exception::create(ctx, Exception::Type::TypeError, "invalid number of arguments");
     }
 
-    return std::make_tuple(ValueConst(ctx, argv[Is]).to<Args>()...);
+    return std::make_tuple(ValueWeak(ctx, argv[Is]).to<Args>()...);
 }
 
 

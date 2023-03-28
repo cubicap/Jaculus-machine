@@ -16,7 +16,7 @@ public:
 
     JSContext* get() { return _ctx; }
 
-    Exception getException(ValueConst val);
+    Exception getException(ValueWeak val);
 
     // TODO: remove implicit conversions?
     operator JSContext*() { return _ctx; }

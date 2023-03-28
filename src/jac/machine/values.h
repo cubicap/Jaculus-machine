@@ -18,7 +18,7 @@ namespace jac {
 
 
 template<typename T>
-T fromValue(ContextRef ctx, ValueConst val);
+T fromValue(ContextRef ctx, ValueWeak val);
 
 template<typename T>
 Value toValue(ContextRef ctx, T val);
@@ -69,8 +69,8 @@ public:
         return *this;
     }
 
-    operator ValueWrapper<false>() {
-        return ValueWrapper<false>(_ctx, _val);
+    operator ValueWeak() {
+        return ValueWeak(_ctx, _val);
     }
 
     ~ValueWrapper() {
@@ -120,18 +120,18 @@ public:
         return fromValue<T>(_ctx, *this);
     }
 
-    ValueWrapper<true> stringify(int indent = 0) {
+    Value stringify(int indent = 0) {
         auto idt = Value::from(_ctx, indent);
-        return ValueWrapper(_ctx, JS_JSONStringify(_ctx, _val, JS_UNDEFINED, idt.getVal()));
+        return Value(_ctx, JS_JSONStringify(_ctx, _val, JS_UNDEFINED, idt.getVal()));
     }
 
     template<typename T>
-    static ValueWrapper<true> from(ContextRef ctx, T val) {
+    static Value from(ContextRef ctx, T val) {
         return toValue(ctx, val);
     }
 
-    static ValueWrapper<true> fromJSON(ContextRef ctx, std::string json, std::string filename = "<json>", bool extended = false) {
-        return ValueWrapper(ctx, JS_ParseJSON2(ctx, json.c_str(), json.size(), filename.c_str(), extended ? JS_PARSE_JSON_EXT : 0));
+    static Value fromJSON(ContextRef ctx, std::string json, std::string filename = "<json>", bool extended = false) {
+        return Value(ctx, JS_ParseJSON2(ctx, json.c_str(), json.size(), filename.c_str(), extended ? JS_PARSE_JSON_EXT : 0));
     }
 
     static ValueWrapper<managed> undefined(ContextRef ctx) {
@@ -179,8 +179,8 @@ public:
         return _message.c_str();
     }
 
-    static ExceptionWrapper<true> create(ContextRef ctx, Type type, std::string message) {
-        ExceptionWrapper<true> val = ValueWrapper<true>::null(ctx).to<ExceptionWrapper<true>>();
+    static Exception create(ContextRef ctx, Type type, std::string message) {
+        Exception val = Value::null(ctx).to<Exception>();
         val._type = type;
         val._message = message;
         return val;
@@ -204,18 +204,18 @@ public:
     }
     ObjectWrapper(ContextRef ctx, JSValue val) : ObjectWrapper(ValueWrapper<managed>(ctx, val)) {}
 
-    template<typename T = ValueWrapper<true>>
+    template<typename T = Value>
     T get(Atom prop) {
-        ValueWrapper<true> val(_ctx, JS_GetProperty(_ctx, _val, prop.get()));
+        Value val(_ctx, JS_GetProperty(_ctx, _val, prop.get()));
         return val.to<T>();
     }
 
-    template<typename T = ValueWrapper<true>>
+    template<typename T = Value>
     T get(const std::string& name) {
         return get<T>(Atom::create(_ctx, name.c_str()));
     }
 
-    template<typename T = ValueWrapper<true>>
+    template<typename T = Value>
     T get(uint32_t idx) {
         return get<T>(Atom::create(_ctx, idx));
     }
@@ -249,7 +249,7 @@ public:
     }
 
     template<typename Id>
-    void defineProperty(Id id, ValueWrapper<true> value, int flags = JS_PROP_C_W_E) {
+    void defineProperty(Id id, Value value, int flags = JS_PROP_C_W_E) {
         Atom atom = Atom::create(_ctx, id);
         JS_DefinePropertyValue(_ctx, _val, atom.get(), value.loot().second, flags);
     }
@@ -266,16 +266,16 @@ public:
         JS_DeleteProperty(_ctx, _val, atom.get(), 0);
     }
 
-    ObjectWrapper<true> getPrototype() {
-        return ObjectWrapper<true>(_ctx, JS_GetPrototype(this->_ctx, this->_val));
+    Object getPrototype() {
+        return Object(_ctx, JS_GetPrototype(this->_ctx, this->_val));
     }
 
-    void setPrototype(ObjectWrapper<true> proto) {
+    void setPrototype(Object proto) {
         JS_SetPrototype(this->_ctx, this->_val, proto.getVal());
     }
 
-    static ObjectWrapper<true> create(ContextRef ctx) {
-        return ObjectWrapper<true>(ctx, JS_NewObject(ctx));
+    static Object create(ContextRef ctx) {
+        return Object(ctx, JS_NewObject(ctx));
     }
 };
 
@@ -294,12 +294,12 @@ public:
     FunctionWrapper(ContextRef ctx, JSValue val) : FunctionWrapper(ObjectWrapper<managed>(ctx, val)) {}
 
     template<typename Res, typename... Args>
-    Res callThis(ValueWrapper<false> thisVal, Args... args) {
+    Res callThis(Value thisVal, Args... args) {
         std::vector<JSValue> vals;
         vals.reserve(sizeof...(Args));
         try {
             (vals.push_back(toValue(_ctx, args).loot().second), ...);
-            ValueWrapper<true> ret(_ctx, JS_Call(_ctx, _val, thisVal.getVal(), vals.size(), vals.data()));
+            Value ret(_ctx, JS_Call(_ctx, _val, thisVal.getVal(), vals.size(), vals.data()));
 
             for (auto &v : vals) {
                 JS_FreeValue(_ctx, v);
@@ -307,7 +307,7 @@ public:
             vals.clear();
 
             return ret.to<Res>();
-        } catch (ExceptionWrapper<true> &e) {
+        } catch (Exception &e) {
             for (auto &v : vals) {
                 JS_FreeValue(_ctx, v);
             }
@@ -317,16 +317,16 @@ public:
 
     template<typename Res, typename... Args>
     Res call(Args... args) {
-        return callThis<Res>(ValueWrapper<true>::undefined(_ctx), args...);
+        return callThis<Res>(Value::undefined(_ctx), args...);
     }
 
     template<typename... Args>
-    ValueWrapper<true> callConstructor(Args... args) {
+    Value callConstructor(Args... args) {
         std::vector<JSValue> vals;
         vals.reserve(sizeof...(Args));
         try {
             (vals.push_back(toValue(_ctx, args).loot().second), ...);
-            ValueWrapper<true> ret(_ctx, JS_CallConstructor(_ctx, _val, vals.size(), vals.data()));
+            Value ret(_ctx, JS_CallConstructor(_ctx, _val, vals.size(), vals.data()));
 
             for (auto &v : vals) {
                 JS_FreeValue(_ctx, v);
@@ -334,7 +334,7 @@ public:
             vals.clear();
 
             return ret;
-        } catch (ExceptionWrapper<true> &e) {
+        } catch (Exception &e) {
             for (auto &v : vals) {
                 JS_FreeValue(_ctx, v);
             }
@@ -361,8 +361,8 @@ public:
         return this->template get<int>("length");
     }
 
-    static ArrayWrapper<true> create(ContextRef ctx) {
-        return ArrayWrapper<true>(ctx, JS_NewArray(ctx));
+    static Array create(ContextRef ctx) {
+        return Array(ctx, JS_NewArray(ctx));
     }
 };
 
@@ -393,14 +393,14 @@ public:
 template<bool managed>
 template<typename Res, typename... Args>
 Res ObjectWrapper<managed>::invoke(Atom key, Args... args) {
-    return get<FunctionWrapper<true>>(key).template callThis<Res>(*this, args...);
+    return get<Function>(key).template callThis<Res>(*this, args...);
 };
 
 
 template<bool managed>
 std::string ExceptionWrapper<managed>::stackTrace() noexcept {
     try {
-        ObjectWrapper<false> obj(*this);
+        ObjectWeak obj(*this);
         return obj.get("stack").toString().c_str();
     } catch (std::exception &e) {
         return "failed to get stack trace: " + std::string(e.what());
@@ -421,7 +421,7 @@ JSValue ExceptionWrapper<managed>::throwJS() {
 
 
     if (_type == Type::Error) {
-        ObjectWrapper<false> errObj(_ctx, JS_NewError(_ctx));
+        ObjectWeak errObj(_ctx, JS_NewError(_ctx));
         errObj.set("message", _message);
 
         return JS_Throw(_ctx, errObj.getVal());
@@ -454,7 +454,7 @@ namespace jac {
 
 
 template<typename T>
-T fromValue([[maybe_unused]] ContextRef ctx, [[maybe_unused]] ValueConst val) {
+T fromValue([[maybe_unused]] ContextRef ctx, [[maybe_unused]] ValueWeak val) {
     if constexpr (std::is_same_v<T, void>) {
         return;
     }

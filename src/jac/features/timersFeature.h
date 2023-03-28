@@ -12,7 +12,7 @@
 
 template<>
 struct jac::ConvTraits<std::chrono::milliseconds> {
-    static std::chrono::milliseconds from(ContextRef ctx, ValueConst value) {
+    static std::chrono::milliseconds from(ContextRef ctx, ValueWeak value) {
         return std::chrono::milliseconds(value.to<int>());
     }
 

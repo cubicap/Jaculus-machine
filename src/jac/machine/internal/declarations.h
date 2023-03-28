@@ -19,22 +19,22 @@ class ExceptionWrapper;
 
 
 using Value = ValueWrapper<true>;        // value/strong reference
-using ValueConst = ValueWrapper<false>;  // weak reference
+using ValueWeak = ValueWrapper<false>;  // weak reference
 
 using Object = ObjectWrapper<true>;
-using ObjectConst = ObjectWrapper<false>;
+using ObjectWeak = ObjectWrapper<false>;
 
 using Function = FunctionWrapper<true>;
-using FunctionConst = FunctionWrapper<false>;
+using FunctionWeak = FunctionWrapper<false>;
 
 using Array = ArrayWrapper<true>;
-using ArrayConst = ArrayWrapper<false>;
+using ArrayWeak = ArrayWrapper<false>;
 
 using Promise = PromiseWrapper<true>;
-using PromiseConst = PromiseWrapper<false>;
+using PromiseWeak = PromiseWrapper<false>;
 
 using Exception = ExceptionWrapper<true>;
-using ExceptionConst = ExceptionWrapper<false>;
+using ExceptionWeak = ExceptionWrapper<false>;
 
 
 }  // namespace jac
