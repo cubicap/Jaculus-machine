@@ -17,20 +17,19 @@ public:
      * @param wait Wait for event if no event is available
      * @return true if event was run, false if no event was run
      */
-    bool runEvent(bool wait) {
+    std::optional<std::function<void()>> getEvent(bool wait) {
         std::unique_lock lock(_scheduledFunctionsMutex);
         if (wait && _scheduledFunctions.empty()) {
             _scheduledFunctionsCondition.wait(lock);
         }
         if (_scheduledFunctions.empty()) {
-            return false;
+            return std::nullopt;
         }
         auto func = std::move(_scheduledFunctions.front());
         _scheduledFunctions.pop_front();
         lock.unlock();
 
-        func();
-        return true;
+        return func;
     }
 
     /**

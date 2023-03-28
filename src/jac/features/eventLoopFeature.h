@@ -3,9 +3,10 @@
 #include <jac/machine/machine.h>
 #include <jac/machine/functionFactory.h>
 #include <noal_func.h>
+#include <condition_variable>
 #include <deque>
 #include <mutex>
-#include <condition_variable>
+#include <optional>
 
 #include "eventLoopTerminal.h"
 
@@ -21,7 +22,7 @@ public:
     void eventLoop_run() {
         _running = true;
 
-        JSContext* ctx = this->_context;
+        JSRuntime* rt = JS_GetRuntime(this->_context);
         JSContext* ctx1;
         int err;
 
@@ -30,14 +31,17 @@ public:
         while (!_shouldExit) {
             runOnEventLoop();
 
-            bool gotEvent = this->runEvent(!didJob);
-            if (!didJob && !gotEvent) {
+            auto event = this->getEvent(!didJob);
+            if (event) {
+                (*event)();
+            }
+            else if (!didJob) {
                 continue;
             }
 
             didJob = false;
             while (!_shouldExit) {
-                err = JS_ExecutePendingJob(JS_GetRuntime(ctx), &ctx1);
+                err = JS_ExecutePendingJob(rt, &ctx1);
                 if (err <= 0) {
                     if (err < 0) {
                         // js_std_dump_error(ctx1);
