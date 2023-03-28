@@ -30,7 +30,7 @@ TEST_CASE("Class", "[class]") {
 
         machine.registerGlobal("TestClass", ctor);
 
-        auto result = evalCode(machine, "new TestClass()", "test", JS_EVAL_TYPE_GLOBAL);
+        auto result = evalCode(machine, "new TestClass()", "test", jac::EvalFlags::Global);
         auto obj = result.to<jac::Object>();
         REQUIRE(obj.getPrototype().get<jac::Object>("constructor").get<std::string>("name") == "TestClass");
     }
@@ -50,7 +50,7 @@ TEST_CASE("Class", "[class]") {
 
         machine.registerGlobal("TestClass", ctor);
 
-        auto result = evalCode(machine, "let val = new TestClass(); report(val.testProp); report(val.testMethod(1, 2)); val;", "test", JS_EVAL_TYPE_GLOBAL);
+        auto result = evalCode(machine, "let val = new TestClass(); report(val.testProp); report(val.testMethod(1, 2)); val;", "test", jac::EvalFlags::Global);
         auto obj = result.to<jac::Object>();
         REQUIRE(obj.getPrototype().get<jac::Object>("constructor").get<std::string>("name") == "TestClass");
         REQUIRE(obj.get("testProp").to<int>() == 42);
@@ -72,8 +72,8 @@ TEST_CASE("Class", "[class]") {
 
         machine.registerGlobal("TestClass", ctor);
 
-        auto result = evalCode(machine, "let val = new TestClass(); report(val(1, 2, 3));", "test", JS_EVAL_TYPE_GLOBAL);
-        evalCodeThrows(machine, "let val = new TestClass(); report(new val(1, 2, 3));", "test", JS_EVAL_TYPE_GLOBAL);
+        auto result = evalCode(machine, "let val = new TestClass(); report(val(1, 2, 3));", "test", jac::EvalFlags::Global);
+        evalCodeThrows(machine, "let val = new TestClass(); report(new val(1, 2, 3));", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
     }
@@ -91,8 +91,8 @@ TEST_CASE("Class", "[class]") {
 
         machine.registerGlobal("TestClass", ctor);
 
-        auto result = evalCode(machine, "let val = new TestClass(); report(new val(1, 2, 3));", "test", JS_EVAL_TYPE_GLOBAL);
-        evalCodeThrows(machine, "let val = new TestClass(); report(val(1, 2, 3));", "test", JS_EVAL_TYPE_GLOBAL);
+        auto result = evalCode(machine, "let val = new TestClass(); report(new val(1, 2, 3));", "test", jac::EvalFlags::Global);
+        evalCodeThrows(machine, "let val = new TestClass(); report(val(1, 2, 3));", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
     }
@@ -114,7 +114,7 @@ TEST_CASE("Class", "[class]") {
 
         machine.registerGlobal("TestClass", ctor);
 
-        auto result = evalCode(machine, "let val = new TestClass(); report(val(1, 2, 3)); report(new val(1, 2, 3));", "test", JS_EVAL_TYPE_GLOBAL);
+        auto result = evalCode(machine, "let val = new TestClass(); report(val(1, 2, 3)); report(new val(1, 2, 3));", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"3", "3"});
     }
 
@@ -158,7 +158,7 @@ TEST_CASE("Class", "[class]") {
             val.setStatic();
             report(val.add(1));
             report(val.countArgs(1, 2, 3));
-        )","test", JS_EVAL_TYPE_GLOBAL);
+        )","test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"42", "43", "44", "3"});
         REQUIRE(aStatic == 43);
     }
@@ -195,7 +195,7 @@ TEST_CASE("Class", "[class]") {
 
         machine.registerGlobal("TestClass", ctor);
 
-        auto result = evalCode(machine, "let val = new TestClass(7); report(val.a); val.a = 43; report(val.a); val.setStatic();", "test", JS_EVAL_TYPE_GLOBAL);
+        auto result = evalCode(machine, "let val = new TestClass(7); report(val.a); val.a = 43; report(val.a); val.setStatic();", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"7", "43"});
         REQUIRE(aStatic == 43);
     }
@@ -246,7 +246,7 @@ TEST_CASE("Class", "[class]") {
             report(val.a);
             val.a = 43;
             report(val(3));
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"8", "9", "7", "46"});
         REQUIRE(calls == 3);
     }
@@ -282,7 +282,7 @@ TEST_CASE("Class", "[class]") {
             val.prefix = "pre";
             report(val.prefix);
             report(val.pref("fix", "ed"));
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"__", "pre", "prefixed"});
     }
 }

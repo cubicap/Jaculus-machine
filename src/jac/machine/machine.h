@@ -15,6 +15,29 @@
 namespace jac {
 
 
+enum class EvalFlags : int {
+    Global = JS_EVAL_TYPE_GLOBAL,
+    Module = JS_EVAL_TYPE_MODULE,
+
+    Strict = JS_EVAL_FLAG_STRICT,
+    Strip = JS_EVAL_FLAG_STRIP,
+    CompileOnly = JS_EVAL_FLAG_COMPILE_ONLY,
+    BacktraceBarrier = JS_EVAL_FLAG_BACKTRACE_BARRIER
+};
+
+inline constexpr EvalFlags operator|(EvalFlags a, EvalFlags b) {
+    int res = static_cast<int>(a) | static_cast<int>(b);
+    if (res & JS_EVAL_TYPE_GLOBAL && res & JS_EVAL_TYPE_MODULE) {
+        throw std::runtime_error("Cannot use both global and module eval flags");
+    }
+    return static_cast<EvalFlags>(res);
+}
+
+inline constexpr EvalFlags operator&(EvalFlags a, EvalFlags b) {
+    return static_cast<EvalFlags>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+
 class MachineBase;
 
 
@@ -83,7 +106,7 @@ public:
         }
     }
 
-    Value eval(std::string code, std::string filename, int eval_flags);
+    Value eval(std::string code, std::string filename, EvalFlags flags = EvalFlags::Global);
 
     void registerGlobal(std::string name, Value value, PropFlags flags = PropFlags::Enumerable);
 

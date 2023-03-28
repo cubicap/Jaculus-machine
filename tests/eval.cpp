@@ -51,7 +51,7 @@ TEST_CASE("TestReportFeature", "[reportFeature]") {
     );
 
     DYNAMIC_SECTION(comment) {
-        machine.eval(code, "test", JS_EVAL_TYPE_MODULE);
+        machine.eval(code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == expected);
     }
 }
@@ -69,20 +69,20 @@ TEST_CASE("Eval", "[eval]") {
         machine.initialize();
 
         std::string code = "let x = 0; report(xx);";
-        REQUIRE_THROWS_AS(machine.eval(code, "test", JS_EVAL_TYPE_MODULE), jac::Exception);
+        REQUIRE_THROWS_AS(machine.eval(code, "test", jac::EvalFlags::Global), jac::Exception);
     }
 
     SECTION("Return value") {
         machine.initialize();
 
         std::string code = "'hello world'";
-        REQUIRE(machine.eval(code, "test", JS_EVAL_TYPE_GLOBAL).to<std::string>() == "hello world");
+        REQUIRE(machine.eval(code, "test", jac::EvalFlags::Global).to<std::string>() == "hello world");
     }
 
     SECTION("Throw") {
         machine.initialize();
 
         std::string code = "throw new Error('hello world')";
-        REQUIRE_THROWS_AS(machine.eval(code, "test", JS_EVAL_TYPE_GLOBAL), jac::Exception);
+        REQUIRE_THROWS_AS(machine.eval(code, "test", jac::EvalFlags::Global), jac::Exception);
     }
 }

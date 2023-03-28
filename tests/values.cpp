@@ -48,7 +48,7 @@ TEST_CASE("Create value", "[base]") {
         auto value = valueGen(machine._context);
 
         machine.registerGlobal("value", value);
-        evalCode(machine, "report(typeof value); report(String(value));", "test", JS_EVAL_TYPE_GLOBAL);
+        evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{type, str});
     }
@@ -125,7 +125,7 @@ TEST_CASE("From JS value", "[base]") {
     auto [comment, valueGen, test] = values;
 
     DYNAMIC_SECTION(comment) {
-        auto value = evalCode(machine, valueGen, "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, valueGen, "test", jac::EvalFlags::Global);
 
         CAPTURE(valueGen);
         CAPTURE(value.toString());
@@ -145,21 +145,21 @@ TEST_CASE("Object get", "[base]") {
     machine.initialize();
 
     SECTION("string key") {
-        auto value = evalCode(machine, "({a: 'Hello World'})", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "({a: 'Hello World'})", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
         REQUIRE(object.get("a").to<std::string>() == "Hello World");
     }
 
     SECTION("int key") {
-        auto value = evalCode(machine, "({42: 'Hello World'})", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "({42: 'Hello World'})", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
         REQUIRE(object.get(42).to<std::string>() == "Hello World");
     }
 
     SECTION("array index") {
-        auto value = evalCode(machine, "([1, 2, 3])", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "([1, 2, 3])", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
         REQUIRE(object.get(1).to<std::string>() == "2");
@@ -177,32 +177,32 @@ TEST_CASE("Object set", "[base]") {
     machine.initialize();
 
     SECTION("string key") {
-        auto value = evalCode(machine, "let x = {}; x", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "let x = {}; x", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
         object.set("a", jac::Value::from(machine._context, "Hello World"));
 
-        evalCode(machine, "report(x.a)", "test", JS_EVAL_TYPE_GLOBAL);
+        evalCode(machine, "report(x.a)", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
     }
 
     SECTION("int key") {
-        auto value = evalCode(machine, "let x = {}; x", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "let x = {}; x", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
         object.set(42, jac::Value::from(machine._context, "Hello World"));
 
-        evalCode(machine, "report(x[42])", "test", JS_EVAL_TYPE_GLOBAL);
+        evalCode(machine, "report(x[42])", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
     }
 
     SECTION("array index") {
-        auto value = evalCode(machine, "let x = []; x", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "let x = []; x", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
         object.set(1, jac::Value::from(machine._context, "Hello World"));
 
-        evalCode(machine, "report(x[1])", "test", JS_EVAL_TYPE_GLOBAL);
+        evalCode(machine, "report(x[1])", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
     }
 }
@@ -222,7 +222,7 @@ TEST_CASE("Object create", "[base]") {
         object.set("a", jac::Value::from(machine._context, "Hello World"));
         machine.registerGlobal("x", object);
 
-        evalCode(machine, "report(x.a)", "test", JS_EVAL_TYPE_GLOBAL);
+        evalCode(machine, "report(x.a)", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
     }
 }
@@ -237,7 +237,7 @@ TEST_CASE("Object hasProperty", "[base]") {
     Machine machine;
     machine.initialize();
 
-    auto value = evalCode(machine, "({a: 'Hello World'})", "test", JS_EVAL_TYPE_GLOBAL);
+    auto value = evalCode(machine, "({a: 'Hello World'})", "test", jac::EvalFlags::Global);
     auto object = value.to<jac::Object>();
 
     REQUIRE(object.hasProperty("a"));
@@ -284,7 +284,7 @@ TEST_CASE("Object deleteProperty", "[base]") {
     Machine machine;
     machine.initialize();
 
-    auto value = evalCode(machine, "({a: 'Hello World'})", "test", JS_EVAL_TYPE_GLOBAL);
+    auto value = evalCode(machine, "({a: 'Hello World'})", "test", jac::EvalFlags::Global);
     auto object = value.to<jac::Object>();
 
     REQUIRE(object.hasProperty("a"));
@@ -303,7 +303,7 @@ TEST_CASE("Function") {
     machine.initialize();
 
     SECTION("call") {
-        auto value = evalCode(machine, "function x() { report('Hello World'); }; x", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "function x() { report('Hello World'); }; x", "test", jac::EvalFlags::Global);
         auto function = value.to<jac::Function>();
 
         function.call<void>();
@@ -312,7 +312,7 @@ TEST_CASE("Function") {
     }
 
     SECTION("call with arguments") {
-        auto value = evalCode(machine, "function x(a, b) { report(a + b); }; x", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "function x(a, b) { report(a + b); }; x", "test", jac::EvalFlags::Global);
         auto function = value.to<jac::Function>();
 
         function.call<void>(1, 2);
@@ -321,7 +321,7 @@ TEST_CASE("Function") {
     }
 
     SECTION("call with return value") {
-        auto value = evalCode(machine, "function x() { return 'Hello World'; }; x", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "function x() { return 'Hello World'; }; x", "test", jac::EvalFlags::Global);
         auto function = value.to<jac::Function>();
 
         auto result = function.call<std::string>();
@@ -330,7 +330,7 @@ TEST_CASE("Function") {
     }
 
     SECTION("call with return value and arguments") {
-        auto value = evalCode(machine, "function x(a, b) { return a + b; }; x", "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, "function x(a, b) { return a + b; }; x", "test", jac::EvalFlags::Global);
         auto function = value.to<jac::Function>();
 
         int result = function.call<int>(1, 2);
@@ -347,7 +347,7 @@ TEST_CASE("Function") {
                 }
             };
             x;
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         auto object = value.to<jac::Object>();
         auto function = object.get("b").to<jac::Function>();
@@ -366,7 +366,7 @@ TEST_CASE("Function") {
                 }
             };
             x;
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         auto object = value.to<jac::Object>();
         auto function = object.get("b").to<jac::Function>();
@@ -385,7 +385,7 @@ TEST_CASE("Function") {
                 }
             };
             x;
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         auto object = value.to<jac::Object>();
         object.invoke<void>("b");
@@ -402,7 +402,7 @@ TEST_CASE("Function") {
                 }
             };
             x;
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         auto object = value.to<jac::Object>();
         int result = object.invoke<int>("b", 1, 2);
@@ -419,7 +419,7 @@ TEST_CASE("Function") {
                 }
             };
             X;
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         auto function = value.to<jac::Function>();
         auto obj = function.callConstructor().to<jac::Object>();
@@ -438,7 +438,7 @@ TEST_CASE("Function") {
                 }
             };
             X;
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         auto function = value.to<jac::Function>();
         auto object = function.callConstructor(1, 2).to<jac::Object>();
@@ -468,7 +468,7 @@ TEST_CASE("Promise", "[base]") {
             x.then(function(value) {
                 report(value);
             });
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{});
 
@@ -491,7 +491,7 @@ TEST_CASE("Promise", "[base]") {
             x.catch(function(value) {
                 report(value);
             });
-        )", "test", JS_EVAL_TYPE_GLOBAL);
+        )", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{});
 
@@ -529,7 +529,7 @@ TEST_CASE("is type", "[base]") {
     );
 
     DYNAMIC_SECTION(comment) {
-        auto value = evalCode(machine, code, "test", JS_EVAL_TYPE_GLOBAL);
+        auto value = evalCode(machine, code, "test", jac::EvalFlags::Global);
 
         REQUIRE(value.isUndefined() == isUndefined);
         REQUIRE(value.isNull() == isNull);

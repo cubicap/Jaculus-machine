@@ -40,7 +40,7 @@ public:
     jac::Value evalFile(std::string path) {
         auto buffer = this->loadCode(path);
 
-        jac::Value val = this->eval(buffer, path, JS_EVAL_TYPE_MODULE);
+        jac::Value val = this->eval(buffer, path, jac::EvalFlags::Module);
         return val;
     }
 

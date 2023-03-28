@@ -41,8 +41,8 @@ void MachineBase::initialize() {
     }, this);
 }
 
-Value MachineBase::eval(std::string code, std::string filename, int eval_flags) {
-    return Value(_context, JS_Eval(_context, code.c_str(), code.size(), filename.c_str(), eval_flags));
+Value MachineBase::eval(std::string code, std::string filename, EvalFlags flags /*= EvalFlags::Global*/) {
+    return Value(_context, JS_Eval(_context, code.c_str(), code.size(), filename.c_str(), static_cast<int>(flags)));
 }
 
 void MachineBase::registerGlobal(std::string name, Value value, PropFlags flags /*= PropFlags::Enumerable*/) {

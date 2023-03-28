@@ -52,7 +52,7 @@ TEST_CASE("New function", "[functionFactory]") {
 
         machine.registerGlobal("f", f);
 
-        evalCode(machine, "f(report);", "test", JS_EVAL_TYPE_GLOBAL);
+        evalCode(machine, "f(report);", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"testReport"});
     }

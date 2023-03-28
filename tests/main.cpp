@@ -44,7 +44,7 @@ int main() {
     Machine machine;
     machine.initialize();
     try {
-        auto val = machine.eval(code, "main.js", JS_EVAL_TYPE_MODULE);
+        auto val = machine.eval(code, "main.js", jac::EvalFlags::Module);
         machine.eventLoop_run();
 
         std::cout << "Exit code: " << machine.eventLoop_getExitCode() << std::endl;

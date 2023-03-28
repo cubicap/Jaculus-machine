@@ -5,6 +5,7 @@
 #include <jac/machine/functionFactory.h>
 #include <noal_func.h>
 
+
 template<class Next>
 class TestReportFeature : public Next {
     std::vector<std::string> _reports;
@@ -42,9 +43,9 @@ jac::Value evalFile(auto& machine, std::string path_) {
 };
 
 
-jac::Value evalCode(auto& machine, std::string code, std::string filename, int eval_flags) {
+jac::Value evalCode(auto& machine, std::string code, std::string filename, jac::EvalFlags flags) {
     try {
-        return machine.eval(code, filename, eval_flags);
+        return machine.eval(code, filename, flags);
     }
     catch (jac::Exception& e) {
         std::string message(e.what());
@@ -79,9 +80,9 @@ void evalFileThrows(auto& machine, std::string path_) {
 };
 
 
-void evalCodeThrows(auto& machine, std::string code, std::string filename, int eval_flags) {
+void evalCodeThrows(auto& machine, std::string code, std::string filename, jac::EvalFlags flags) {
     try {
-        machine.eval(code, filename, eval_flags);
+        machine.eval(code, filename, flags);
     }
     catch (jac::Exception& e) {
         return;
