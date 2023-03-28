@@ -28,7 +28,16 @@ void MachineBase::initialize() {
 
     _runtime = JS_NewRuntime();
     _context = JS_NewContext(_runtime);
+
     JS_SetContextOpaque(_context, this);
+    JS_SetInterruptHandler(_runtime, [](JSRuntime* rt, void* opaque) {
+        MachineBase& base = *reinterpret_cast<MachineBase*>(opaque);
+        if (base._interrupt) {
+            base._interrupt = false;
+            return 1;
+        }
+        return 0;
+    }, this);
 }
 
 Value MachineBase::eval(std::string code, std::string filename, int eval_flags) {

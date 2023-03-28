@@ -59,6 +59,8 @@ class MachineBase {
 private:
     std::unordered_map<JSModuleDef*, JSModule> _modules;
     JSModule& findModule(JSModuleDef* m);
+
+    bool _interrupt = false;
 public:
     JSRuntime* _runtime = nullptr;
     ContextRef _context = nullptr;
@@ -86,6 +88,10 @@ public:
     void registerGlobal(std::string name, Value value);
 
     JSModule& newModule(std::string name);
+
+    void interruptRuntime() {
+        _interrupt = true;
+    }
 
     friend class JSModule;
 };

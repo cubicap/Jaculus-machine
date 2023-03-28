@@ -53,6 +53,7 @@ public:
 
     void eventLoop_stop() {
         _shouldExit = true;
+        this->interruptRuntime();
         this->notifyEventLoop();
     }
 
