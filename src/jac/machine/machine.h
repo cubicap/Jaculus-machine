@@ -85,7 +85,7 @@ public:
 
     Value eval(std::string code, std::string filename, int eval_flags);
 
-    void registerGlobal(std::string name, Value value);
+    void registerGlobal(std::string name, Value value, PropFlags flags = PropFlags::Enumerable);
 
     JSModule& newModule(std::string name);
 

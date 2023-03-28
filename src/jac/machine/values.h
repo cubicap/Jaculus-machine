@@ -17,6 +17,23 @@
 namespace jac {
 
 
+enum class PropFlags : int {
+    None = 0,
+    Configurable = JS_PROP_CONFIGURABLE,
+    Writable = JS_PROP_WRITABLE,
+    Enumerable = JS_PROP_ENUMERABLE,
+    C_W_E = JS_PROP_C_W_E
+};
+
+inline constexpr PropFlags operator|(PropFlags a, PropFlags b) {
+    return static_cast<PropFlags>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+inline constexpr PropFlags operator&(PropFlags a, PropFlags b) {
+    return static_cast<PropFlags>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+
 template<typename T>
 T fromValue(ContextRef ctx, ValueWeak val);
 
@@ -32,7 +49,7 @@ protected:
 public:
     ValueWrapper(ContextRef ctx, JSValue val) : _ctx(ctx), _val(val) {
         if (JS_IsException(_val)) {
-            throw ctx.getException(*this);
+            throw ctx.getException();
         }
     }
     ValueWrapper(const ValueWrapper &other):
@@ -222,7 +239,9 @@ public:
 
     template<typename T>
     void set(Atom prop, T val) {
-        JS_SetProperty(_ctx, _val, prop.get(), toValue(_ctx, val).loot().second);
+        if (JS_SetProperty(_ctx, _val, prop.get(), toValue(_ctx, val).loot().second) < 0) {
+            throw _ctx.getException();
+        }
     }
 
     template<typename T>
@@ -249,21 +268,29 @@ public:
     }
 
     template<typename Id>
-    void defineProperty(Id id, Value value, int flags = JS_PROP_C_W_E) {
+    void defineProperty(Id id, Value value, PropFlags flags = PropFlags::None) {
         Atom atom = Atom::create(_ctx, id);
-        JS_DefinePropertyValue(_ctx, _val, atom.get(), value.loot().second, flags);
+        if (JS_DefinePropertyValue(_ctx, _val, atom.get(), value.loot().second, static_cast<int>(flags)) < 0) {
+            throw _ctx.getException();
+        }
     }
 
     template<typename Id>
     bool hasProperty(Id id) {
         Atom atom = Atom::create(_ctx, id);
-        return JS_HasProperty(_ctx, _val, atom.get());
+        int res = JS_HasProperty(_ctx, _val, atom.get());
+        if (res < 0) {
+            throw _ctx.getException();
+        }
+        return res;
     }
 
     template<typename Id>
     void deleteProperty(Id id) {
         Atom atom = Atom::create(_ctx, id);
-        JS_DeleteProperty(_ctx, _val, atom.get(), 0);
+        if (JS_DeleteProperty(_ctx, _val, atom.get(), 0) < 0) {
+            throw _ctx.getException();
+        }
     }
 
     Object getPrototype() {
@@ -271,7 +298,9 @@ public:
     }
 
     void setPrototype(Object proto) {
-        JS_SetPrototype(this->_ctx, this->_val, proto.getVal());
+        if (JS_SetPrototype(this->_ctx, this->_val, proto.getVal()) < 0) {
+            throw _ctx.getException();
+        }
     }
 
     static Object create(ContextRef ctx) {

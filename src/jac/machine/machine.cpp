@@ -1,6 +1,7 @@
 #include "machine.h"
 #include "functionFactory.h"
 
+
 namespace jac {
 
 
@@ -44,9 +45,9 @@ Value MachineBase::eval(std::string code, std::string filename, int eval_flags) 
     return Value(_context, JS_Eval(_context, code.c_str(), code.size(), filename.c_str(), eval_flags));
 }
 
-void MachineBase::registerGlobal(std::string name, Value value) {
+void MachineBase::registerGlobal(std::string name, Value value, PropFlags flags /*= PropFlags::Enumerable*/) {
     Object globalObject(_context, JS_GetGlobalObject(_context));
-    globalObject.set(name, value);
+    globalObject.defineProperty(name, value, flags);
 }
 
 JSModule& MachineBase::newModule(std::string name) {

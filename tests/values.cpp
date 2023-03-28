@@ -260,6 +260,17 @@ TEST_CASE("Object defineProperty", "[base]") {
         object.defineProperty("a", jac::Value::from(machine._context, "Hello World"));
         REQUIRE(object.hasProperty("a"));
         REQUIRE(object.get<std::string>("a") == "Hello World");
+        REQUIRE_THROWS_AS(object.set("a", jac::Value::from(machine._context, "Hallo Welt")), jac::Exception);
+    }
+
+    SECTION("writable") {
+        auto object = jac::Object::create(machine._context);
+
+        object.defineProperty("a", jac::Value::from(machine._context, "Hello World"), jac::PropFlags::Writable);
+        REQUIRE(object.hasProperty("a"));
+        REQUIRE(object.get<std::string>("a") == "Hello World");
+        object.set("a", jac::Value::from(machine._context, "Hallo Welt"));
+        REQUIRE(object.get<std::string>("a") == "Hallo Welt");
     }
 }
 

@@ -62,7 +62,6 @@ template<template <typename...> class Base, typename Derived>
 inline constexpr bool is_base_of_template_v = is_base_of_template<Base, Derived>::value;
 
 
-// TODO: property flags
 namespace ProtoBuilder {
 
     template<typename T>
@@ -103,7 +102,7 @@ namespace ProtoBuilder {
 
 
         template<typename U, U(T::*member)>
-        static void addPropMember(ContextRef ctx, Object proto, std::string name, int flags = JS_PROP_C_W_E) {
+        static void addPropMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
             using GetRaw = JSValue(*)(JSContext* ctx_, JSValueConst this_val);
             using SetRaw = JSValue(*)(JSContext* ctx_, JSValueConst this_val, JSValueConst val);
 
@@ -121,11 +120,11 @@ namespace ProtoBuilder {
             JSValue setter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(set), std::string("set " + name).c_str(), 1, JS_CFUNC_setter, 0);
 
             Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
-            JS_DefinePropertyGetSet(ctx, proto.getVal(), atom.get(), getter, setter, flags);
+            JS_DefinePropertyGetSet(ctx, proto.getVal(), atom.get(), getter, setter, static_cast<int>(flags));
         }
 
         template<typename Sgn, Sgn member>
-        static void addMethodMember(ContextRef ctx, Object proto, std::string name, int flags = JS_PROP_C_W_E) {
+        static void addMethodMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
             using MethodRaw = JSValue(*)(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 
             const SgnUnwrap Unwrap_(member);
@@ -146,12 +145,12 @@ namespace ProtoBuilder {
                 JSValue funcVal = JS_NewCFunction(ctx, reinterpret_cast<JSCFunction*>(func), name.c_str(), 0);
 
                 Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
-                JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), funcVal, flags);
+                JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), funcVal, static_cast<int>(flags));
             }(Unwrap_);
         }
 
         template<typename Sgn, Sgn member>
-        static void addMethodMemberVariadic(ContextRef ctx, Object proto, std::string name, int flags = JS_PROP_C_W_E) {
+        static void addMethodMemberVariadic(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
             using MethodRaw = JSValue(*)(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 
             const SgnUnwrap Unwrap_(member);
@@ -172,7 +171,7 @@ namespace ProtoBuilder {
                 JSValue funcVal = JS_NewCFunction(ctx, reinterpret_cast<JSCFunction*>(func), name.c_str(), 0);
 
                 Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
-                JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), funcVal, flags);
+                JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), funcVal, static_cast<int>(flags));
             }(Unwrap_);
         }
     };
@@ -195,9 +194,9 @@ namespace ProtoBuilder {
         static void addProperties(ContextRef ctx, Object proto) {}
 
 
-        static void addProp(ContextRef ctx, Object proto, std::string name, Value value, int flags = JS_PROP_C_W_E) {
+        static void addProp(ContextRef ctx, Object proto, std::string name, Value value, PropFlags flags = PropFlags::C_W_E) {
             Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
-            JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), value.loot().second, flags);
+            JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), value.loot().second, static_cast<int>(flags));
         }
     };
 }
