@@ -2,6 +2,7 @@
 
 #include <quickjs.h>
 #include <cassert>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -418,6 +419,50 @@ public:
     }
 };
 
+
+template<bool managed>
+class ArrayBufferWrapper : public ObjectWrapper<managed> {
+protected:
+    using ObjectWrapper<managed>::_val;
+    using ObjectWrapper<managed>::_ctx;
+
+    static void freeArrayBuffer(JSRuntime *rt, void *opaque, void *ptr) {
+        delete[] reinterpret_cast<uint8_t*>(ptr);
+    }
+public:
+    ArrayBufferWrapper(ObjectWrapper<managed> value) : ObjectWrapper<managed>(std::move(value)) {
+        // TODO: check if array buffer
+    }
+    ArrayBufferWrapper(ContextRef ctx, JSValue val) : ArrayBufferWrapper(ObjectWrapper<managed>(ctx, val)) {}
+
+    uint8_t* data() {
+        return reinterpret_cast<uint8_t*>(JS_GetArrayBuffer(_ctx, nullptr, _val));
+    }
+
+    size_t size() {
+        size_t size;
+        JS_GetArrayBuffer(_ctx, &size, _val);
+        return size;
+    }
+
+    template<typename T>
+    std::span<T> typedView() {
+        if (size() % sizeof(T) != 0) {
+            throw Exception::create(_ctx, Exception::Type::TypeError, "size is not a multiple of the element size");
+        }
+        size_t size;
+        T* ptr = reinterpret_cast<T*>(JS_GetArrayBuffer(_ctx, &size, _val));
+        return std::span<T>(ptr, size / sizeof(T));
+    }
+
+    static ArrayBuffer create(ContextRef ctx, size_t size) {
+        return ArrayBuffer(ctx, JS_NewArrayBuffer(ctx, new uint8_t[size]{}, size, freeArrayBuffer, nullptr, false));
+    }
+
+    static ArrayBuffer create(ContextRef ctx, std::span<const uint8_t> data) {
+        return ArrayBuffer(ctx, JS_NewArrayBufferCopy(ctx, data.data(), data.size()));
+    }
+};
 
 template<bool managed>
 template<typename Res, typename... Args>

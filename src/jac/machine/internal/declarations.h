@@ -16,6 +16,8 @@ template<bool managed>
 class PromiseWrapper;
 template<bool managed>
 class ExceptionWrapper;
+template<bool managed>
+class ArrayBufferWrapper;
 
 
 using Value = ValueWrapper<true>;        // value/strong reference
@@ -36,5 +38,7 @@ using PromiseWeak = PromiseWrapper<false>;
 using Exception = ExceptionWrapper<true>;
 using ExceptionWeak = ExceptionWrapper<false>;
 
+using ArrayBuffer = ArrayBufferWrapper<true>;
+using ArrayBufferWeak = ArrayBufferWrapper<false>;
 
 }  // namespace jac

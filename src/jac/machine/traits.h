@@ -237,6 +237,30 @@ struct ConvTraits<Exception> {
     }
 };
 
+template<>
+struct ConvTraits<ArrayBuffer> {
+    static ArrayBuffer from(ContextRef ctx, ValueWeak val) {
+        JS_DupValue(ctx, val.getVal());
+        return ArrayBuffer(ctx, val.getVal());
+    }
+
+    static Value to(ContextRef ctx, ArrayBuffer val) {
+        return static_cast<Value>(val);
+    }
+};
+
+template<>
+struct ConvTraits<ArrayBufferWeak> {
+    static ArrayBufferWeak from(ContextRef ctx, ValueWeak val) {
+        return ArrayBufferWeak(ctx, val.getVal());
+    }
+
+    static Value to(ContextRef ctx, ArrayBufferWeak val) {
+        JS_DupValue(ctx, val.getVal());
+        return Value(ctx, val.getVal());
+    }
+};
+
 template<typename T>
 struct ConvTraits<std::vector<T>> {
     static std::vector<T> from(ContextRef ctx, ValueWeak val) {

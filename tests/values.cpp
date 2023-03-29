@@ -12,7 +12,7 @@
 #include "util.h"
 
 
-TEST_CASE("Create value", "[base]") {
+TEST_CASE("To JS value", "[base]") {
     using Machine =
         TestReportFeature<
         jac::MachineBase
@@ -591,5 +591,92 @@ TEST_CASE("json", "[base]") {
 
         REQUIRE(value.stringify(4).to<std::string>() == "[\n    1,\n    2,\n    3\n]");
         REQUIRE(value.stringify(2).to<std::string>() == "[\n  1,\n  2,\n  3\n]");
+    }
+}
+
+
+TEST_CASE("ArrayBuffer", "[base]") {
+    using Machine =
+        TestReportFeature<
+        jac::MachineBase
+    >;
+
+    Machine machine;
+    machine.initialize();
+
+    SECTION("create") {
+        auto buffer = jac::ArrayBuffer::create(machine._context, 10);
+        machine.registerGlobal("x", buffer);
+
+        REQUIRE(buffer.size() == 10);
+
+        auto view = buffer.typedView<uint8_t>();
+        REQUIRE(view.size() == 10);
+        REQUIRE(std::vector<uint8_t>(view.begin(), view.end()) == std::vector<uint8_t>(10, 0));
+
+        for (size_t i = 0; i < 10; ++i) {
+            view[i] = i;
+        }
+
+        evalCode(machine, R"(
+            let int8 = new Int8Array(x);
+            for (var i = 0; i < int8.length; ++i) {
+                report(int8[i]);
+            }
+        )", "test", jac::EvalFlags::Global);
+
+        REQUIRE(machine.getReports() == std::vector<std::string>{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
+    }
+
+    SECTION("Get from JS") {
+        auto val = evalCode(machine, R"(
+            let x = new ArrayBuffer(10);
+            x;
+        )", "test", jac::EvalFlags::Global);
+
+        auto buffer = val.to<jac::ArrayBuffer>();
+
+        REQUIRE(buffer.size() == 10);
+
+        auto view = buffer.typedView<uint8_t>();
+        REQUIRE(view.size() == 10);
+        REQUIRE(std::vector<uint8_t>(view.begin(), view.end()) == std::vector<uint8_t>(10, 0));
+
+        for (size_t i = 0; i < 10; ++i) {
+            view[i] = i;
+        }
+
+        evalCode(machine, R"(
+            let int8 = new Int8Array(x);
+            for (var i = 0; i < int8.length; ++i) {
+                report(int8[i]);
+            }
+        )", "test", jac::EvalFlags::Global);
+    }
+
+    SECTION("From typed Array") {
+        auto val = evalCode(machine, R"(
+            let x = new Int8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            x.buffer;
+        )", "test", jac::EvalFlags::Global);
+
+        auto buffer = val.to<jac::ArrayBuffer>();
+
+        REQUIRE(buffer.size() == 10);
+
+        auto view = buffer.typedView<uint8_t>();
+        REQUIRE(view.size() == 10);
+        std::vector<uint8_t> expected{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        REQUIRE(std::vector<uint8_t>(view.begin(), view.end()) == expected);
+
+        for (size_t i = 0; i < 10; ++i) {
+            view[i] = i;
+        }
+
+        evalCode(machine, R"(
+            for (var i = 0; i < x.length; ++i) {
+                report(x[i]);
+            }
+        )", "test", jac::EvalFlags::Global);
     }
 }
