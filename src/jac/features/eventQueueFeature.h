@@ -13,9 +13,9 @@ private:
     std::condition_variable _scheduledFunctionsCondition;
 public:
     /**
-     * @brief Check event queue for events and run one if available
+     * @brief Check the event queue and return the first event
      * @param wait Wait for event if no event is available
-     * @return true if event was run, false if no event was run
+     * @return Event or std::nullopt if no event is available
      */
     std::optional<std::function<void()>> getEvent(bool wait) {
         std::unique_lock lock(_scheduledFunctionsMutex);
