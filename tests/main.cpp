@@ -1,4 +1,6 @@
 #include <jac/machine/machine.h>
+#include <jac/machine/values.h>
+#include <jac/machine/class.h>
 #include <jac/features/basicStreamFeature.h>
 #include <jac/features/stdioFeature.h>
 #include <jac/features/eventLoopFeature.h>
@@ -7,31 +9,27 @@
 #include <jac/features/yieldFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/features/filesystemFeature.h>
-#include <jac/machine/values.h>
-#include <jac/machine/class.h>
+#include <jac/features/util/ostreamjs.h>
 #include <string>
+#include <iostream>
 
 
 using Machine =
     EventLoopTerminal<
     TimersFeature<
     YieldFeature<
-    EventLoopFeature<
-    EventQueueFeature<
     ModuleLoaderFeature<
     FilesystemFeature<
+    EventLoopFeature<
     StdioFeature<
     BasicStreamFeature<
+    EventQueueFeature<
     jac::MachineBase
 >>>>>>>>>;
 
 
 const char* code = R"(
-import { stderr, stdout, stdin } from 'stdio';
-
-stdout.print('Enter text:');
-let input = stdin.readLine();
-stdout.println('You entered: ' + input);
+console.log("Hello world!");
 
 exit(0);
 )";
@@ -42,6 +40,7 @@ int main() {
     std::cout << "Running on thread: " << std::this_thread::get_id() << std::endl;
 
     Machine machine;
+    initializeIo(machine);
     machine.initialize();
     try {
         auto val = machine.eval(code, "main.js", jac::EvalFlags::Module);

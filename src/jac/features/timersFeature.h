@@ -196,8 +196,8 @@ public:
 
         this->registerGlobal("sleep", ff.newFunction([this](int millis) {
             auto [promise, resolve, _] = jac::Promise::create(this->_context);
-            createTimer([resolve]() {
-                const_cast<jac::Function&>(resolve).call<void>();
+            createTimer([resolve]() mutable {
+                static_cast<jac::Function&>(resolve).call<void>();
             }, std::chrono::milliseconds(millis), false);
             return promise;
         }));

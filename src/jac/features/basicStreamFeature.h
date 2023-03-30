@@ -11,28 +11,15 @@
 template<class Next>
 class BasicStreamFeature : public Next {
 public:
+
     class Writable {
     public:
-        virtual void print(std::string str) = 0;
-
-        virtual void println(std::string str) {
-            print(str + "\n");
+        virtual void write(std::span<const uint8_t> buffer) = 0;
+        virtual void write(jac::ArrayBuffer buffer) {
+            write(buffer.typedView<uint8_t>());
         }
-
-        virtual void print(std::vector<jac::ValueWeak> args) {
-            for (auto val : args) {
-                try {
-                    print(val.to<std::string>() + " ");
-                }
-                catch (...) {
-                    print(std::string("[Cannot convert]") + " ");
-                }
-            }
-        }
-
-        virtual void println(std::vector<jac::ValueWeak> args) {
-            print(args);
-            print("\n");
+        virtual void print(std::string str) {
+            write(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(str.data()), str.size()));
         }
 
         virtual ~Writable() = default;
@@ -40,21 +27,37 @@ public:
 
     struct WritableProtoBuilder : public jac::ProtoBuilder::Opaque<Writable>, public jac::ProtoBuilder::Properties {
         static void addProperties(jac::ContextRef ctx, jac::Object proto) {
-            addMethodMemberVariadic<void(Writable::*)(std::vector<jac::ValueWeak>), &Writable::print>(ctx, proto, "print");
-            addMethodMemberVariadic<void(Writable::*)(std::vector<jac::ValueWeak>), &Writable::println>(ctx, proto, "println");
+            addMethodMember<void(Writable::*)(std::string), &Writable::print>(ctx, proto, "print");
+            addMethodMember<void(Writable::*)(jac::ArrayBuffer), &Writable::write>(ctx, proto, "write");
+
         }
     };
 
     class Readable {
     public:
-        virtual std::string readLine() = 0;
+        virtual bool read(std::function<void(std::span<const uint8_t>)> callback) = 0;
 
         virtual ~Readable() = default;
     };
 
     struct ReadableProtoBuilder : public jac::ProtoBuilder::Opaque<Readable>, public jac::ProtoBuilder::Properties {
         static void addProperties(jac::ContextRef ctx, jac::Object proto) {
-            addMethodMember<std::string(Readable::*)(), &Readable::readLine>(ctx, proto, "readLine");
+            jac::FunctionFactory ff(ctx);
+
+            addProp(ctx, proto, "read", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
+                Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
+                auto [promise, resolve, reject] = jac::Promise::create(ctx_);
+
+                bool res = self_.read([resolve, ctx_](std::span<const uint8_t> buffer) mutable {
+                    resolve.call<void>(jac::ArrayBuffer::create(ctx_, buffer));
+                });
+
+                if (!res) {
+                    reject.call<void>(jac::Exception::create(ctx_, jac::Exception::Type::Error, "Stream is not readable"));
+                }
+
+                return promise;
+            }));
         }
     };
 
@@ -64,30 +67,17 @@ public:
     public:
         WritableRef(Writable* ptr): _ptr(ptr) {}
 
+        void write(std::span<const uint8_t> buffer) override {
+            _ptr->write(buffer);
+        }
+
+        void write(jac::ArrayBuffer buffer) override {
+            _ptr->write(buffer);
+        }
+
         void print(std::string str) override {
             _ptr->print(str);
         }
-
-        void println(std::string str) override {
-            _ptr->println(str);
-        }
-
-        void print(std::vector<jac::ValueWeak> args) override {
-            for (auto val : args) {
-                try {
-                    _ptr->print(val.to<std::string>() + " ");
-                }
-                catch (...) {
-                    _ptr->print(std::string("[Cannot convert]") + " ");
-                }
-            }
-        }
-
-        void println(std::vector<jac::ValueWeak> args) override {
-            _ptr->print(args);
-            _ptr->print("\n");
-        }
-
     };
 
     class ReadableRef : public Readable {
@@ -96,8 +86,8 @@ public:
     public:
         ReadableRef(Readable* ptr): _ptr(ptr) {}
 
-        std::string readLine() override {
-            return _ptr->readLine();
+        bool read(std::function<void(std::span<const uint8_t>)> callback) override {
+            return _ptr->read(std::move(callback));
         }
     };
 

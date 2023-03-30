@@ -45,7 +45,7 @@ public:
                 if (err <= 0) {
                     if (err < 0) {
                         // js_std_dump_error(ctx1);
-                        this->stdio.err->println(std::string("Error executing job: ") + std::to_string(err));
+                        this->stdio.err->print(std::string("Error executing job: ") + std::to_string(err) + "\n");
                     }
                     break;
                 }
