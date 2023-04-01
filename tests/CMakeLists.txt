@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 Include(FetchContent)
+include(CTest)
 
 FetchContent_Declare(
     Catch2
