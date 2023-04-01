@@ -28,6 +28,7 @@ public:
 
     class Readable {
     public:
+        virtual bool get(std::function<void(char)> callback) = 0;
         virtual bool read(std::function<void(std::string)> callback) = 0;
 
         virtual ~Readable() = default;
@@ -36,6 +37,21 @@ public:
     struct ReadableProtoBuilder : public jac::ProtoBuilder::Opaque<Readable>, public jac::ProtoBuilder::Properties {
         static void addProperties(jac::ContextRef ctx, jac::Object proto) {
             jac::FunctionFactory ff(ctx);
+
+            addProp(ctx, proto, "get", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
+                Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
+                auto [promise, resolve, reject] = jac::Promise::create(ctx_);
+
+                bool res = self_.get([resolve, ctx_](char data) mutable {
+                    resolve.call<void>(std::string{static_cast<char>(data)});
+                });
+
+                if (!res) {
+                    reject.call<void>(jac::Exception::create(ctx_, jac::Exception::Type::Error, "Stream is not readable"));
+                }
+
+                return promise;
+            }));
 
             addProp(ctx, proto, "read", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
                 Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
@@ -73,6 +89,10 @@ public:
 
         bool read(std::function<void(std::string)> callback) override {
             return _ptr->read(std::move(callback));
+        }
+
+        bool get(std::function<void(char)> callback) override {
+            return _ptr->get(std::move(callback));
         }
     };
 
