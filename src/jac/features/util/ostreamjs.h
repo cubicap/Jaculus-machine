@@ -12,8 +12,8 @@ class OsWritable : public Machine::Writable {
 public:
     OsWritable(std::ostream& stream): _stream(stream) {}
 
-    void write(std::span<const uint8_t> buffer) override {
-        _stream.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+    void write(std::string data) override {
+        _stream.write(data.data(), data.size());
     }
 };
 

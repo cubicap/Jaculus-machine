@@ -30,19 +30,19 @@ public:
 
         jac::Object console = jac::Object::create(this->_context);
         console.set("debug", ff.newFunction([this](std::string str) {
-            this->stdio.out->print(str + "\n");
+            this->stdio.out->write(str + "\n");
         }));
         console.set("log", ff.newFunction([this](std::string str) {
-            this->stdio.out->print(str + "\n");
+            this->stdio.out->write(str + "\n");
         }));
         console.set("info", ff.newFunction([this](std::string str) {
-            this->stdio.out->print(str + "\n");
+            this->stdio.out->write(str + "\n");
         }));
         console.set("warn", ff.newFunction([this](std::string str) {
-            this->stdio.err->print(str + "\n");
+            this->stdio.err->write(str + "\n");
         }));
         console.set("error", ff.newFunction([this](std::string str) {
-            this->stdio.err->print(str + "\n");
+            this->stdio.err->write(str + "\n");
         }));
         this->registerGlobal("console", console);
 
