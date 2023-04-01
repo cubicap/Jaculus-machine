@@ -1,0 +1,2 @@
+report("first")
+report("second")

@@ -31,7 +31,7 @@ TEST_CASE("Filesystem", "[filesystem]") {
 
 
     SECTION("code - existing") {
-        std::string file("test_files/moduleLoader/test.js");
+        std::string file("test_files/fs/test.js");
         std::string expected("report(\"first\")\nreport(\"second\")\n");
         machine.setCodeDir(machine.path.dirname(file));
         machine.initialize();
@@ -48,12 +48,12 @@ TEST_CASE("Filesystem", "[filesystem]") {
     }
 
     SECTION("data - existing") {
-        std::string file("test_files/moduleLoader/test.js");
+        std::string file("test_files/fs/test.js");
         std::string expected("report(\"first\")\nreport(\"second\")\n");
         machine.setDataDir(machine.path.dirname(file));
         machine.initialize();
 
-        REQUIRE(readFile(machine.fs.openData(machine.path.basename(file), "r")) == expected);
+        REQUIRE(readFile(machine.fs.open(machine.path.basename(file), "r")) == expected);
     }
 
     SECTION("data - not existing") {
@@ -61,7 +61,7 @@ TEST_CASE("Filesystem", "[filesystem]") {
         machine.setDataDir(".");
         machine.initialize();
 
-        REQUIRE_THROWS_AS(readFile(machine.fs.openData(file, "r")), std::runtime_error);
+        REQUIRE_THROWS_AS(readFile(machine.fs.open(file, "r")), std::runtime_error);
     }
 
     SECTION("data - write") {
@@ -72,16 +72,139 @@ TEST_CASE("Filesystem", "[filesystem]") {
         machine.setDataDir(".");
         machine.initialize();
 
-        auto f = machine.fs.openData(file, "wt");
+        auto f = machine.fs.open(file, "wt");
         f.write("test");
         f.close();
 
         REQUIRE(std::filesystem::exists(file));
-        REQUIRE(readFile(machine.fs.openData(file, "r")) == "test");
+        REQUIRE(readFile(machine.fs.open(file, "r")) == "test");
 
         std::filesystem::remove(file);
     }
+
+    SECTION("exists") {
+        machine.setDataDir(".");
+        machine.initialize();
+
+        REQUIRE(machine.fs.exists("test_files/fs/test.js"));
+        REQUIRE(machine.fs.exists("test_files/fs/test_dir"));
+        REQUIRE_FALSE(machine.fs.exists("not_existing.js"));
+    }
+
+    SECTION("isFile") {
+        machine.setDataDir(".");
+        machine.initialize();
+
+        REQUIRE(machine.fs.isFile("test_files/fs/test.js"));
+        REQUIRE_FALSE(machine.fs.isFile("test_files/fs/test_dir"));
+        REQUIRE_FALSE(machine.fs.isFile("not_existing.js"));
+    }
+
+    SECTION("isDirectory") {
+        machine.setDataDir(".");
+        machine.initialize();
+
+        REQUIRE_FALSE(machine.fs.isDirectory("test_files/fs/test.js"));
+        REQUIRE(machine.fs.isDirectory("test_files/fs/test_dir"));
+        REQUIRE_FALSE(machine.fs.isDirectory("not_existing.js"));
+    }
+
+    SECTION("mkdir") {
+        std::string dir("test_files/fs/tomkdir");
+        if (std::filesystem::exists(dir)) {
+            std::filesystem::remove_all(dir);
+        }
+        machine.setDataDir(".");
+        machine.initialize();
+
+        machine.fs.mkdir(dir);
+
+        REQUIRE(std::filesystem::exists(dir));
+        REQUIRE(std::filesystem::is_directory(dir));
+
+        std::filesystem::remove_all(dir);
+    }
+
+    SECTION("mkdir - recursive") {
+        std::string dir("test_files/fs/tomkdirrec/dir2/dir3");
+        if (std::filesystem::exists("test_files/fs/tomkdirrec")) {
+            std::filesystem::remove_all(dir);
+        }
+        machine.setDataDir(".");
+        machine.initialize();
+
+        machine.fs.mkdir(dir);
+
+        REQUIRE(std::filesystem::exists(dir));
+        REQUIRE(std::filesystem::is_directory(dir));
+
+        std::filesystem::remove_all(dir);
+    }
+
+    SECTION("rm") {
+        std::string file("test_files/fs/rmfile.txt");
+        machine.setDataDir(".");
+        machine.initialize();
+
+        machine.fs.rm(file);
+
+        REQUIRE_FALSE(std::filesystem::exists(file));
+    }
+
+    SECTION("rmdir") {
+        std::string dir("test_files/fs/tormdir");
+        if (!std::filesystem::exists(dir)) {
+            std::filesystem::create_directory(dir);
+        }
+        machine.setDataDir(".");
+        machine.initialize();
+
+        machine.fs.rmdir(dir);
+
+        REQUIRE_FALSE(std::filesystem::exists(dir));
+    }
 }
+
+
+TEST_CASE("Path", "[filesystem]") {
+    using Machine =
+        FilesystemFeature<
+        jac::MachineBase
+    >;
+    Machine machine;
+
+    SECTION("dirname") {
+        REQUIRE(machine.path.dirname("test.js") == ".");
+        REQUIRE(machine.path.dirname("test/test.js") == "test");
+        REQUIRE(machine.path.dirname("test/test/test.js") == "test/test");
+    }
+
+    SECTION("basename") {
+        REQUIRE(machine.path.basename("test.js") == "test.js");
+        REQUIRE(machine.path.basename("test/test.js") == "test.js");
+        REQUIRE(machine.path.basename("test/test/test.js") == "test.js");
+    }
+
+    SECTION("join") {
+        REQUIRE(machine.path.join({"test", "test.js"}) == "test/test.js");
+        REQUIRE(machine.path.join({"test", "test", "test.js"}) == "test/test/test.js");
+    }
+
+    SECTION("normalize") {
+        REQUIRE(machine.path.normalize("test/test.js") == "test/test.js");
+        REQUIRE(machine.path.normalize("test/../test.js") == "test.js");
+        REQUIRE(machine.path.normalize("test/./test.js") == "test/test.js");
+        REQUIRE(machine.path.normalize("test/../test/../test.js") == "test.js");
+        REQUIRE(machine.path.normalize("test/../../test.js") == "../test.js");
+        REQUIRE(machine.path.normalize("test/../../test/../test.js") == "../test.js");
+        REQUIRE(machine.path.normalize("../test/test.js") == "../test/test.js");
+        REQUIRE(machine.path.normalize("../test/../test.js") == "../test.js");
+        REQUIRE(machine.path.normalize("test///test.js") == "test/test.js");
+        REQUIRE(machine.path.normalize("test/test") == "test/test");
+        REQUIRE(machine.path.normalize("test/test/") == "test/test/");
+    }
+}
+
 
 TEST_CASE("File class js", "[filesystem]") {
     using Machine =
@@ -111,7 +234,7 @@ TEST_CASE("File class js", "[filesystem]") {
                          "file.close();\n");
 
         evalCode(machine, code, "test.js", jac::EvalFlags::Module);
-        REQUIRE(readFile(machine.fs.openData("testWrite.txt", "r")) == "test");
+        REQUIRE(readFile(machine.fs.open("testWrite.txt", "r")) == "test");
         std::filesystem::remove("test_files/fs/testWrite.txt");
     }
 
