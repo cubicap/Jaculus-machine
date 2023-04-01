@@ -13,7 +13,7 @@ private:
 
         std::string buffer;
         try {
-            buffer = self.loadCode(filename);
+            buffer = self.fs.loadCode(filename);
         } catch (std::exception &e) {
             auto error = jac::Exception::create(ctx, jac::Exception::Type::Error, e.what());
             error.throwJS();
@@ -37,10 +37,10 @@ private:
     }
 
 public:
-    jac::Value evalFile(std::string path) {
-        auto buffer = this->loadCode(path);
+    jac::Value evalFile(std::string path_) {
+        auto buffer = this->fs.loadCode(path_);
 
-        jac::Value val = this->eval(buffer, path, jac::EvalFlags::Module);
+        jac::Value val = this->eval(buffer, path_, jac::EvalFlags::Module);
         return val;
     }
 

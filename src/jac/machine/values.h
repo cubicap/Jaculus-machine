@@ -19,7 +19,7 @@ namespace jac {
 
 
 enum class PropFlags : int {
-    None = 0,
+    ReadOnly = 0,
     Configurable = JS_PROP_CONFIGURABLE,
     Writable = JS_PROP_WRITABLE,
     Enumerable = JS_PROP_ENUMERABLE,
@@ -269,7 +269,7 @@ public:
     }
 
     template<typename Id>
-    void defineProperty(Id id, Value value, PropFlags flags = PropFlags::None) {
+    void defineProperty(Id id, Value value, PropFlags flags = PropFlags::ReadOnly) {
         Atom atom = Atom::create(_ctx, id);
         if (JS_DefinePropertyValue(_ctx, _val, atom.get(), value.loot().second, static_cast<int>(flags)) < 0) {
             throw _ctx.getException();

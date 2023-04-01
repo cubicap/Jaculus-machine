@@ -11,52 +11,7 @@
 #include "util.h"
 
 
-TEST_CASE("Filesystem", "[filesystem]") {
-    using Machine =
-        FilesystemFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>;
-    Machine machine;
-
-
-    SECTION("code - existing") {
-        std::string file("test_files/moduleLoader/test.js");
-        std::string expected("report(\"first\")\nreport(\"second\")\n");
-        machine.setCodeDir(machine.getParentDir(file));
-        machine.initialize();
-
-        REQUIRE(machine.loadCode(machine.getFilename(file)) == expected);
-    }
-
-    SECTION("code - not existing") {
-        std::string file("not_existing.js");
-        machine.setCodeDir(".");
-        machine.initialize();
-
-        REQUIRE_THROWS_AS(machine.loadCode(file), std::runtime_error);
-    }
-
-    SECTION("data - existing") {
-        std::string file("test_files/moduleLoader/test.js");
-        std::string expected("report(\"first\")\nreport(\"second\")\n");
-        machine.setDataDir(machine.getParentDir(file));
-        machine.initialize();
-
-        REQUIRE(machine.loadData(machine.getFilename(file)) == expected);
-    }
-
-    SECTION("data - not existing") {
-        std::string file("not_existing.js");
-        machine.setDataDir(".");
-        machine.initialize();
-
-        REQUIRE_THROWS_AS(machine.loadData(file), std::runtime_error);
-    }
-}
-
-
-TEST_CASE("Eval file", "[filesystem, moduleLoader]") {
+TEST_CASE("Eval file", "[moduleLoader]") {
     using Machine =
         ModuleLoaderFeature<
         FilesystemFeature<
@@ -75,16 +30,16 @@ TEST_CASE("Eval file", "[filesystem, moduleLoader]") {
     );
 
     DYNAMIC_SECTION(comment) {
-        machine.setCodeDir(machine.getParentDir(path));
+        machine.setCodeDir(machine.path.dirname(path));
         machine.initialize();
 
-        machine.evalFile(machine.getFilename(path));
+        machine.evalFile(machine.path.basename(path));
         REQUIRE(machine.getReports() == expected);
     }
 }
 
 
-TEST_CASE("Import file", "[filesystem, moduleLoader]") {
+TEST_CASE("Import file", "[moduleLoader]") {
     using Machine =
         ModuleLoaderFeature<
         FilesystemFeature<
@@ -113,10 +68,10 @@ TEST_CASE("Import file", "[filesystem, moduleLoader]") {
     );
 
     DYNAMIC_SECTION(comment) {
-        machine.setCodeDir(machine.getParentDir(path));
+        machine.setCodeDir(machine.path.dirname(path));
         machine.initialize();
 
-        evalFile(machine, machine.getFilename(path));
+        evalFile(machine, machine.path.basename(path));
 
         REQUIRE(machine.getReports() == expected);
     }

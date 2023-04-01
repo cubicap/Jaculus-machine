@@ -21,6 +21,7 @@ function(add_test_executable name)
     add_test(NAME ${name} COMMAND ${EXECUTABLE_OUTPUT_PATH}/${name})
 endfunction()
 
+add_test_executable(filesystem)
 add_test_executable(eval)
 add_test_executable(moduleLoader)
 add_test_executable(machineBase)
