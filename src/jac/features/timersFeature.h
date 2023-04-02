@@ -2,6 +2,7 @@
 
 #include <jac/machine/machine.h>
 #include <jac/machine/functionFactory.h>
+#include <atomic>
 #include <chrono>
 #include <queue>
 #include <mutex>
@@ -90,7 +91,7 @@ private:
     std::mutex _timersMutex;
     std::condition_variable _timersCondition;
     std::thread _timerThread;
-    bool _stop = false;
+    std::atomic<bool> _stop = false;
 
     int nextId = 1;
 

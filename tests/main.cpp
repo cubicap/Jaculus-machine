@@ -37,7 +37,6 @@ exit(0);
 
 int main() {
     std::cout << "Start" << std::endl;
-    std::cout << "Running on thread: " << std::this_thread::get_id() << std::endl;
 
     Machine machine;
     initializeIo(machine);

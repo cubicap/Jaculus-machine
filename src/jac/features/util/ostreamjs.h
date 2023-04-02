@@ -3,7 +3,6 @@
 #include <vector>
 #include <memory>
 #include <iostream>
-#include <thread>
 
 
 template<class Machine>
