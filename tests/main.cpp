@@ -43,9 +43,9 @@ int main() {
     machine.initialize();
     try {
         auto val = machine.eval(code, "main.js", jac::EvalFlags::Module);
-        machine.eventLoop_run();
+        machine.runEventLoop();
 
-        std::cout << "Exit code: " << machine.eventLoop_getExitCode() << std::endl;
+        std::cout << "Exit code: " << machine.getExitCode() << std::endl;
     } catch (jac::Exception& e) {
         std::cout << "Exception: " << e.toString() << std::endl;
         std::cout << "Stack: " << e.stackTrace() << std::endl;

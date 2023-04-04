@@ -14,59 +14,63 @@
 template<class Next>
 class EventLoopFeature : public Next {
 private:
-    bool _running = false;
     bool _shouldExit = false;
     int _exitCode = 1;
 public:
 
-    void eventLoop_run() {
-        _running = true;
+    void runEventLoop() {
+        try {
+            JSRuntime* rt = JS_GetRuntime(this->_context);
+            JSContext* ctx1;
 
-        JSRuntime* rt = JS_GetRuntime(this->_context);
-        JSContext* ctx1;
-        int err;
-
-        bool didJob = true;
-
-        while (!_shouldExit) {
-            runOnEventLoop();
-
-            auto event = this->getEvent(!didJob);
-            if (event) {
-                (*event)();
-            }
-            else if (!didJob) {
-                continue;
-            }
-
-            didJob = false;
+            bool didJob = true;
             while (!_shouldExit) {
-                err = JS_ExecutePendingJob(rt, &ctx1);
-                if (err <= 0) {
-                    if (err < 0) {
-                        // js_std_dump_error(ctx1);
-                        this->stdio.err->write(std::string("Error executing job: ") + std::to_string(err) + "\n");
-                    }
-                    break;
+                runOnEventLoop();
+
+                auto event = this->getEvent(!didJob);
+                if (event) {
+                    (*event)();
                 }
-                didJob = true;
+                else if (!didJob) {
+                    continue;
+                }
+
+                didJob = false;
+                while (!_shouldExit) {
+                    int err = JS_ExecutePendingJob(rt, &ctx1);
+                    if (err <= 0) {
+                        if (err < 0) {
+                            throw jac::ContextRef(ctx1).getException();
+                        }
+                        break;
+                    }
+                    didJob = true;
+                }
             }
         }
-        _running = false;
+        catch (...) {
+            if (_shouldExit) {
+                // ignore
+            }
+            else {
+                throw;
+            }
+        }
     }
 
-    void eventLoop_stop() {
+    void kill() {
         _shouldExit = true;
         this->interruptRuntime();
         this->notifyEventLoop();
+        _exitCode = 1;
     }
 
-    void eventLoop_exit(int code = 0) {
+    void exit(int code = 0) {
+        kill();
         _exitCode = code;
-        eventLoop_stop();
     }
 
-    int eventLoop_getExitCode() {
+    int getExitCode() {
         return _exitCode;
     }
 
@@ -75,7 +79,7 @@ public:
     void initialize() {
         Next::initialize();
         jac::FunctionFactory ff(this->_context);
-        this->registerGlobal("exit", ff.newFunction(noal::function(&EventLoopFeature::eventLoop_exit, this)));
+        this->registerGlobal("exit", ff.newFunction(noal::function(&EventLoopFeature::exit, this)));
     }
 
     void onEventLoop() {
