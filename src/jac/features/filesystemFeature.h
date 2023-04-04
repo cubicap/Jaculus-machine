@@ -186,7 +186,7 @@ public:
 
         jac::FunctionFactory ff(this->_context);
 
-        jac::JSModule& pathMod = this->newModule("path");
+        jac::Module& pathMod = this->newModule("path");
         pathMod.addExport("normalize", ff.newFunction(noal::function(&Path::normalize, &(this->path))));
         pathMod.addExport("dirname", ff.newFunction(noal::function(&Path::dirname, &(this->path))));
         pathMod.addExport("basename", ff.newFunction(noal::function(&Path::basename, &(this->path))));
@@ -198,7 +198,7 @@ public:
             return this->path.join(paths_);
         }));
 
-        jac::JSModule& fsMod = this->newModule("fs");
+        jac::Module& fsMod = this->newModule("fs");
         fsMod.addExport("open", ff.newFunction([this](std::string path_, std::string flags) {
             return FileClass::createInstance(this->_context, new File(this->fs.open(path_, flags)));
         }));

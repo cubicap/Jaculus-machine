@@ -41,24 +41,23 @@ inline constexpr EvalFlags operator&(EvalFlags a, EvalFlags b) {
 class MachineBase;
 
 
-class JSModule {
+class Module {
     ContextRef _ctx;
     JSModuleDef *_def;
 
     std::vector<std::tuple<std::string, Value>> exports;
 public:
-    // JSModule() = default;
-    JSModule(ContextRef ctx, std::string name);
-    JSModule& operator=(const JSModule&) = delete;
-    JSModule(const JSModule&) = delete;
-    JSModule& operator=(JSModule&& other) {
+    Module(ContextRef ctx, std::string name);
+    Module& operator=(const Module&) = delete;
+    Module(const Module&) = delete;
+    Module& operator=(Module&& other) {
         _ctx = other._ctx;
         _def = other._def;
         exports = std::move(other.exports);
         other._def = nullptr;
         return *this;
     }
-    JSModule(JSModule&& other): _ctx(other._ctx), _def(other._def), exports(std::move(other.exports)) {
+    Module(Module&& other): _ctx(other._ctx), _def(other._def), exports(std::move(other.exports)) {
         other._def = nullptr;
     }
 
@@ -80,8 +79,8 @@ public:
 
 class MachineBase {
 private:
-    std::unordered_map<JSModuleDef*, JSModule> _modules;
-    JSModule& findModule(JSModuleDef* m);
+    std::unordered_map<JSModuleDef*, Module> _modules;
+    Module& findModule(JSModuleDef* m);
 
     bool _interrupt = false;
 public:
@@ -110,13 +109,13 @@ public:
 
     void registerGlobal(std::string name, Value value, PropFlags flags = PropFlags::Enumerable);
 
-    JSModule& newModule(std::string name);
+    Module& newModule(std::string name);
 
     void interruptRuntime() {
         _interrupt = true;
     }
 
-    friend class JSModule;
+    friend class Module;
 };
 
 

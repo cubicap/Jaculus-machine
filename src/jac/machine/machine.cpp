@@ -5,9 +5,9 @@
 namespace jac {
 
 
-JSModule::JSModule(ContextRef ctx, std::string name) : _ctx(ctx) {
+Module::Module(ContextRef ctx, std::string name) : _ctx(ctx) {
     _def = JS_NewCModule(ctx, name.c_str(), [](JSContext* context, JSModuleDef* def) {
-        JSModule& module = base(context).findModule(def);
+        Module& module = base(context).findModule(def);
 
         for (auto& [exName, exVal] : module.exports) {
             JS_SetModuleExport(context, def, exName.c_str(), exVal.loot().second);
@@ -19,7 +19,7 @@ JSModule::JSModule(ContextRef ctx, std::string name) : _ctx(ctx) {
     }
 }
 
-void JSModule::addExport(std::string name, Value val) {
+void Module::addExport(std::string name, Value val) {
     JS_AddModuleExport(_ctx, _def, name.c_str());
     exports.emplace_back(name, val);
 }
@@ -55,15 +55,15 @@ void MachineBase::registerGlobal(std::string name, Value value, PropFlags flags 
     globalObject.defineProperty(name, value, flags);
 }
 
-JSModule& MachineBase::newModule(std::string name) {
-    JSModule module(_context, name);
+Module& MachineBase::newModule(std::string name) {
+    Module module(_context, name);
     JSModuleDef* def = module.get();
     _modules.emplace(def, std::move(module));
 
     return _modules.find(def)->second;
 }
 
-JSModule& MachineBase::findModule(JSModuleDef* m) {
+Module& MachineBase::findModule(JSModuleDef* m) {
     auto it = _modules.find(m);
     if (it == _modules.end()) {
         throw std::runtime_error("module not found");
