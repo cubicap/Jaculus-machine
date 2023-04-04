@@ -65,7 +65,7 @@ public:
         _exitCode = 1;
     }
 
-    void exit(int code = 0) {
+    void exit(int code) {
         kill();
         _exitCode = code;
     }

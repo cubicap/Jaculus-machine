@@ -40,7 +40,7 @@ public:
     jac::Value evalFile(std::string path_) {
         auto buffer = this->fs.loadCode(path_);
 
-        jac::Value val = this->eval(buffer, path_, jac::EvalFlags::Module);
+        jac::Value val = this->eval(std::move(buffer), path_, jac::EvalFlags::Module);
         return val;
     }
 

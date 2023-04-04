@@ -42,7 +42,12 @@ void MachineBase::initialize() {
 }
 
 Value MachineBase::eval(std::string code, std::string filename, EvalFlags flags /*= EvalFlags::Global*/) {
-    return Value(_context, JS_Eval(_context, code.c_str(), code.size(), filename.c_str(), static_cast<int>(flags)));
+    Value bytecode(_context, JS_Eval(_context, code.c_str(), code.size(), filename.c_str(), static_cast<int>(flags | EvalFlags::CompileOnly)));
+    if (static_cast<int>(flags & EvalFlags::CompileOnly) != 0) {
+        return bytecode;
+    }
+    code = "";
+    return Value(_context, JS_EvalFunction(_context, bytecode.loot().second));
 }
 
 void MachineBase::registerGlobal(std::string name, Value value, PropFlags flags /*= PropFlags::Enumerable*/) {
