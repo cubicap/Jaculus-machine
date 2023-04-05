@@ -8,6 +8,9 @@
 namespace jac {
 
 
+/**
+ * @brief A wrapper around QuickJS C-string with automatic memory management
+ */
 class StringView : public std::basic_string_view<char> {
     using basic_string_view = std::basic_string_view<char>;
 
@@ -31,13 +34,25 @@ public:
         return *this;
     }
 
+    /**
+     * @brief Get the C string
+     *
+     * @return const char*
+     */
     const char* c_str() const {
         return data();
     }
 
     StringView() = default;
+
+    /**
+     * @brief Wrap a QuickJS allocated string. The string will be freed when the StringView is freed.
+     * @note The string must be allocated using QuickJS functions - JS_NewString, JS_ToCString, etc.
+     *
+     * @param ctx context to work in
+     * @param str string to wrap
+     */
     StringView(ContextRef ctx, const char* str) : basic_string_view(str), _ctx(ctx) {}
-    StringView(ContextRef ctx, const char* str, size_t len) : basic_string_view(str, len), _ctx(ctx) {}
 
     ~StringView() {
         if (_ctx) {

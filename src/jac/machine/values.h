@@ -410,7 +410,7 @@ public:
 
     /**
      * @brief Create a new Promise object
-     * @return tuple of the Promise object, resolve function, reject function
+     * @return Tuple of the Promise object, resolve function, reject function
      */
     static std::tuple<Promise, Function, Function> create(ContextRef ctx) {
         JSValue functions[2];

@@ -81,7 +81,7 @@ public:
      * @brief Release ownership of the JSAtom. The JSAtom will have to be freed manually.
      * @note After this call, the Atom will be in an invalid state.
      *
-     * @return pair of ContextRef and JSAtom
+     * @return Pair of ContextRef and JSAtom
      */
     std::pair<ContextRef, JSAtom> loot() {
         JSAtom atom_ = _atom;
@@ -105,7 +105,7 @@ public:
      *
      * @param ctx context to create the atom in
      * @param value the value
-     * @return the newly constructed atom
+     * @return The newly constructed atom
      */
     static Atom create(ContextRef ctx, uint32_t value) {
         return Atom(ctx, JS_NewAtomUInt32(ctx, value));
@@ -116,7 +116,7 @@ public:
      *
      * @param ctx context to create the atom in
      * @param value the value
-     * @return the newly constructed atom
+     * @return The newly constructed atom
      */
     static Atom create(ContextRef ctx, const char* value) {
         return Atom(ctx, JS_NewAtom(ctx, value));
@@ -127,7 +127,7 @@ public:
      *
      * @param ctx context to create the atom in
      * @param value the value
-     * @return the newly constructed atom
+     * @return The newly constructed atom
      */
     static Atom create(ContextRef ctx, std::string value) {
         return create(ctx, value.c_str());

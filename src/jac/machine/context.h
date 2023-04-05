@@ -21,7 +21,7 @@ public:
     /**
      * @brief Get the underlying JSContext*
      *
-     * @return the JSContext*
+     * @return The JSContext*
      */
     JSContext* get() { return _ctx; }
 
@@ -29,7 +29,7 @@ public:
      * @brief Get pending exception thrown in this context
      * @note If there is no pending exception, new Exception will be thrown
      *
-     * @return the Exception
+     * @return The Exception
      */
     Exception getException();
 

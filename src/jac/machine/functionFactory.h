@@ -7,16 +7,18 @@
 
 namespace jac {
 
-
+/**
+ * @brief Various methods for wrapping C++ functions into javascript functions
+ *
+ * About exceptions propagation:
+ *
+ * When jac::Exception is thrown, the wrapped value or given error
+ * type is thrown. When std::exception is thrown, an InternalError
+ * is thrown. When any other exception is thrown, an InternalError
+ * is thrown with the message "unknown error".
+ */
 class FunctionFactory {
-    /**
-     * About exceptions propagation:
-     *
-     * When jac::Exception is thrown, the wrapped value or given error
-     * type is thrown. When std::exception is thrown, an InternalError
-     * is thrown. When any other exception is thrown, an InternalError
-     * is thrown with the message "unknown error".
-     */
+
     ContextRef _context;
 
     template<typename Func, typename Res, typename... Args>
@@ -37,13 +39,13 @@ public:
      * @brief Wraps a C++ function into a javascript function object
      *
      * The expected signature of the function object is Res(Args...).
-     * Arguments and return value of the function are automatically
+     * Arguments and the result of the function call are automatically
      * converted to and from javascript values. Exceptions thrown within
      * the function are automatically propagated to the javascript side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
-     * @return the created function object
+     * @return The created function object
      */
     template<class Func>
     Function newFunction(Func func) {
@@ -54,15 +56,15 @@ public:
      * @brief Wraps a C++ function into a javascript function object
      *
      * The expected signature of the function object is
-     * Res(std::vector<ValueWeak>). The vector will contain all
-     * arguments passed to the function. The return value of the
-     * function is automatically converted from a javascript value.
+     * Res(std::vector<@ref ValueWeak>). The vector will contain all
+     * arguments passed to the function. The result of the function
+     * call is automatically converted from a javascript value.
      * Exceptions thrown within the function are automatically
      * propagated to the javascript side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
-     * @return the created function object
+     * @return The created function object
      */
     template<class Func>
     Function newFunctionVariadic(Func func) {
@@ -72,14 +74,14 @@ public:
     /**
      * @brief Wraps a C++ function into a javascript function object
      *
-     * The expected signature of the function object is Res(jac::Value, Args...).
-     * Arguments and return value of the function are automatically
+     * The expected signature of the function object is Res(@ref Value, Args...).
+     * Arguments and the result of the function call are automatically
      * converted to and from javascript values. Exceptions thrown within
      * the function are automatically propagated to the javascript side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
-     * @return the created function object
+     * @return The created function object
      */
     template<class Func>
     Function newFunctionThis(Func func) {
@@ -90,15 +92,15 @@ public:
      * @brief Wraps a C++ function into a javascript function object
      *
      * The expected signature of the function object is
-     * Res(jac::Value, std::vector<ValueWeak>). The vector will contain
-     * all arguments passed to the function. The return value of the
-     * function is automatically converted from a javascript value.
+     * Res(@ref Value, std::vector<@ref ValueWeak>). The vector will contain
+     * all arguments passed to the function. The the result of the
+     * function call is automatically converted from a javascript value.
      * Exceptions thrown within the function are automatically
      * propagated to the javascript side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
-     * @return the created function object
+     * @return The created function object
      */
     template<class Func>
     Function newFunctionThisVariadic(Func func) {

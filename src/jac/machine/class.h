@@ -86,7 +86,7 @@ namespace ProtoBuilder {
          *
          * @param ctx context to work in
          * @param args arguments passed to the constructor
-         * @return a pointer to the opaque data
+         * @return A pointer to the opaque data
          */
         static T* constructOpaque(ContextRef ctx, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be instantiated");
@@ -108,7 +108,7 @@ namespace ProtoBuilder {
          *
          * @param ctx context to work in
          * @param thisVal the instance of the class
-         * @return a pointer to the opaque data
+         * @return A pointer to the opaque data
          */
         static T* getOpaque(ContextRef ctx, ValueWeak thisVal) {
             T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal.getVal(), classId));
@@ -128,7 +128,7 @@ namespace ProtoBuilder {
          * @param funcObj instance of the class
          * @param thisVal value of `this` in the function
          * @param argv arguments passed to the function
-         * @return return value of the function
+         * @return Result of the call
          */
         template<typename Sgn, Sgn member>
         static Value callMember(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> argv) {
@@ -239,7 +239,7 @@ namespace ProtoBuilder {
          * @param funcObj instance of the class
          * @param target value of `new.target` in the function
          * @param args arguments passed to the function
-         * @return result of the call
+         * @return Result of the call
          */
         static Value callConstructor(ContextRef ctx, ValueWeak funcObj, ValueWeak target, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a constructor");
@@ -410,7 +410,7 @@ public:
      * @note if the class wasn't initialized in the context, it will be initialized
      *
      * @param ctx context to work in
-     * @return the prototype object
+     * @return The prototype object
      */
     static Object getProto(ContextRef ctx) {
         JSRuntime* rt = JS_GetRuntime(ctx);
@@ -430,7 +430,7 @@ public:
      * @note if the class wasn't initialized in the context, it will be initialized
      *
      * @param ctx context to work in
-     * @return the constructor object
+     * @return The constructor object
      */
     static Function getConstructor(ContextRef ctx) {
         Object proto = getProto(ctx);
@@ -443,7 +443,7 @@ public:
      *
      * @param ctx the context
      * @param instance a new-allocated instance to be saved as opaque data
-     * @return the new instance
+     * @return The new instance
      */
     template<typename T, typename Bdr = Builder>
     static std::enable_if_t<is_base_of_template_v<ProtoBuilder::Opaque, Bdr>
