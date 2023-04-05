@@ -1,8 +1,8 @@
 #pragma once
 
-#include "values.h"
-#include "funcUtil.h"
 #include "class.h"
+#include "funcUtil.h"
+#include "values.h"
 
 
 namespace jac {
@@ -43,7 +43,7 @@ public:
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
-     * @return The created function object
+     * @return the created function object
      */
     template<class Func>
     Function newFunction(Func func) {
@@ -62,18 +62,44 @@ public:
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
-     * @return The created function object
+     * @return the created function object
      */
     template<class Func>
     Function newFunctionVariadic(Func func) {
         return newFunctionVariadicHelper(func, std::function(func));
     }
 
+    /**
+     * @brief Wraps a C++ function into a javascript function object
+     *
+     * The expected signature of the function object is Res(jac::Value, Args...).
+     * Arguments and return value of the function are automatically
+     * converted to and from javascript values. Exceptions thrown within
+     * the function are automatically propagated to the javascript side.
+     *
+     * @tparam Func type of the function to be wrapped
+     * @param func the function object to be wrapped
+     * @return the created function object
+     */
     template<class Func>
     Function newFunctionThis(Func func) {
         return newFunctionThisHelper(func, std::function(func));
     }
 
+    /**
+     * @brief Wraps a C++ function into a javascript function object
+     *
+     * The expected signature of the function object is
+     * Res(jac::Value, std::vector<ValueWeak>). The vector will contain
+     * all arguments passed to the function. The return value of the
+     * function is automatically converted from a javascript value.
+     * Exceptions thrown within the function are automatically
+     * propagated to the javascript side.
+     *
+     * @tparam Func type of the function to be wrapped
+     * @param func the function object to be wrapped
+     * @return the created function object
+     */
     template<class Func>
     Function newFunctionThisVariadic(Func func) {
         return newFunctionThisVariadicHelper(func, std::function(func));
@@ -86,9 +112,9 @@ inline Function FunctionFactory::newFunctionHelper(Func& func, std::function<Res
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
-            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
-            return processCall<Func, Res, Args...>(ctx, this_val, args, *ptr);
+        static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
+            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, funcObj);
+            return processCall<Func, Res, Args...>(ctx, thisVal, args, *ptr);
         }
     };
 
@@ -103,9 +129,9 @@ Function FunctionFactory::newFunctionVariadicHelper(Func& func, std::function<Re
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
-            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
-            return processCallVariadic<Func, Res>(ctx, this_val, args, *ptr);
+        static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
+            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, funcObj);
+            return processCallVariadic<Func, Res>(ctx, thisVal, args, *ptr);
         }
     };
 
@@ -120,9 +146,9 @@ Function FunctionFactory::newFunctionThisHelper(Func& func, std::function<Res(Co
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
-            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
-            return processCallThis<Func, Res, Args...>(ctx, this_val, args, *ptr);
+        static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
+            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, funcObj);
+            return processCallThis<Func, Res, Args...>(ctx, thisVal, args, *ptr);
         }
     };
 
@@ -137,9 +163,9 @@ Function FunctionFactory::newFunctionThisVariadicHelper(Func& func, std::functio
     Func* funcPtr = new Func(std::move(func));
 
     struct FuncProtoBuilder : public ProtoBuilder::Opaque<Func>, public ProtoBuilder::Callable {
-        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
-            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, func_obj);
-            return processCallThisVariadic<Func, Res>(ctx, this_val, args, *ptr);
+        static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
+            Func* ptr = ProtoBuilder::Opaque<Func>::getOpaque(ctx, funcObj);
+            return processCallThisVariadic<Func, Res>(ctx, thisVal, args, *ptr);
         }
     };
 

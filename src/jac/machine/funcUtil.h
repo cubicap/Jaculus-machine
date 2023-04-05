@@ -7,6 +7,13 @@
 namespace jac {
 
 
+/**
+ * Various functions to process function calls with unprocessed javascript arguments.
+ * Arguments and return value of the functions are automatically converted to
+ * and from javascript values. Exceptions thrown within the functions are
+ * caught and propagated to the javascript side.
+ */
+
 template<typename Func>
 inline JSValue propagateExceptions(ContextRef ctx, Func& f) noexcept {
     try {
@@ -29,7 +36,7 @@ inline JSValue propagateExceptions(ContextRef ctx, Func&& f) noexcept {
 }
 
 template<typename Func, typename Res, typename... Args>
-inline JSValue processCallRaw(ContextRef ctx, JSValueConst this_val, int argc, JSValueConst* argv, Func& f) {
+inline JSValue processCallRaw(ContextRef ctx, JSValueConst thisVal, int argc, JSValueConst* argv, Func& f) {
     std::tuple<Args...> args = convertArgs<Args...>(ctx, argv, argc, std::make_index_sequence<sizeof...(Args)>());
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -42,7 +49,7 @@ inline JSValue processCallRaw(ContextRef ctx, JSValueConst this_val, int argc, J
 }
 
 template<typename Func, typename Res, typename... Args>
-inline Value processCall(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
+inline Value processCall(ContextRef ctx, ValueWeak thisVal, std::vector<ValueWeak> argv, Func& f) {
     std::tuple<Args...> args = convertArgs<Args...>(ctx, argv, std::make_index_sequence<sizeof...(Args)>());
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -55,7 +62,7 @@ inline Value processCall(ContextRef ctx, ValueWeak this_val, std::vector<ValueWe
 }
 
 template<typename Func, typename Res>
-inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst this_val, int argc, JSValueConst* argv, Func& f) {
+inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst thisVal, int argc, JSValueConst* argv, Func& f) {
     std::vector<ValueWeak> args;
     for (int i = 0; i < argc; i++) {
         args.push_back(ValueWeak(ctx, argv[i]));
@@ -71,7 +78,7 @@ inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst this_val, int
 }
 
 template<typename Func, typename Res>
-inline Value processCallVariadic(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
+inline Value processCallVariadic(ContextRef ctx, ValueWeak thisVal, std::vector<ValueWeak> argv, Func& f) {
     if constexpr (std::is_same_v<Res, void>) {
         f(argv);
         return Value::undefined(ctx);
@@ -82,27 +89,27 @@ inline Value processCallVariadic(ContextRef ctx, ValueWeak this_val, std::vector
 }
 
 template<typename Func, typename Res, typename... Args>
-inline Value processCallThis(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
+inline Value processCallThis(ContextRef ctx, ValueWeak thisVal, std::vector<ValueWeak> argv, Func& f) {
     std::tuple<Args...> args = convertArgs<Args...>(ctx, argv, std::make_index_sequence<sizeof...(Args)>());
 
     if constexpr (std::is_same_v<Res, void>) {
-        std::apply(f, std::tuple_cat(std::make_tuple(ctx, this_val), args));
+        std::apply(f, std::tuple_cat(std::make_tuple(ctx, thisVal), args));
         return Value::undefined(ctx);
     }
     else {
-        return Value::from(ctx, std::apply(f, std::tuple_cat(std::make_tuple(ctx, this_val), args)));
+        return Value::from(ctx, std::apply(f, std::tuple_cat(std::make_tuple(ctx, thisVal), args)));
     }
 }
 
 template<typename Func, typename Res>
-inline Value processCallThisVariadic(ContextRef ctx, ValueWeak this_val, std::vector<ValueWeak> argv, Func& f) {
+inline Value processCallThisVariadic(ContextRef ctx, ValueWeak thisVal, std::vector<ValueWeak> argv, Func& f) {
 
     if constexpr (std::is_same_v<Res, void>) {
-        f(ctx, this_val, argv);
+        f(ctx, thisVal, argv);
         return Value::undefined(ctx);
     }
     else {
-        return Value::from(ctx, f(ctx, this_val, argv));
+        return Value::from(ctx, f(ctx, thisVal, argv));
     }
 }
 

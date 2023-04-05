@@ -1,8 +1,7 @@
 #pragma once
 
 #include <stddef.h>
-#include <utility>
-#include <algorithm>
+
 
 namespace noal {
 

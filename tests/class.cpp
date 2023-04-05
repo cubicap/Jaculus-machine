@@ -61,7 +61,7 @@ TEST_CASE("Class", "[class]") {
 
     SECTION("Callable function") {
         struct ClassBuilder : jac::ProtoBuilder::Callable {
-            static jac::Value callFunction(jac::ContextRef ctx, jac::ValueWeak func_obj, jac::ValueWeak this_val, std::vector<jac::ValueWeak> args) {
+            static jac::Value callFunction(jac::ContextRef ctx, jac::ValueWeak funcObj, jac::ValueWeak thisVal, std::vector<jac::ValueWeak> args) {
                 return jac::Value::from(ctx, static_cast<int>(args.size()));
             }
         };
@@ -80,7 +80,7 @@ TEST_CASE("Class", "[class]") {
 
     SECTION("Callable constructor") {
         struct ClassBuilder : jac::ProtoBuilder::Callable {
-            static jac::Value callConstructor(jac::ContextRef ctx, jac::ValueWeak func_obj, jac::ValueWeak target, std::vector<jac::ValueWeak> args) {
+            static jac::Value callConstructor(jac::ContextRef ctx, jac::ValueWeak funcObj, jac::ValueWeak target, std::vector<jac::ValueWeak> args) {
                 return jac::Value::from(ctx, static_cast<int>(args.size()));
             }
         };
@@ -99,11 +99,11 @@ TEST_CASE("Class", "[class]") {
 
     SECTION("Callable function, constructor") {
         struct ClassBuilder : jac::ProtoBuilder::Callable {
-            static jac::Value callFunction(jac::ContextRef ctx, jac::ValueWeak func_obj, jac::ValueWeak this_val, std::vector<jac::ValueWeak> args) {
+            static jac::Value callFunction(jac::ContextRef ctx, jac::ValueWeak funcObj, jac::ValueWeak thisVal, std::vector<jac::ValueWeak> args) {
                 return jac::Value::from(ctx, static_cast<int>(args.size()));
             }
 
-            static jac::Value callConstructor(jac::ContextRef ctx, jac::ValueWeak func_obj, jac::ValueWeak target, std::vector<jac::ValueWeak> args) {
+            static jac::Value callConstructor(jac::ContextRef ctx, jac::ValueWeak funcObj, jac::ValueWeak target, std::vector<jac::ValueWeak> args) {
                 return jac::Value::from(ctx, static_cast<int>(args.size()));
             }
         };
@@ -141,7 +141,6 @@ TEST_CASE("Class", "[class]") {
                 addPropMember<int, &Opq::a>(ctx, proto, "a");
                 addMethodMember<decltype(&Opq::setStatic), &Opq::setStatic>(ctx, proto, "setStatic");
                 addMethodMember<decltype(&Opq::add), &Opq::add>(ctx, proto, "add");
-                addMethodMemberVariadic<decltype(&Opq::countArgs), &Opq::countArgs>(ctx, proto, "countArgs");
             }
         };
 
@@ -157,9 +156,8 @@ TEST_CASE("Class", "[class]") {
             report(val.a);
             val.setStatic();
             report(val.add(1));
-            report(val.countArgs(1, 2, 3));
         )","test", jac::EvalFlags::Global);
-        REQUIRE(machine.getReports() == std::vector<std::string>{"42", "43", "44", "3"});
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42", "43", "44"});
         REQUIRE(aStatic == 43);
     }
 
@@ -220,11 +218,11 @@ TEST_CASE("Class", "[class]") {
                 return new Opq(args[0].to<int>());
             }
 
-            static jac::Value callFunction(jac::ContextRef ctx, jac::ValueWeak func_obj, jac::ValueWeak this_val, std::vector<jac::ValueWeak> args) {
+            static jac::Value callFunction(jac::ContextRef ctx, jac::ValueWeak funcObj, jac::ValueWeak thisVal, std::vector<jac::ValueWeak> args) {
                 if (args.size() != 1) {
                     throw jac::Exception::create(ctx, jac::Exception::Type::TypeError, "invalid number of arguments");
                 }
-                return callMember<decltype(&Opq::operator()), &Opq::operator()>(ctx, func_obj, this_val, args);
+                return callMember<decltype(&Opq::operator()), &Opq::operator()>(ctx, funcObj, thisVal, args);
             }
 
             static void addProperties(jac::ContextRef ctx, jac::Value proto) {
@@ -260,8 +258,8 @@ TEST_CASE("Class", "[class]") {
             static void addProperties(jac::ContextRef ctx, jac::Value proto) {
                 addPropMember<std::string, &Opq::prefix>(ctx, proto, "prefix");
                 jac::FunctionFactory ff(ctx);
-                addProp(ctx, proto, "pref", ff.newFunctionThisVariadic([](jac::ContextRef _ctx, jac::ValueWeak this_val, std::vector<jac::ValueWeak> args) {
-                    auto opq = getOpaque(_ctx, this_val);
+                addProp(ctx, proto, "pref", ff.newFunctionThisVariadic([](jac::ContextRef _ctx, jac::ValueWeak thisVal, std::vector<jac::ValueWeak> args) {
+                    auto opq = getOpaque(_ctx, thisVal);
                     std::string result = opq->prefix;
                     for (auto& arg : args) {
                         result += arg.to<std::string>();

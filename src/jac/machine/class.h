@@ -2,15 +2,14 @@
 
 #include <quickjs.h>
 
-#include <vector>
-#include <variant>
-#include <tuple>
 #include <string>
-#include <experimental/type_traits>
+#include <tuple>
+#include <variant>
+#include <vector>
 
+#include "funcUtil.h"
 #include "machine.h"
 #include "values.h"
-#include "funcUtil.h"
 
 
 namespace jac {
@@ -34,26 +33,33 @@ SgnUnwrap(Res (Class::*)(Args...)) -> SgnUnwrap<Res(Args...)>;
 template<class Class, typename Res, typename... Args>
 SgnUnwrap(Res (Class::*)(Args...) const) -> SgnUnwrap<Res(Args...)>;
 
+namespace detail {
+    template<template <typename...> class Base, typename Derived>
+    struct is_base_of_template_impl {
+        template<typename... Ts>
+        static constexpr void is_callable(Base<Ts...>*);
 
+        template<typename T>
+        using is_callable_t = decltype(is_callable(std::declval<T*>()));
+
+        template<template<class...> class A, class Void = void>
+        struct check : std::false_type {};
+
+        template<template<class...> class A>
+        struct check<A, std::void_t<A<Derived>>> : std::true_type {};
+
+        using value_t = check<is_callable_t>;
+    };
+}
+
+/**
+ * @brief Checks if a type is derived from a template class
+ *
+ * @tparam Base The base template class
+ * @tparam Derived The tested type
+ */
 template<template <typename...> class Base, typename Derived>
-struct is_base_of_template_impl {
-    template<typename... Ts>
-    static constexpr void is_callable(Base<Ts...>*);
-
-    template<typename T>
-    using is_callable_t = decltype(is_callable(std::declval<T*>()));
-
-    template<template<class...> class A, class Void = void>
-    struct check : std::false_type {};
-
-    template<template<class...> class A>
-    struct check<A, std::void_t<A<Derived>>> : std::true_type {};
-
-    using value_t = check<is_callable_t>;
-};
-
-template<template <typename...> class Base, typename Derived>
-struct is_base_of_template : is_base_of_template_impl<Base, Derived>::value_t {};
+struct is_base_of_template : detail::is_base_of_template_impl<Base, Derived>::value_t {};
 
 template<template <typename...> class Base, typename Derived>
 using is_base_of_template_t = typename is_base_of_template<Base, Derived>::type;
@@ -64,54 +70,102 @@ inline constexpr bool is_base_of_template_v = is_base_of_template<Base, Derived>
 
 namespace ProtoBuilder {
 
+    /**
+     * @brief A class used as a base for javascript classes with opaque data
+     *
+     * @tparam T The type of the opaque data
+     */
     template<typename T>
     struct Opaque {
         using OpaqueType = T;
         static inline JSClassID classId;
 
+        /**
+         * @brief Construct a new Opaque object from javascript arguments
+         * @note This function is only called upon javascript class instantiation
+         *
+         * @param ctx context to work in
+         * @param args arguments passed to the constructor
+         * @return a pointer to the opaque data
+         */
         static T* constructOpaque(ContextRef ctx, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be instantiated");
         }
 
+        /**
+         * @brief Destroy the Opaque object
+         * @note This function is only called when the javascript object is garbage collected
+         *
+         * @param rt runtime to work in
+         * @param ptr pointer to the opaque data
+         */
         static void destroyOpaque(JSRuntime* rt, T* ptr) noexcept {
             delete ptr;
         }
 
-
-        static T* getOpaque(ContextRef ctx, ValueWeak this_val) {
-            T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val.getVal(), classId));
+        /**
+         * @brief Get the Opaque object from an instance of the class
+         *
+         * @param ctx context to work in
+         * @param thisVal the instance of the class
+         * @return a pointer to the opaque data
+         */
+        static T* getOpaque(ContextRef ctx, ValueWeak thisVal) {
+            T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal.getVal(), classId));
             if (!ptr) {
                 throw Exception::create(ctx, Exception::Type::TypeError, "Invalid opaque data");
             }
             return ptr;
         }
 
+        /**
+         * @brief Process a call to a member function of the wrapped class
+         * @note The arguments and return value are automatically converted to and from javascript values
+         *
+         * @tparam Sgn the signature of the member function
+         * @tparam member pointer to the member function
+         * @param ctx context to work in
+         * @param funcObj instance of the class
+         * @param thisVal value of `this` in the function
+         * @param argv arguments passed to the function
+         * @return return value of the function
+         */
         template<typename Sgn, Sgn member>
-        static Value callMember(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> argv) {
+        static Value callMember(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> argv) {
             const SgnUnwrap Unwrap_(member);
 
             return [&]<typename Res, typename... Args>(SgnUnwrap<Res(Args...)>) {
                 auto f = [&](Args... args) -> Res {
-                    T* ptr = reinterpret_cast<T*>(JS_GetOpaque(func_obj.getVal(), classId));
+                    T* ptr = reinterpret_cast<T*>(JS_GetOpaque(funcObj.getVal(), classId));
                     return (ptr->*member)(args...);
                 };
 
-                return processCall<decltype(f), Res, Args...>(ctx, this_val, argv, f);
+                return processCall<decltype(f), Res, Args...>(ctx, thisVal, argv, f);
             }(Unwrap_);
         }
 
 
+        /**
+         * @brief Add a property to the object prototype from a member variable of the wrapped class
+         *
+         * @tparam U the type of the member variable
+         * @tparam U(T::*member) pointer to the member variable
+         * @param ctx context to work in
+         * @param proto the prototype of the class
+         * @param name name of the property
+         * @param flags flags of the property
+         */
         template<typename U, U(T::*member)>
         static void addPropMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
-            using GetRaw = JSValue(*)(JSContext* ctx_, JSValueConst this_val);
-            using SetRaw = JSValue(*)(JSContext* ctx_, JSValueConst this_val, JSValueConst val);
+            using GetRaw = JSValue(*)(JSContext* ctx_, JSValueConst thisVal);
+            using SetRaw = JSValue(*)(JSContext* ctx_, JSValueConst thisVal, JSValueConst val);
 
-            GetRaw get = [](JSContext* ctx_, JSValueConst this_val) -> JSValue {
-                T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val, classId));
+            GetRaw get = [](JSContext* ctx_, JSValueConst thisVal) -> JSValue {
+                T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal, classId));
                 return Value::from(ctx_, ptr->*member).loot().second;
             };
-            SetRaw set = [](JSContext* ctx_, JSValueConst this_val, JSValueConst val) -> JSValue {
-                T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val, classId));
+            SetRaw set = [](JSContext* ctx_, JSValueConst thisVal, JSValueConst val) -> JSValue {
+                T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal, classId));
                 ptr->*member = ValueWeak(ctx_, val).to<U>();
                 return JS_UNDEFINED;
             };
@@ -123,48 +177,33 @@ namespace ProtoBuilder {
             JS_DefinePropertyGetSet(ctx, proto.getVal(), atom.get(), getter, setter, static_cast<int>(flags));
         }
 
+
+        /**
+         * @brief Add a property to the object prototype from a member function of the wrapped class
+         *
+         * @tparam Sgn signature of the member function
+         * @tparam member pointer to the member function
+         * @param ctx context to work in
+         * @param proto the prototype of the class
+         * @param name name of the property
+         * @param flags flags of the property
+         */
         template<typename Sgn, Sgn member>
         static void addMethodMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
-            using MethodRaw = JSValue(*)(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+            using MethodRaw = JSValue(*)(JSContext* ctx, JSValueConst thisVal, int argc, JSValueConst *argv);
 
             const SgnUnwrap Unwrap_(member);
 
             [&]<typename Res, typename... Args>(SgnUnwrap<Res(Args...)>) {
-                MethodRaw func = [](JSContext* ctx_, JSValueConst this_val, int argc, JSValueConst* argv) -> JSValue {
-                    T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val, classId));
+                MethodRaw func = [](JSContext* ctx_, JSValueConst thisVal, int argc, JSValueConst* argv) -> JSValue {
+                    T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal, classId));
 
                     auto f = [ptr](Args... args) -> Res {
                         return (ptr->*member)(args...);
                     };
 
                     return propagateExceptions(ctx_, [&]() -> JSValue {
-                        return processCallRaw<decltype(f), Res, Args...>(ctx_, this_val, argc, argv, f);
-                    });
-                };
-
-                JSValue funcVal = JS_NewCFunction(ctx, reinterpret_cast<JSCFunction*>(func), name.c_str(), 0);
-
-                Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
-                JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), funcVal, static_cast<int>(flags));
-            }(Unwrap_);
-        }
-
-        template<typename Sgn, Sgn member>
-        static void addMethodMemberVariadic(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
-            using MethodRaw = JSValue(*)(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst *argv);
-
-            const SgnUnwrap Unwrap_(member);
-
-            [&]<typename Res, typename... Args>(SgnUnwrap<Res(Args...)>) {
-                MethodRaw func = [](JSContext* ctx_, JSValueConst this_val, int argc, JSValueConst* argv) -> JSValue {
-                    T* ptr = reinterpret_cast<T*>(JS_GetOpaque(this_val, classId));
-
-                    auto f = [ptr](std::vector<ValueWeak> args) -> Res {
-                        return (ptr->*member)(args);
-                    };
-
-                    return propagateExceptions(ctx_, [&]() -> JSValue {
-                        return processCallVariadicRaw<decltype(f), Res>(ctx_, this_val, argc, argv, f);
+                        return processCallRaw<decltype(f), Res, Args...>(ctx_, thisVal, argc, argv, f);
                     });
                 };
 
@@ -176,27 +215,62 @@ namespace ProtoBuilder {
         }
     };
 
+    /**
+     * @brief A class used as a base for javascript classes with callable instances
+     */
     struct Callable {
-        static bool isConstructor() {
-            return false;
-        }
-
-        static Value callFunction(ContextRef ctx, ValueWeak func_obj, ValueWeak this_val, std::vector<ValueWeak> args) {
+        /**
+         * @brief Process a call to the wrapped class
+         *
+         * @param ctx context to work in
+         * @param funcObj instance of the class
+         * @param thisVal value of `this` in the function
+         * @param args arguments passed to the function
+         * @return result of the call
+         */
+        static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a function");
         }
 
-        static Value callConstructor(ContextRef ctx, ValueWeak func_obj, ValueWeak target, std::vector<ValueWeak> args) {
+        /**
+         * @brief Process a call to the wrapped class as a constructor
+         *
+         * @param ctx context to work in
+         * @param funcObj instance of the class
+         * @param target value of `new.target` in the function
+         * @param args arguments passed to the function
+         * @return result of the call
+         */
+        static Value callConstructor(ContextRef ctx, ValueWeak funcObj, ValueWeak target, std::vector<ValueWeak> args) {
             throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a constructor");
         }
     };
 
+    /**
+     * @brief A class used as a base for javascript classes added properties
+     */
     struct Properties {
+        /**
+         * @brief Add properties to the object prototype
+         * @note This function is only called when the class prototype is created
+         *
+         * @param ctx context to work in
+         * @param proto the prototype of the class
+         */
         static void addProperties(ContextRef ctx, Object proto) {}
 
-
+        /**
+         * @brief Shortcut for adding a property to the object prototype
+         *
+         * @param ctx context to work in
+         * @param proto the prototype of the class
+         * @param name name of the property
+         * @param value value of the property
+         * @param flags flags of the property
+         */
         static void addProp(ContextRef ctx, Object proto, std::string name, Value value, PropFlags flags = PropFlags::C_W_E) {
-            Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
-            JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), value.loot().second, static_cast<int>(flags));
+            // TODO: remove
+            proto.defineProperty(name, value, flags);
         }
     };
 }
@@ -209,14 +283,14 @@ class Class {
     static inline std::string className;
     static inline bool isConstructor;
 
-    static JSValue constructor_impl(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst *argv) noexcept {
+    static JSValue constructor_impl(JSContext* ctx, JSValueConst thisVal, int argc, JSValueConst *argv) noexcept {
         return propagateExceptions(ctx, [&]() -> JSValue {
             Value proto = Value::undefined(ctx);
-            if (JS_IsUndefined(this_val)) {
+            if (JS_IsUndefined(thisVal)) {
                 proto = Value(ctx, JS_GetClassProto(ctx, classId));
             }
             else {
-                proto = Value(ctx, JS_GetPropertyStr(ctx, this_val, "prototype"));
+                proto = Value(ctx, JS_GetPropertyStr(ctx, thisVal, "prototype"));
             }
             Value obj(ctx, JS_NewObjectProtoClass(ctx, proto.getVal(), classId));
 
@@ -238,6 +312,14 @@ class Class {
     }
 
 public:
+    /**
+     * @brief Initialize the class
+     * @note This function should be called only once. Any subsequent calls
+     * with different parameters will throw an exception
+     *
+     * @param name name of the class
+     * @param isCtor whether or not the class is callable a constructor (if it's callable at all)
+     */
     static void init(std::string name, bool isCtor = false) {
         if (classId != 0) {
             if (className != name || isConstructor != isCtor) {
@@ -262,7 +344,7 @@ public:
         }
 
         if constexpr (std::is_base_of_v<ProtoBuilder::Callable, Builder>) {
-            call = [](JSContext* ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst* argv, int flags) noexcept -> JSValue {
+            call = [](JSContext* ctx, JSValueConst funcObj, JSValueConst thisVal, int argc, JSValueConst* argv, int flags) noexcept -> JSValue {
                 std::vector<ValueWeak> args;
                 args.reserve(argc);
                 for (int i = 0; i < argc; i++) {
@@ -271,9 +353,9 @@ public:
 
                 return propagateExceptions(ctx, [&]() -> JSValue {
                     if (flags & JS_CALL_FLAG_CONSTRUCTOR) {
-                        return Builder::callConstructor(ctx, ValueWeak(ctx, func_obj), ValueWeak(ctx, this_val), args).loot().second;
+                        return Builder::callConstructor(ctx, ValueWeak(ctx, funcObj), ValueWeak(ctx, thisVal), args).loot().second;
                     } else {
-                        return Builder::callFunction(ctx, ValueWeak(ctx, func_obj), ValueWeak(ctx, this_val), args).loot().second;
+                        return Builder::callFunction(ctx, ValueWeak(ctx, funcObj), ValueWeak(ctx, thisVal), args).loot().second;
                     }
 
                     return JS_UNDEFINED;
@@ -290,6 +372,12 @@ public:
         };
     }
 
+    /**
+     * @brief Initialize the class prototype
+     * @note If the class is already initialized, this function does nothing
+     *
+     * @param ctx context to work in
+     */
     static void initContext(ContextRef ctx) {
         JSRuntime* rt = JS_GetRuntime(ctx);
         if (!JS_IsRegisteredClass(rt, classId)) {
@@ -308,10 +396,22 @@ public:
         JS_SetClassProto(ctx, classId, proto.loot().second);
     }
 
+    /**
+     * @brief Get the class id of this class
+     *
+     * @return JSClassID
+     */
     static JSClassID getClassId() {
         return classId;
     }
 
+    /**
+     * @brief Get the prototype object of this class in given context
+     * @note if the class wasn't initialized in the context, it will be initialized
+     *
+     * @param ctx context to work in
+     * @return the prototype object
+     */
     static Object getProto(ContextRef ctx) {
         JSRuntime* rt = JS_GetRuntime(ctx);
         if (!JS_IsRegisteredClass(rt, classId)) {
@@ -329,7 +429,7 @@ public:
      * @brief Get the constructor object of this class in given context
      * @note if the class wasn't initialized in the context, it will be initialized
      *
-     * @param ctx the context
+     * @param ctx context to work in
      * @return the constructor object
      */
     static Function getConstructor(ContextRef ctx) {
@@ -350,7 +450,6 @@ public:
             && std::is_base_of_v<typename Bdr::OpaqueType, T>
             && std::is_same_v<Bdr, Builder>, Value>
         createInstance(ContextRef ctx, T* instance) {
-        // TODO: add createInstance for classes without opaque data
         Value proto = getProto(ctx);
         Value obj(ctx, JS_NewObjectProtoClass(ctx, proto.getVal(), classId));
         JS_SetOpaque(obj.getVal(), instance);
