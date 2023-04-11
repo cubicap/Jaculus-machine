@@ -45,6 +45,7 @@ private:
                 throw std::runtime_error("Could not open file: " + path);
             }
         }
+        File(std::filesystem::path path, std::string flags): File(path.string(), flags) {}
 
         std::string read(int length = 1024) {
             std::string buffer;
