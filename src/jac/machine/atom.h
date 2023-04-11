@@ -26,7 +26,8 @@ protected:
     JSAtom _atom;
 public:
     /**
-     * @brief Wrap an existing JSAtom. The JSAtom will be freed when the Atom is freed.
+     * @brief Wrap an existing JSAtom. The JSAtom will be freed when the Atom is destroyed.
+     * @note Used internally when directly working with QuickJS API. New Atom should be created using Atom::create().
      *
      * @param ctx context to work in
      * @param atom JSAtom to wrap
