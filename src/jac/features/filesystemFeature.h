@@ -84,8 +84,8 @@ private:
         }
     };
 
-    std::filesystem::path _codeDir;
-    std::filesystem::path _dataDir;
+    std::filesystem::path _codeDir = ".";
+    std::filesystem::path _workingDir = ".";
 
 public:
     using FileClass = jac::Class<FileProtoBuilder>;
@@ -94,8 +94,8 @@ public:
         this->_codeDir = std::filesystem::path(path_).lexically_normal();
     }
 
-    void setDataDir(std::string path_) {
-        this->_dataDir = std::filesystem::path(path_).lexically_normal();
+    void setWorkingDir(std::string path_) {
+        this->_workingDir = std::filesystem::path(path_).lexically_normal();
     }
 
     class Path {
@@ -144,31 +144,39 @@ private:
 
 
         File open(std::string path_, std::string flags) {
-            return File(_feature._dataDir / path_, flags);
+            return File(_feature._workingDir / path_, flags);
         }
 
         bool exists(std::string path_) {
-            return std::filesystem::exists(_feature._dataDir / path_);
+            return std::filesystem::exists(_feature._workingDir / path_);
         }
 
         bool isFile(std::string path_) {
-            return std::filesystem::is_regular_file(_feature._dataDir / path_);
+            return std::filesystem::is_regular_file(_feature._workingDir / path_);
         }
 
         bool isDirectory(std::string path_) {
-            return std::filesystem::is_directory(_feature._dataDir / path_);
+            return std::filesystem::is_directory(_feature._workingDir / path_);
         }
 
         void mkdir(std::string path_) {
-            std::filesystem::create_directories(_feature._dataDir / path_);
+            std::filesystem::create_directories(_feature._workingDir / path_);
+        }
+
+        std::vector<std::string> readdir(std::string path_) {
+            std::vector<std::string> res;
+            for (auto& p : std::filesystem::directory_iterator(_feature._workingDir / path_)) {
+                res.push_back(p.path().filename().string());
+            }
+            return res;
         }
 
         void rm(std::string path_) {
-            std::filesystem::remove(_feature._dataDir / path_);
+            std::filesystem::remove(_feature._workingDir / path_);
         }
 
         void rmdir(std::string path_) {
-            std::filesystem::remove_all(_feature._dataDir / path_);
+            std::filesystem::remove_all(_feature._workingDir / path_);
         }
     };
 
@@ -209,5 +217,6 @@ public:
         fsMod.addExport("mkdir", ff.newFunction(noal::function(&Fs::mkdir, &(this->fs))));
         fsMod.addExport("rm", ff.newFunction(noal::function(&Fs::rm, &(this->fs))));
         fsMod.addExport("rmdir", ff.newFunction(noal::function(&Fs::rmdir, &(this->fs))));
+        fsMod.addExport("readdir", ff.newFunction(noal::function(&Fs::readdir, &(this->fs))));
     }
 };
