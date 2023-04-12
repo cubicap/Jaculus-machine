@@ -31,11 +31,20 @@ void MachineBase::initialize() {
     _context = JS_NewContext(_runtime);
 
     JS_SetContextOpaque(_context, this);
-    JS_SetInterruptHandler(_runtime, [](JSRuntime* rt, void* opaque) {
+    JS_SetInterruptHandler(_runtime, [](JSRuntime* rt, void* opaque) noexcept {
         MachineBase& base = *reinterpret_cast<MachineBase*>(opaque);
         if (base._interrupt) {
             base._interrupt = false;
             return 1;
+        }
+        if (base._watchdogTimeout.count() > 0) {
+            auto now = std::chrono::steady_clock::now();
+            if (now > base._watchdogNext) {
+                base._watchdogNext = now + base._watchdogTimeout;
+                if (base._wathdogCallback && base._wathdogCallback()) {
+                    return 1;
+                }
+            }
         }
         return 0;
     }, this);
@@ -47,6 +56,7 @@ Value MachineBase::eval(std::string code, std::string filename, EvalFlags flags 
         return bytecode;
     }
     code = "";
+    resetWatchdog();
     return Value(_context, JS_EvalFunction(_context, bytecode.loot().second));
 }
 

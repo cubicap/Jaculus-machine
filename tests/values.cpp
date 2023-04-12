@@ -3,6 +3,7 @@
 
 #include <string>
 #include <memory>
+#include <cstring>
 
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>

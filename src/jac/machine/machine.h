@@ -2,13 +2,14 @@
 
 #include <quickjs.h>
 
-#include <string>
-#include <stdexcept>
+#include <chrono>
 #include <functional>
+#include <stdexcept>
+#include <string>
 #include <string_view>
-#include <vector>
 #include <unordered_map>
-#include <string.h>
+#include <vector>
+
 #include "values.h"
 
 
@@ -104,6 +105,10 @@ private:
     Module& findModule(JSModuleDef* m);
 
     bool _interrupt = false;
+
+    std::chrono::milliseconds _watchdogTimeout = std::chrono::milliseconds(0);
+    std::chrono::time_point<std::chrono::steady_clock> _watchdogNext;
+    std::function<bool()> _wathdogCallback;
 public:
     JSRuntime* _runtime = nullptr;
     ContextRef _context = nullptr;
@@ -165,6 +170,36 @@ public:
      */
     void interruptRuntime() {
         _interrupt = true;
+    }
+
+    /**
+     * @brief Reset the watchdog timer. This should be called periodically
+     * to prevent the watchdog from triggering.
+     */
+    void resetWatchdog() {
+        _watchdogNext = std::chrono::steady_clock::now() + _watchdogTimeout;
+    }
+
+    /**
+     * @brief Set the watchdog timeout. If the timeout is zero, the watchdog
+     * is disabled. Otherwise, the watchdog will be called when the timeout
+     * has passed since the last reset.
+     *
+     * @param timeout watchdog timeout
+     */
+    void setWatchdogTimeout(std::chrono::milliseconds timeout) {
+        _watchdogTimeout = timeout;
+    }
+
+    /**
+     * @brief Set the watchdog callback. The callback will be called when the
+     * watchdog timeout has passed since the last reset. If the callback returns
+     * true, the runtime will be interrupted.
+     *
+     * @param callback callback to call
+     */
+    void setWatchdogHandler(std::function<bool()> callback) {
+        _wathdogCallback = callback;
     }
 
     friend class Module;

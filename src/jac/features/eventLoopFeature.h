@@ -28,6 +28,7 @@ public:
                 runOnEventLoop();
 
                 auto event = this->getEvent(!didJob);
+                this->resetWatchdog();
                 if (event) {
                     (*event)();
                 }
@@ -37,6 +38,7 @@ public:
 
                 didJob = false;
                 while (!_shouldExit) {
+                    this->resetWatchdog();
                     int err = JS_ExecutePendingJob(rt, &ctx1);
                     if (err <= 0) {
                         if (err < 0) {
