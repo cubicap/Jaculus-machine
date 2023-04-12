@@ -6,7 +6,6 @@
 #include <jac/features/eventLoopFeature.h>
 #include <jac/features/eventQueueFeature.h>
 #include <jac/features/timersFeature.h>
-#include <jac/features/yieldFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/util/ostreamjs.h>
@@ -17,7 +16,6 @@
 using Machine =
     EventLoopTerminal<
     TimersFeature<
-    YieldFeature<
     ModuleLoaderFeature<
     FilesystemFeature<
     EventLoopFeature<
@@ -25,7 +23,7 @@ using Machine =
     BasicStreamFeature<
     EventQueueFeature<
     jac::MachineBase
->>>>>>>>>;
+>>>>>>>>;
 
 
 const char* code = R"(
