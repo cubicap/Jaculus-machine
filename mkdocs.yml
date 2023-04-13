@@ -1,0 +1,50 @@
+site_name: Jaculus-machine - Embeddable JavaScript runtime
+
+repo_url: https://github.com/cubicap/Jaculus-machine
+repo_name: cubicap/Jaculus-machine
+
+theme:
+  name: material
+  palette:
+    primary: green
+  font:
+    text: Roboto
+  features:
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.expand
+    - navigation.indexes
+
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+plugins:
+  - search:
+      lang: en
+  - mkdoxy:
+      projects:
+        doxygen:
+          src-dirs: src
+          full-doc: True
+          doxy-cfg:
+            FILE_PATTERNS: "*.cpp *.h*"
+            EXAMPLE_PATH: examples
+            RECURSIVE: True
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Reference:
+    - Values: reference/values.md
+    - Exceptions: reference/exceptions.md
+  - API:
+    - Class Index: "doxygen/classes.md"
+    - Namespace List: "doxygen/namespaces.md"
+    - File list: "doxygen/files.md"
+  - Pitfalls: pitfalls.md
