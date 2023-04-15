@@ -10,7 +10,6 @@ namespace jac {
 
 /**
  * @brief A wrapper around JSContext* providing some related functionality
- * @note ContextRef must be freed manually using free()
  */
 class ContextRef {
     JSContext* _ctx;
@@ -38,14 +37,6 @@ public:
     operator JSContext*() const { return _ctx; }
     operator bool() { return _ctx != nullptr; }
     ContextRef operator=(JSContext* ctx) { _ctx = ctx; return *this; }
-
-    /**
-     * @brief Free the context
-     */
-    void free() {
-        JS_FreeContext(_ctx);
-        _ctx = nullptr;
-    }
 };
 
 

@@ -130,7 +130,7 @@ public:
     virtual ~MachineBase() {
         _modules.clear();
         if (_context) {
-            _context.free();
+            JS_FreeContext(_context);
         }
         if (_runtime) {
             JS_FreeRuntime(_runtime);
