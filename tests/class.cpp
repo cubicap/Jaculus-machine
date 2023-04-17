@@ -37,10 +37,10 @@ TEST_CASE("Class", "[class]") {
 
     SECTION("Properties") {
         struct ClassBuilder : jac::ProtoBuilder::Properties {
-            static void addProperties(jac::ContextRef ctx, jac::Value proto) {
-                addProp(ctx, proto, "testProp", jac::Value::from(ctx, 42));
+            static void addProperties(jac::ContextRef ctx, jac::Object proto) {
+                proto.defineProperty("testProp", jac::Value::from(ctx, 42));
                 jac::FunctionFactory ff(ctx);
-                addProp(ctx, proto, "testMethod", ff.newFunction([](int a, int b) { return a + b; }));
+                proto.defineProperty("testMethod", ff.newFunction([](int a, int b) { return a + b; }));
             }
         };
         using TestClass = jac::Class<ClassBuilder>;
@@ -255,10 +255,10 @@ TEST_CASE("Class", "[class]") {
         };
 
         struct ClassBuilder : jac::ProtoBuilder::Opaque<Opq>, jac::ProtoBuilder::Properties {
-            static void addProperties(jac::ContextRef ctx, jac::Value proto) {
+            static void addProperties(jac::ContextRef ctx, jac::Object proto) {
                 addPropMember<std::string, &Opq::prefix>(ctx, proto, "prefix");
                 jac::FunctionFactory ff(ctx);
-                addProp(ctx, proto, "pref", ff.newFunctionThisVariadic([](jac::ContextRef _ctx, jac::ValueWeak thisVal, std::vector<jac::ValueWeak> args) {
+                proto.defineProperty("pref", ff.newFunctionThisVariadic([](jac::ContextRef _ctx, jac::ValueWeak thisVal, std::vector<jac::ValueWeak> args) {
                     auto opq = getOpaque(_ctx, thisVal);
                     std::string result = opq->prefix;
                     for (auto& arg : args) {

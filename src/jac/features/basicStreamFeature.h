@@ -38,7 +38,7 @@ public:
         static void addProperties(jac::ContextRef ctx, jac::Object proto) {
             jac::FunctionFactory ff(ctx);
 
-            addProp(ctx, proto, "get", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
+            proto.defineProperty("get", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
                 Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
                 auto [promise, resolve, reject] = jac::Promise::create(ctx_);
 
@@ -53,7 +53,7 @@ public:
                 return promise;
             }));
 
-            addProp(ctx, proto, "read", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
+            proto.defineProperty("read", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
                 Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
                 auto [promise, resolve, reject] = jac::Promise::create(ctx_);
 

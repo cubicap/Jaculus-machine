@@ -25,8 +25,12 @@ public:
 
         jac::FunctionFactory ff(this->_context);
 
-        assert(this->stdio.out);
-        assert(this->stdio.err);
+        if (!this->stdio.out) {
+            throw std::runtime_error("StdioFeature: stdio.out is not set");
+        }
+        if (!this->stdio.err) {
+            throw std::runtime_error("StdioFeature: stdio.err is not set");
+        }
 
         jac::Object console = jac::Object::create(this->_context);
         console.set("debug", ff.newFunction([this](std::string str) {

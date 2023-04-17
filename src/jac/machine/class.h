@@ -258,20 +258,6 @@ namespace ProtoBuilder {
          * @param proto the prototype of the class
          */
         static void addProperties(ContextRef ctx, Object proto) {}
-
-        /**
-         * @brief Shortcut for adding a property to the object prototype
-         *
-         * @param ctx context to work in
-         * @param proto the prototype of the class
-         * @param name name of the property
-         * @param value value of the property
-         * @param flags flags of the property
-         */
-        static void addProp(ContextRef ctx, Object proto, std::string name, Value value, PropFlags flags = PropFlags::C_W_E) {
-            // TODO: remove
-            proto.defineProperty(name, value, flags);
-        }
     };
 }
 
