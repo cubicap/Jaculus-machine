@@ -156,7 +156,7 @@ namespace ProtoBuilder {
          * @param flags flags of the property
          */
         template<typename U, U(T::*member)>
-        static void addPropMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
+        static void addPropMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::ReadOnly) {
             using GetRaw = JSValue(*)(JSContext* ctx_, JSValueConst thisVal);
             using SetRaw = JSValue(*)(JSContext* ctx_, JSValueConst thisVal, JSValueConst val);
 
@@ -189,7 +189,7 @@ namespace ProtoBuilder {
          * @param flags flags of the property
          */
         template<typename Sgn, Sgn member>
-        static void addMethodMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::C_W_E) {
+        static void addMethodMember(ContextRef ctx, Object proto, std::string name, PropFlags flags = PropFlags::ReadOnly) {
             using MethodRaw = JSValue(*)(JSContext* ctx, JSValueConst thisVal, int argc, JSValueConst *argv);
 
             const SgnUnwrap Unwrap_(member);
