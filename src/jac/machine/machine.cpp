@@ -41,7 +41,7 @@ void MachineBase::initialize() {
             auto now = std::chrono::steady_clock::now();
             if (now > base._watchdogNext) {
                 base._watchdogNext = now + base._watchdogTimeout;
-                if (base._wathdogCallback && base._wathdogCallback()) {
+                if (!base._wathdogCallback || base._wathdogCallback()) {
                     return 1;
                 }
             }
