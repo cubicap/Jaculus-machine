@@ -174,28 +174,29 @@ public:
         });
 
         jac::FunctionFactory ff(this->_context);
+        jac::Object global = this->_context.getGlobalObject();
 
-        this->registerGlobal("setInterval", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
+        global.defineProperty("setInterval", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
             return setInterval([func]() mutable {
                 func.call<void>();
             }, millis);
-        }));
+        }), jac::PropFlags::Enumerable);
 
-        this->registerGlobal("setTimeout", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
+        global.defineProperty("setTimeout", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
             return setTimeout([func]() mutable {
                 func.call<void>();
             }, millis);
-        }));
+        }), jac::PropFlags::Enumerable);
 
-        this->registerGlobal("clearInterval", ff.newFunction([this](int id) {
+        global.defineProperty("clearInterval", ff.newFunction([this](int id) {
             clearInterval(id);
-        }));
+        }), jac::PropFlags::Enumerable);
 
-        this->registerGlobal("clearTimeout", ff.newFunction([this](int id) {
+        global.defineProperty("clearTimeout", ff.newFunction([this](int id) {
             clearTimeout(id);
-        }));
+        }), jac::PropFlags::Enumerable);
 
-        this->registerGlobal("sleep", ff.newFunction([this](int millis) {
+        global.defineProperty("sleep", ff.newFunction([this](int millis) {
             auto [promise, resolve, _] = jac::Promise::create(this->_context);
             setTimeout([resolve]() mutable {
                 static_cast<jac::Function&>(resolve).call<void>();

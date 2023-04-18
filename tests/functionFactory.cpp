@@ -19,6 +19,7 @@ TEST_CASE("New function", "[functionFactory]") {
 
     Machine machine;
     machine.initialize();
+    jac::Object global = machine._context.getGlobalObject();
 
     jac::FunctionFactory ff(machine._context);
 
@@ -50,7 +51,7 @@ TEST_CASE("New function", "[functionFactory]") {
     SECTION("Value(Function))") {
         auto f = ff.newFunction([](jac::Function func) { return func.call<void>("testReport"); });
 
-        machine.registerGlobal("f", f);
+        global.defineProperty("f", f);
 
         evalCode(machine, "f(report);", "test", jac::EvalFlags::Global);
 

@@ -19,8 +19,9 @@ TEST_CASE("Register global", "[base]") {
 
     Machine machine;
     machine.initialize();
+    jac::Object global = machine._context.getGlobalObject();
 
-    machine.registerGlobal("test", jac::Value::from<std::string>(machine._context, "test string"));
+    global.defineProperty("test", jac::Value::from<std::string>(machine._context, "test string"));
 
 
     evalCode(machine, "report(test);", "test", jac::EvalFlags::Module);

@@ -60,11 +60,6 @@ Value MachineBase::eval(std::string code, std::string filename, EvalFlags flags 
     return Value(_context, JS_EvalFunction(_context, bytecode.loot().second));
 }
 
-void MachineBase::registerGlobal(std::string name, Value value, PropFlags flags /*= PropFlags::Enumerable*/) {
-    Object globalObject(_context, JS_GetGlobalObject(_context));
-    globalObject.defineProperty(name, value, flags);
-}
-
 Module& MachineBase::newModule(std::string name) {
     Module module(_context, name);
     JSModuleDef* def = module.get();

@@ -81,7 +81,9 @@ public:
     void initialize() {
         Next::initialize();
         jac::FunctionFactory ff(this->_context);
-        this->registerGlobal("exit", ff.newFunction(noal::function(&EventLoopFeature::exit, this)));
+        jac::Object global = this->_context.getGlobalObject();
+
+        global.defineProperty("exit", ff.newFunction(noal::function(&EventLoopFeature::exit, this)), jac::PropFlags::Enumerable);
     }
 
     void onEventLoop() {

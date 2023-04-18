@@ -21,8 +21,9 @@ public:
     void initialize() {
         Next::initialize();
         jac::FunctionFactory ff(this->_context);
+        jac::Object global = this->_context.getGlobalObject();
 
-        this->registerGlobal("report", ff.newFunction([this](jac::ValueWeak val) {
+        global.defineProperty("report", ff.newFunction([this](jac::ValueWeak val) {
             this->report(val.to<std::string>());
         }));
     }

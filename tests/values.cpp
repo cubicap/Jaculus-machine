@@ -21,6 +21,7 @@ TEST_CASE("To JS value", "[base]") {
 
     Machine machine;
     machine.initialize();
+    jac::Object global = machine._context.getGlobalObject();
 
     using val = std::tuple<std::string, std::function<jac::Value(jac::ContextRef)>, std::string, std::string>;
     auto values = GENERATE(
@@ -48,7 +49,7 @@ TEST_CASE("To JS value", "[base]") {
     DYNAMIC_SECTION(comment) {
         auto value = valueGen(machine._context);
 
-        machine.registerGlobal("value", value);
+        global.defineProperty("value", value);
         evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{type, str});
@@ -217,11 +218,12 @@ TEST_CASE("Object create", "[base]") {
 
     Machine machine;
     machine.initialize();
+    jac::Object global = machine._context.getGlobalObject();
 
     SECTION("create") {
         auto object = jac::Object::create(machine._context);
         object.set("a", jac::Value::from(machine._context, "Hello World"));
-        machine.registerGlobal("x", object);
+        global.defineProperty("x", object);
 
         evalCode(machine, "report(x.a)", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
@@ -459,11 +461,12 @@ TEST_CASE("Promise", "[base]") {
 
     Machine machine;
     machine.initialize();
+    jac::Object global = machine._context.getGlobalObject();
 
     SECTION("resolve") {
         auto [promise, resolve, reject] = jac::Promise::create(machine._context);
 
-        machine.registerGlobal("x", promise);
+        global.defineProperty("x", promise);
 
         evalCode(machine, R"(
             x.then(function(value) {
@@ -486,7 +489,7 @@ TEST_CASE("Promise", "[base]") {
     SECTION("reject") {
         auto [promise, resolve, reject] = jac::Promise::create(machine._context);
 
-        machine.registerGlobal("x", promise);
+        global.defineProperty("x", promise);
 
         evalCode(machine, R"(
             x.catch(function(value) {
@@ -604,10 +607,11 @@ TEST_CASE("ArrayBuffer", "[base]") {
 
     Machine machine;
     machine.initialize();
+    jac::Object global = machine._context.getGlobalObject();
 
     SECTION("create") {
         auto buffer = jac::ArrayBuffer::create(machine._context, 10);
-        machine.registerGlobal("x", buffer);
+        global.defineProperty("x", buffer);
 
         REQUIRE(buffer.size() == 10);
 

@@ -48,7 +48,8 @@ public:
         console.set("error", ff.newFunction([this](std::string str) {
             this->stdio.err->write(str + "\n");
         }));
-        this->registerGlobal("console", console);
+        jac::Object global = this->_context.getGlobalObject();
+        global.defineProperty("console", console);
 
         auto& module = this->newModule("stdio");
         module.addExport("stdout", Next::WritableClass::createInstance(this->_context, new Next::WritableRef(stdio.out.get())));

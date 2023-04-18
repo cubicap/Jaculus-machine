@@ -148,15 +148,6 @@ public:
     Value eval(std::string code, std::string filename, EvalFlags flags = EvalFlags::Global);
 
     /**
-     * @brief Register a property on the global object
-     *
-     * @param name name of the property
-     * @param value value of the property
-     * @param flags flags of the property
-     */
-    void registerGlobal(std::string name, Value value, PropFlags flags = PropFlags::Enumerable);
-
-    /**
      * @brief Create a new module in the machine
      *
      * @param name name of the module

@@ -13,5 +13,9 @@ Exception ContextRef::getException() {
     }
 }
 
+Object ContextRef::getGlobalObject() {
+    return Object(_ctx, JS_GetGlobalObject(_ctx));
+}
+
 
 } // namespace jac

@@ -32,6 +32,13 @@ public:
      */
     Exception getException();
 
+    /**
+     * @brief Get the global object of this context
+     *
+     * @return The global object
+     */
+    Object getGlobalObject();
+
     // XXX: remove implicit conversions?
     operator JSContext*() { return _ctx; }
     operator JSContext*() const { return _ctx; }
