@@ -22,7 +22,7 @@ namespace jac {
  * @brief Flags to specify property access attributes
  */
 enum class PropFlags : int {
-    ReadOnly = 0,
+    Default = 0,
     Configurable = JS_PROP_CONFIGURABLE,
     Writable = JS_PROP_WRITABLE,
     Enumerable = JS_PROP_ENUMERABLE,
@@ -452,7 +452,7 @@ public:
      * @param flags the property flags
      */
     template<typename Id>
-    void defineProperty(Id id, Value value, PropFlags flags = PropFlags::ReadOnly) {
+    void defineProperty(Id id, Value value, PropFlags flags = PropFlags::Default) {
         Atom atom = Atom::create(_ctx, id);
         if (JS_DefinePropertyValue(_ctx, _val, atom.get(), value.loot().second, static_cast<int>(flags)) < 0) {
             throw _ctx.getException();

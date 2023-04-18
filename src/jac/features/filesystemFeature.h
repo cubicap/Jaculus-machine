@@ -76,11 +76,11 @@ private:
         static void addProperties(jac::ContextRef ctx, jac::Object proto) {
             jac::FunctionFactory ff(ctx);
 
-            addPropMember<std::string, &File::path_>(ctx, proto, "path", jac::PropFlags::ReadOnly);
-            addMethodMember<bool(File::*)(), &File::isOpen>(ctx, proto, "isOpen", jac::PropFlags::ReadOnly);
-            addMethodMember<void(File::*)(), &File::close>(ctx, proto, "close", jac::PropFlags::ReadOnly);
-            addMethodMember<std::string(File::*)(int), &File::read>(ctx, proto, "read", jac::PropFlags::ReadOnly);
-            addMethodMember<void(File::*)(std::string), &File::write>(ctx, proto, "write", jac::PropFlags::ReadOnly);
+            addPropMember<std::string, &File::path_>(ctx, proto, "path", jac::PropFlags::Enumerable);
+            addMethodMember<bool(File::*)(), &File::isOpen>(ctx, proto, "isOpen", jac::PropFlags::Enumerable);
+            addMethodMember<void(File::*)(), &File::close>(ctx, proto, "close", jac::PropFlags::Enumerable);
+            addMethodMember<std::string(File::*)(int), &File::read>(ctx, proto, "read", jac::PropFlags::Enumerable);
+            addMethodMember<void(File::*)(std::string), &File::write>(ctx, proto, "write", jac::PropFlags::Enumerable);
         }
     };
 
