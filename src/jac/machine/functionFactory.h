@@ -74,7 +74,7 @@ public:
     /**
      * @brief Wraps a C++ function into a javascript function object
      *
-     * The expected signature of the function object is Res(@ref Value, Args...).
+     * The expected signature of the function object is Res(@ref ValueWeak, Args...).
      * Arguments and the result of the function call are automatically
      * converted to and from javascript values. Exceptions thrown within
      * the function are automatically propagated to the javascript side.
@@ -92,8 +92,8 @@ public:
      * @brief Wraps a C++ function into a javascript function object
      *
      * The expected signature of the function object is
-     * Res(@ref Value, std::vector<@ref ValueWeak>). The vector will contain
-     * all arguments passed to the function. The the result of the
+     * Res(@ref ValueWeak, std::vector<@ref ValueWeak>). The vector will
+     * contain all arguments passed to the function. The the result of the
      * function call is automatically converted from a javascript value.
      * Exceptions thrown within the function are automatically
      * propagated to the javascript side.
