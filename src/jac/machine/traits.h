@@ -31,7 +31,7 @@ struct ConvTraits<int> {
         int32_t res;
         int ex = JS_ToInt32(ctx, &res, val.getVal());
         if (ex < 0) {
-            throw Exception::create(ctx, Exception::Type::TypeError, "Failed to convert to int");
+            throw Exception::create(Exception::Type::TypeError, "Failed to convert to int");
         }
         return res;
     }
@@ -47,7 +47,7 @@ struct ConvTraits<double> {
         double res;
         int ex = JS_ToFloat64(ctx, &res, val.getVal());
         if (ex < 0) {
-            throw Exception::create(ctx, Exception::Type::TypeError, "Failed to convert to double");
+            throw Exception::create(Exception::Type::TypeError, "Failed to convert to double");
         }
         return res;
     }
@@ -72,7 +72,7 @@ struct ConvTraits<StringView> {
     static StringView from(ContextRef ctx, ValueWeak val) {
         const char* str = JS_ToCString(ctx, val.getVal());
         if (!str) {
-            throw Exception::create(ctx, Exception::Type::TypeError, "Failed to convert to string");
+            throw Exception::create(Exception::Type::TypeError, "Failed to convert to string");
         }
         return StringView(ctx, str);
     }
@@ -271,7 +271,7 @@ struct ConvTraits<std::vector<T>> {
                 res.push_back(arr.get(i).to<T>());
             }
             catch (Exception& e) {
-                throw Exception::create(ctx, Exception::Type::TypeError, "Failed to convert array element");
+                throw Exception::create(Exception::Type::TypeError, "Failed to convert array element");
             }
         }
         return res;
@@ -292,7 +292,7 @@ struct ConvTraits<std::tuple<Args...>> {
     static std::tuple<Args...> unwrapHelper(ContextRef ctx, ValueWeak val, std::index_sequence<Is...>) {
         Array arr = val.to<Array>();
         if (arr.length() < static_cast<int>(sizeof...(Args))) {
-            throw Exception::create(ctx, Exception::Type::TypeError, "Tuple size mismatch");
+            throw Exception::create(Exception::Type::TypeError, "Tuple size mismatch");
         }
         return std::make_tuple(arr.get<Args>(Is)...);
     }

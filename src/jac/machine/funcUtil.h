@@ -20,13 +20,13 @@ inline JSValue propagateExceptions(ContextRef ctx, Func& f) noexcept {
         return f();
     }
     catch (Exception& e) {
-        return e.throwJS();
+        return e.throwJS(ctx);
     }
     catch (std::exception& e) {
-        return Exception::create(ctx, Exception::Type::InternalError, e.what()).throwJS();
+        return Exception::create(Exception::Type::InternalError, e.what()).throwJS(ctx);
     }
     catch (...) {
-        return Exception::create(ctx, Exception::Type::InternalError, "unknown error").throwJS();
+        return Exception::create(Exception::Type::InternalError, "unknown error").throwJS(ctx);
     }
 }
 
@@ -116,7 +116,7 @@ inline Value processCallThisVariadic(ContextRef ctx, ValueWeak thisVal, std::vec
 template<typename... Args, std::size_t... Is>
 constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, std::vector<ValueWeak> argv, std::index_sequence<Is...>) {
     if (argv.size() != sizeof...(Args)) {
-        throw Exception::create(ctx, Exception::Type::TypeError, "invalid number of arguments");
+        throw Exception::create(Exception::Type::TypeError, "invalid number of arguments");
     }
 
     return std::make_tuple(argv[Is].to<Args>()...);
@@ -125,7 +125,7 @@ constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, std::v
 template<typename... Args, std::size_t... Is>
 constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, JSValueConst* argv, int argc, std::index_sequence<Is...>) {
     if (argc != sizeof...(Args)) {
-        throw Exception::create(ctx, Exception::Type::TypeError, "invalid number of arguments");
+        throw Exception::create(Exception::Type::TypeError, "invalid number of arguments");
     }
 
     return std::make_tuple(ValueWeak(ctx, argv[Is]).to<Args>()...);

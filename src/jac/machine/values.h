@@ -326,8 +326,8 @@ public:
      * @param message exception message
      * @return The resulting Exception
      */
-    static Exception create(ContextRef ctx, Type type, std::string message) {
-        Exception val = Value::null(ctx).to<Exception>();
+    static Exception create(Type type, std::string message) {
+        Exception val = Value::null(nullptr).to<Exception>();
         val._type = type;
         val._message = message;
         return val;
@@ -338,10 +338,11 @@ public:
      * @brief Throw the exception into JS.
      * @note Used internally when directly working with QuickJS API. In most cases, exceptions should be
      * thrown using a throw statement and wrapper functions will propagate the exception to JS.
+     * @param ctx context to throw the exception in
      *
      * @return JSValue containing the exception
      */
-    JSValue throwJS();
+    JSValue throwJS(ContextRef ctx);
 };
 
 
@@ -366,7 +367,7 @@ public:
      */
     ObjectWrapper(ValueWrapper<managed> value) : ValueWrapper<managed>(std::move(value)) {
         if (!this->isObject()) {
-            throw Exception::create(_ctx, Exception::Type::TypeError, "not an object");
+            throw Exception::create(Exception::Type::TypeError, "not an object");
         }
     }
     ObjectWrapper(ContextRef ctx, JSValue val) : ObjectWrapper(ValueWrapper<managed>(ctx, val)) {}
@@ -542,7 +543,7 @@ public:
      */
     FunctionWrapper(ObjectWrapper<managed> value) : ObjectWrapper<managed>(std::move(value)) {
         if (!this->isFunction()) {
-            throw Exception::create(this->_ctx, Exception::Type::TypeError, "not a function");
+            throw Exception::create(Exception::Type::TypeError, "not a function");
         }
     }
     FunctionWrapper(ContextRef ctx, JSValue val) : FunctionWrapper(ObjectWrapper<managed>(ctx, val)) {}
@@ -654,7 +655,7 @@ public:
      */
     ArrayWrapper(ObjectWrapper<managed> value) : ObjectWrapper<managed>(std::move(value)) {
         if (!this->isArray()) {
-            throw Exception::create(this->_ctx, Exception::Type::TypeError, "not an array");
+            throw Exception::create(Exception::Type::TypeError, "not an array");
         }
     }
     ArrayWrapper(ContextRef ctx, JSValue val) : ArrayWrapper(ObjectWrapper<managed>(ctx, val)) {}
@@ -771,7 +772,7 @@ public:
     template<typename T>
     std::span<T> typedView() {
         if (size() % sizeof(T) != 0) {
-            throw Exception::create(_ctx, Exception::Type::TypeError, "size is not a multiple of the element size");
+            throw Exception::create(Exception::Type::TypeError, "size is not a multiple of the element size");
         }
         size_t size;
         T* ptr = reinterpret_cast<T*>(JS_GetArrayBuffer(_ctx, &size, _val));
@@ -820,37 +821,33 @@ std::string ExceptionWrapper<managed>::stackTrace() noexcept {
 
 
 template<bool managed>
-JSValue ExceptionWrapper<managed>::throwJS() {
-    if (!_ctx) {
-        throw std::runtime_error("no value to throw");
-    }
-
+JSValue ExceptionWrapper<managed>::throwJS(ContextRef ctx) {
     if (_type == Type::Any) {
-        auto [ctx, val] = ValueWrapper<managed>::loot();
+        auto [_, val] = ValueWrapper<managed>::loot();
         return JS_Throw(ctx, val);
     }
 
 
     if (_type == Type::Error) {
-        ObjectWeak errObj(_ctx, JS_NewError(_ctx));
+        ObjectWeak errObj(ctx, JS_NewError(ctx));
         errObj.set("message", _message);
 
-        return JS_Throw(_ctx, errObj.getVal());
+        return JS_Throw(ctx, errObj.getVal());
     }
 
     switch (_type) {
         case Type::SyntaxError:
-            return JS_ThrowSyntaxError(_ctx, "%s", _message.c_str());
+            return JS_ThrowSyntaxError(ctx, "%s", _message.c_str());
         case Type::TypeError:
-            return JS_ThrowTypeError(_ctx, "%s", _message.c_str());
+            return JS_ThrowTypeError(ctx, "%s", _message.c_str());
         case Type::ReferenceError:
-            return JS_ThrowReferenceError(_ctx, "%s", _message.c_str());
+            return JS_ThrowReferenceError(ctx, "%s", _message.c_str());
         case Type::RangeError:
-            return JS_ThrowRangeError(_ctx, "%s", _message.c_str());
+            return JS_ThrowRangeError(ctx, "%s", _message.c_str());
         case Type::InternalError:
-            return JS_ThrowInternalError(_ctx, "%s", _message.c_str());
+            return JS_ThrowInternalError(ctx, "%s", _message.c_str());
         default:
-            return JS_Throw(_ctx, JS_NewError(_ctx));
+            return JS_Throw(ctx, JS_NewError(ctx));
     }
 }
 

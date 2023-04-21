@@ -26,7 +26,7 @@ Second way is to define `Exception` as an `Error` template. This way, the correc
 the exception is propagated to JavaScript:
 
 ```cpp
-Exception ex = Exception::create(machine.context(), Exception::Type::TypeError, "Invalid argument");
+Exception ex = Exception::create(Exception::Type::TypeError, "Invalid argument");
 ```
 
 More information can be found in the [API documentation](/doxygen/classjac_1_1ExceptionWrapper).

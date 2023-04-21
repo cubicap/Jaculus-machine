@@ -176,7 +176,7 @@ TEST_CASE("Class", "[class]") {
         struct ClassBuilder : jac::ProtoBuilder::Opaque<Opq>, jac::ProtoBuilder::Properties, jac::ProtoBuilder::Callable {
             static Opq* constructOpaque(jac::ContextRef ctx, std::vector<jac::ValueWeak> args) {
                 if (args.size() != 1) {
-                    throw jac::Exception::create(ctx, jac::Exception::Type::TypeError, "invalid number of arguments");
+                    throw jac::Exception::create(jac::Exception::Type::TypeError, "invalid number of arguments");
                 }
                 return new Opq(args[0].to<int>());
             }
@@ -214,14 +214,14 @@ TEST_CASE("Class", "[class]") {
         struct ClassBuilder : jac::ProtoBuilder::Opaque<Opq>, jac::ProtoBuilder::Properties, jac::ProtoBuilder::Callable {
             static Opq* constructOpaque(jac::ContextRef ctx, std::vector<jac::ValueWeak> args) {
                 if (args.size() != 1) {
-                    throw jac::Exception::create(ctx, jac::Exception::Type::TypeError, "invalid number of arguments");
+                    throw jac::Exception::create(jac::Exception::Type::TypeError, "invalid number of arguments");
                 }
                 return new Opq(args[0].to<int>());
             }
 
             static jac::Value callFunction(jac::ContextRef ctx, jac::ValueWeak funcObj, jac::ValueWeak thisVal, std::vector<jac::ValueWeak> args) {
                 if (args.size() != 1) {
-                    throw jac::Exception::create(ctx, jac::Exception::Type::TypeError, "invalid number of arguments");
+                    throw jac::Exception::create(jac::Exception::Type::TypeError, "invalid number of arguments");
                 }
                 return callMember<decltype(&Opq::operator()), &Opq::operator()>(ctx, funcObj, thisVal, args);
             }

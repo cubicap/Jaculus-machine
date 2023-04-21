@@ -89,7 +89,7 @@ namespace ProtoBuilder {
          * @return A pointer to the opaque data
          */
         static T* constructOpaque(ContextRef ctx, std::vector<ValueWeak> args) {
-            throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be instantiated");
+            throw Exception::create(Exception::Type::TypeError, "Class cannot be instantiated");
         }
 
         /**
@@ -113,7 +113,7 @@ namespace ProtoBuilder {
         static T* getOpaque(ContextRef ctx, ValueWeak thisVal) {
             T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal.getVal(), classId));
             if (!ptr) {
-                throw Exception::create(ctx, Exception::Type::TypeError, "Invalid opaque data");
+                throw Exception::create(Exception::Type::TypeError, "Invalid opaque data");
             }
             return ptr;
         }
@@ -229,7 +229,7 @@ namespace ProtoBuilder {
          * @return result of the call
          */
         static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
-            throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a function");
+            throw Exception::create(Exception::Type::TypeError, "Class cannot be called as a function");
         }
 
         /**
@@ -242,7 +242,7 @@ namespace ProtoBuilder {
          * @return Result of the call
          */
         static Value callConstructor(ContextRef ctx, ValueWeak funcObj, ValueWeak target, std::vector<ValueWeak> args) {
-            throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a constructor");
+            throw Exception::create(Exception::Type::TypeError, "Class cannot be called as a constructor");
         }
     };
 

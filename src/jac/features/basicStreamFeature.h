@@ -47,7 +47,7 @@ public:
                 });
 
                 if (!res) {
-                    reject.call<void>(jac::Exception::create(ctx_, jac::Exception::Type::Error, "Stream is not readable"));
+                    reject.call<void>(jac::Exception::create(jac::Exception::Type::Error, "Stream is not readable"));
                 }
 
                 return promise;
@@ -62,7 +62,7 @@ public:
                 });
 
                 if (!res) {
-                    reject.call<void>(jac::Exception::create(ctx_, jac::Exception::Type::Error, "Stream is not readable"));
+                    reject.call<void>(jac::Exception::create(jac::Exception::Type::Error, "Stream is not readable"));
                 }
 
                 return promise;

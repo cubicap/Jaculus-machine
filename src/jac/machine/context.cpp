@@ -9,7 +9,7 @@ Exception ContextRef::getException() {
         return Exception(_ctx, JS_GetException(_ctx));
     }
     catch (std::exception& e) {
-        throw Exception::create(_ctx, Exception::Type::InternalError, "No exception");
+        throw Exception::create(Exception::Type::InternalError, "No exception");
     }
 }
 

@@ -27,7 +27,7 @@ struct MyBuilder2 : public ProtoBuilder::Callable {
 
     // the default implementation - does not have to be overridden if not needed
     static Value callConstructor(ContextRef ctx, ValueWeak funcObj, ValueWeak target, std::vector<ValueWeak> args) {
-        throw Exception::create(ctx, Exception::Type::TypeError, "Class cannot be called as a constructor");
+        throw Exception::create(Exception::Type::TypeError, "Class cannot be called as a constructor");
     }
 };
 
