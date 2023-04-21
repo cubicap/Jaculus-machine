@@ -18,12 +18,11 @@ using Machine =
     FilesystemFeature<
     StdioFeature<
     BasicStreamFeature<
-    EventQueueFeature<
     jac::MachineBase
->>>>>;
+>>>>;
 ```
 
-After we have defined the machine, we can create an instance of the machine:
+After the machine is defined, we can create an instance of the machine:
 
 ```cpp
 Machine machine;

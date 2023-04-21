@@ -2,7 +2,7 @@
 
 ## Only one context per Machine
 From the beginning, the design of Jaculus-machine was to have only one context per machine. The honest reason is my lack of knowledge
-of QuickJS and JavaScript internals at the time. Now it starts to show it was a bad decision and proves to be a limitation in some cases.
+of QuickJS and JavaScript internals at the time. Now it starts to show it was a wrong decision and proves to be a limitation in some cases.
 
 It seems like it can be fixed relatively easily, but it is not a priority at the moment.
 
@@ -21,8 +21,15 @@ new Promise((resolve, reject) => {
 });
 ```
 
-The promise is created and immediately rejected. At that moment, the promise does not have a rejection handler and thus QuickJS reports
+The promise is created and immediately rejected. At that moment, the promise does not have a rejection handler, and thus QuickJS reports
 an unhandled promise rejection. However, the handler is added before the promise goes out of scope and handles the rejection.
 
 To fix this, diving into the divine magic of QuickJS internals would be required, which would mean a lot of work.
 As this does not pose any problem for running good JavaScript code and is problematic only when running bad code, it is not a priority.
+
+
+## Conversion of JavaScript value to int
+Standard JavaScript allows the dynamic conversion of values to number type. This means that the string `"123"` can be converted to the number `123`
+without specifying it explicitly. JavaScript numbers, however, may also contain values such as `NaN`. `Nan` is, among other uses, used to indicate
+that a conversion to a number failed. QuickJS function for converting a value to `int32_t` does not check for `NaN` and on invalid conversion
+returns `0` instead.

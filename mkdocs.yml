@@ -49,6 +49,7 @@ nav:
   - Reference:
     - Values: reference/values.md
     - Exceptions: reference/exceptions.md
+    - Functions: reference/functions.md
   - API:
     - Class Index: "doxygen/classes.md"
     - Namespace List: "doxygen/namespaces.md"

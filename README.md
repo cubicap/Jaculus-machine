@@ -5,5 +5,4 @@ Jaculus-machine is a C++ centric JavaScript runtime that can be easily embedded 
 
 # License
 
-Everything in this repository, unless otherwise noted, is licensed under the
-GNU General Public License, version 3.0.
+Everything in this repository, unless otherwise noted, is licensed under the GNU General Public License, version 3.0.
