@@ -40,8 +40,8 @@ TEST_CASE("Cpp Module", "[base]") {
     machine.initialize();
 
     SECTION("Simple") {
-        auto& module = machine.newModule("testModule");
-        module.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
+        auto& mdl = machine.newModule("testModule");
+        mdl.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
         evalCode(machine, "import * as testModule from 'testModule'; report(testModule.test);", "test", jac::EvalFlags::Module);
 
@@ -49,8 +49,8 @@ TEST_CASE("Cpp Module", "[base]") {
     }
 
     SECTION("Not imported") {
-        auto& module = machine.newModule("testModule");
-        module.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
+        auto& mdl = machine.newModule("testModule");
+        mdl.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
         evalCode(machine, "report('nothing');", "test", jac::EvalFlags::Module);
 
@@ -58,8 +58,8 @@ TEST_CASE("Cpp Module", "[base]") {
     }
 
     SECTION("Two modules") {
-        auto& module = machine.newModule("testModule1");
-        module.addExport("test1", jac::Value::from<std::string>(machine.context(), "test string 1"));
+        auto& mdl = machine.newModule("testModule1");
+        mdl.addExport("test1", jac::Value::from<std::string>(machine.context(), "test string 1"));
 
         auto& module2 = machine.newModule("testModule2");
         module2.addExport("test2", jac::Value::from<std::string>(machine.context(), "test string 2"));

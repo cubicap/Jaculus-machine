@@ -28,13 +28,13 @@ private:
             return nullptr;
         }
 
-        JSModuleDef *module = reinterpret_cast<JSModuleDef*>(JS_VALUE_GET_PTR(val));
+        JSModuleDef *mdl = reinterpret_cast<JSModuleDef*>(JS_VALUE_GET_PTR(val));
 
-        jac::Object meta(ctx, JS_GetImportMeta(ctx, module));
+        jac::Object meta(ctx, JS_GetImportMeta(ctx, mdl));
         meta.set("url", filename);
         meta.set("main", false);
 
-        return module;
+        return mdl;
     }
 
 public:

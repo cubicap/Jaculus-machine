@@ -51,11 +51,11 @@ public:
         jac::Object global = this->context().getGlobalObject();
         global.defineProperty("console", console);
 
-        auto& module = this->newModule("stdio");
-        module.addExport("stdout", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.out.get())));
-        module.addExport("stderr", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.err.get())));
+        auto& mdl = this->newModule("stdio");
+        mdl.addExport("stdout", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.out.get())));
+        mdl.addExport("stderr", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.err.get())));
         if (stdio.in) {
-            module.addExport("stdin", Next::ReadableClass::createInstance(this->context(), new Next::ReadableRef(stdio.in.get())));
+            mdl.addExport("stdin", Next::ReadableClass::createInstance(this->context(), new Next::ReadableRef(stdio.in.get())));
         }
     }
 };

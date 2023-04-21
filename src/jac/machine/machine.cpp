@@ -7,9 +7,9 @@ namespace jac {
 
 Module::Module(ContextRef ctx, std::string name) : _ctx(ctx) {
     _def = JS_NewCModule(ctx, name.c_str(), [](JSContext* context, JSModuleDef* def) {
-        Module& module = base(context).findModule(def);
+        Module& mdl = base(context).findModule(def);
 
-        for (auto& [exName, exVal] : module.exports) {
+        for (auto& [exName, exVal] : mdl.exports) {
             JS_SetModuleExport(context, def, exName.c_str(), exVal.loot().second);
         }
         return 0;
@@ -61,9 +61,9 @@ Value MachineBase::eval(std::string code, std::string filename, EvalFlags flags 
 }
 
 Module& MachineBase::newModule(std::string name) {
-    Module module(_context, name);
-    JSModuleDef* def = module.get();
-    _modules.emplace(def, std::move(module));
+    Module mdl(_context, name);
+    JSModuleDef* def = mdl.get();
+    _modules.emplace(def, std::move(mdl));
 
     return _modules.find(def)->second;
 }
