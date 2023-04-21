@@ -77,3 +77,17 @@ obj2.set("f", f2);
 
 int res3 = obj2.invoke<int>("f");  // calls obj2.f() and returns the result as an int
 ```
+
+## Calling constructors
+
+JavaScript distinguishes whether a function is called as a constructor or as a normal function - inside JavaScript, this is signified by the `new` keyword.
+To call a `jac::Function` as a constructor, use the `callConstructor<Res, Args...>(Args... args)` method.
+
+```cpp
+MachineBase machine;
+machine.initialize();
+
+jac::Function a = machine.eval("class A { constructor(x) { this.x = x } }", "<eval>", jac::EvalFlags::Global).to<jac::Function>();
+
+jac::Object obj = a.callConstructor<jac::Object>(5);  // calls new f(5) and returns the result as a jac::Object
+```

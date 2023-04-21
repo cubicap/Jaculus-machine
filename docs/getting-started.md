@@ -1,8 +1,8 @@
 # Getting started
 
-The core concept of Jaculus-machine is a *Machine* type. A *Machine* is parametrized by *features* that should be part of it.
+The core concept of Jaculus-machine is a *Machine* type. A *Machine* is parametrized by *Features* that should be part of it.
 *Machine* is created using stack inheritance. At the bottom of the stack, there is always `jac::MachineBase` which provides the basic functionality.
-For example, a *machine* with core *features* can be created like this:
+For example, a *Machine* with core *Features* can be created like this:
 
 ```cpp
 #include <jaculus/machine.h>
@@ -58,13 +58,13 @@ Both `eval` and `evalFile`, however, only evaluate the code and do not control t
 
 
 ## Features
-*Features* are the building blocks of a *Machine*. The stack design of *Machine* allows interfacing with different *features* in C++ directly
-and to implement new *features* on top of existing ones without large performance penalty.
+*Features* are the building blocks of a *Machine*. The stack design of *Machine* allows interfacing with different *Features* in C++ directly
+and to implement new *Features* on top of existing ones without a large performance penalty.
 
-Only the most basic and necessary features are included with the library:
+Only the most basic and necessary *Features* are included with the library:
 
 - `jac::MachineBase` - the base class of all machines. It provides the basic functionality of the runtime.
-- `EventQueueFeature` - provides an event queue build on top of the standard library.
+- `EventQueueFeature` - provides an event queue built on top of the standard library.
 - `EventLoopFeature` - provides a default event loop implementation.
 - `FileystemFeature` - provides filesystem access through `fs` and `path` modules
 - `ModuleLoaderFeature` - provides module loading through `import`, and `evalFile` method

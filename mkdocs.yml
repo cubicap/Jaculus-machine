@@ -47,9 +47,14 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Reference:
+    - Context: reference/context.md
+    - Atom: reference/atom.md
     - Values: reference/values.md
     - Exceptions: reference/exceptions.md
     - Functions: reference/functions.md
+    - Classes: reference/classes.md
+    - Event loop: reference/event-loop.md
+    - Custom Features: reference/features.md
   - API:
     - Class Index: "doxygen/classes.md"
     - Namespace List: "doxygen/namespaces.md"
