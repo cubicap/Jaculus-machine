@@ -19,9 +19,9 @@ TEST_CASE("Register global", "[base]") {
 
     Machine machine;
     machine.initialize();
-    jac::Object global = machine._context.getGlobalObject();
+    jac::Object global = machine.context().getGlobalObject();
 
-    global.defineProperty("test", jac::Value::from<std::string>(machine._context, "test string"));
+    global.defineProperty("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
 
     evalCode(machine, "report(test);", "test", jac::EvalFlags::Module);
@@ -41,7 +41,7 @@ TEST_CASE("Cpp Module", "[base]") {
 
     SECTION("Simple") {
         auto& module = machine.newModule("testModule");
-        module.addExport("test", jac::Value::from<std::string>(machine._context, "test string"));
+        module.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
         evalCode(machine, "import * as testModule from 'testModule'; report(testModule.test);", "test", jac::EvalFlags::Module);
 
@@ -50,7 +50,7 @@ TEST_CASE("Cpp Module", "[base]") {
 
     SECTION("Not imported") {
         auto& module = machine.newModule("testModule");
-        module.addExport("test", jac::Value::from<std::string>(machine._context, "test string"));
+        module.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
         evalCode(machine, "report('nothing');", "test", jac::EvalFlags::Module);
 
@@ -59,10 +59,10 @@ TEST_CASE("Cpp Module", "[base]") {
 
     SECTION("Two modules") {
         auto& module = machine.newModule("testModule1");
-        module.addExport("test1", jac::Value::from<std::string>(machine._context, "test string 1"));
+        module.addExport("test1", jac::Value::from<std::string>(machine.context(), "test string 1"));
 
         auto& module2 = machine.newModule("testModule2");
-        module2.addExport("test2", jac::Value::from<std::string>(machine._context, "test string 2"));
+        module2.addExport("test2", jac::Value::from<std::string>(machine.context(), "test string 2"));
 
         evalCode(machine, R"(
             import * as testModule1 from 'testModule1';

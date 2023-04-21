@@ -191,9 +191,9 @@ public:
     void initialize() {
         Next::initialize();
 
-        FileClass::initContext(this->_context);
+        FileClass::initContext(this->context());
 
-        jac::FunctionFactory ff(this->_context);
+        jac::FunctionFactory ff(this->context());
 
         jac::Module& pathMod = this->newModule("path");
         pathMod.addExport("normalize", ff.newFunction(noal::function(&Path::normalize, &(this->path))));
@@ -209,7 +209,7 @@ public:
 
         jac::Module& fsMod = this->newModule("fs");
         fsMod.addExport("open", ff.newFunction([this](std::string path_, std::string flags) {
-            return FileClass::createInstance(this->_context, new File(this->fs.open(path_, flags)));
+            return FileClass::createInstance(this->context(), new File(this->fs.open(path_, flags)));
         }));
         fsMod.addExport("exists", ff.newFunction(noal::function(&Fs::exists, &(this->fs))));
         fsMod.addExport("isFile", ff.newFunction(noal::function(&Fs::isFile, &(this->fs))));

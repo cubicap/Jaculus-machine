@@ -107,7 +107,7 @@ public:
     void initialize() {
         Next::initialize();
 
-        WritableClass::initContext(this->_context);
-        ReadableClass::initContext(this->_context);
+        WritableClass::initContext(this->context());
+        ReadableClass::initContext(this->context());
     }
 };

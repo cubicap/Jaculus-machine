@@ -20,7 +20,7 @@ public:
 
     void runEventLoop() {
         try {
-            JSRuntime* rt = JS_GetRuntime(this->_context);
+            JSRuntime* rt = JS_GetRuntime(this->context());
             JSContext* ctx1;
 
             bool didJob = true;
@@ -80,8 +80,8 @@ public:
 
     void initialize() {
         Next::initialize();
-        jac::FunctionFactory ff(this->_context);
-        jac::Object global = this->_context.getGlobalObject();
+        jac::FunctionFactory ff(this->context());
+        jac::Object global = this->context().getGlobalObject();
 
         global.defineProperty("exit", ff.newFunction(noal::function(&EventLoopFeature::exit, this)), jac::PropFlags::Enumerable);
     }

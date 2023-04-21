@@ -20,14 +20,14 @@ TEST_CASE("Class", "[class]") {
 
     Machine machine;
     machine.initialize();
-    jac::Object global = machine._context.getGlobalObject();
+    jac::Object global = machine.context().getGlobalObject();
 
     SECTION("Empty") {
         struct ClassBuilder {};
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", false);
 
-        auto ctor = TestClass::getConstructor(machine._context);
+        auto ctor = TestClass::getConstructor(machine.context());
 
         global.defineProperty("TestClass", ctor);
 
@@ -47,7 +47,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", false);
 
-        auto ctor = TestClass::getConstructor(machine._context);
+        auto ctor = TestClass::getConstructor(machine.context());
 
         global.defineProperty("TestClass", ctor);
 
@@ -69,7 +69,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", false);
 
-        auto ctor = TestClass::getConstructor(machine._context);
+        auto ctor = TestClass::getConstructor(machine.context());
 
         global.defineProperty("TestClass", ctor);
 
@@ -88,7 +88,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", true);
 
-        auto ctor = TestClass::getConstructor(machine._context);
+        auto ctor = TestClass::getConstructor(machine.context());
 
         global.defineProperty("TestClass", ctor);
 
@@ -111,7 +111,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", true);
 
-        auto ctor = TestClass::getConstructor(machine._context);
+        auto ctor = TestClass::getConstructor(machine.context());
 
         global.defineProperty("TestClass", ctor);
 
@@ -148,7 +148,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", false);
 
-        auto instance = TestClass::createInstance(machine._context, new Opq());
+        auto instance = TestClass::createInstance(machine.context(), new Opq());
         global.defineProperty("val", instance);
 
         auto result = evalCode(machine, R"(
@@ -190,7 +190,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", true);
 
-        auto ctor = TestClass::getConstructor(machine._context);
+        auto ctor = TestClass::getConstructor(machine.context());
 
         global.defineProperty("TestClass", ctor);
 
@@ -234,7 +234,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", true);
 
-        auto ctor = TestClass::getConstructor(machine._context);
+        auto ctor = TestClass::getConstructor(machine.context());
 
         global.defineProperty("TestClass", ctor);
 
@@ -273,7 +273,7 @@ TEST_CASE("Class", "[class]") {
         using TestClass = jac::Class<ClassBuilder>;
         TestClass::init("TestClass", false);
 
-        auto instance = TestClass::createInstance(machine._context, new Opq());
+        auto instance = TestClass::createInstance(machine.context(), new Opq());
         global.defineProperty("val", instance);
 
         auto result = evalCode(machine, R"(

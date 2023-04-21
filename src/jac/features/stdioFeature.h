@@ -23,7 +23,7 @@ public:
     void initialize() {
         Next::initialize();
 
-        jac::FunctionFactory ff(this->_context);
+        jac::FunctionFactory ff(this->context());
 
         if (!this->stdio.out) {
             throw std::runtime_error("StdioFeature: stdio.out is not set");
@@ -32,7 +32,7 @@ public:
             throw std::runtime_error("StdioFeature: stdio.err is not set");
         }
 
-        jac::Object console = jac::Object::create(this->_context);
+        jac::Object console = jac::Object::create(this->context());
         console.set("debug", ff.newFunction([this](std::string str) {
             this->stdio.out->write(str + "\n");
         }));
@@ -48,14 +48,14 @@ public:
         console.set("error", ff.newFunction([this](std::string str) {
             this->stdio.err->write(str + "\n");
         }));
-        jac::Object global = this->_context.getGlobalObject();
+        jac::Object global = this->context().getGlobalObject();
         global.defineProperty("console", console);
 
         auto& module = this->newModule("stdio");
-        module.addExport("stdout", Next::WritableClass::createInstance(this->_context, new Next::WritableRef(stdio.out.get())));
-        module.addExport("stderr", Next::WritableClass::createInstance(this->_context, new Next::WritableRef(stdio.err.get())));
+        module.addExport("stdout", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.out.get())));
+        module.addExport("stderr", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.err.get())));
         if (stdio.in) {
-            module.addExport("stdin", Next::ReadableClass::createInstance(this->_context, new Next::ReadableRef(stdio.in.get())));
+            module.addExport("stdin", Next::ReadableClass::createInstance(this->context(), new Next::ReadableRef(stdio.in.get())));
         }
     }
 };

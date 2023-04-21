@@ -21,7 +21,7 @@ TEST_CASE("To JS value", "[base]") {
 
     Machine machine;
     machine.initialize();
-    jac::Object global = machine._context.getGlobalObject();
+    jac::Object global = machine.context().getGlobalObject();
 
     using val = std::tuple<std::string, std::function<jac::Value(jac::ContextRef)>, std::string, std::string>;
     auto values = GENERATE(
@@ -47,7 +47,7 @@ TEST_CASE("To JS value", "[base]") {
     auto [comment, valueGen, type, str] = values;
 
     DYNAMIC_SECTION(comment) {
-        auto value = valueGen(machine._context);
+        auto value = valueGen(machine.context());
 
         global.defineProperty("value", value);
         evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
@@ -87,7 +87,7 @@ TEST_CASE("toString", "[base]") {
     auto [comment, valueGen, type, str] = values;
 
     DYNAMIC_SECTION(comment) {
-        auto value = valueGen(machine._context);
+        auto value = valueGen(machine.context());
 
         std::string result(value.toString());
 
@@ -182,7 +182,7 @@ TEST_CASE("Object set", "[base]") {
         auto value = evalCode(machine, "let x = {}; x", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
-        object.set("a", jac::Value::from(machine._context, "Hello World"));
+        object.set("a", jac::Value::from(machine.context(), "Hello World"));
 
         evalCode(machine, "report(x.a)", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
@@ -192,7 +192,7 @@ TEST_CASE("Object set", "[base]") {
         auto value = evalCode(machine, "let x = {}; x", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
-        object.set(42, jac::Value::from(machine._context, "Hello World"));
+        object.set(42, jac::Value::from(machine.context(), "Hello World"));
 
         evalCode(machine, "report(x[42])", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
@@ -202,7 +202,7 @@ TEST_CASE("Object set", "[base]") {
         auto value = evalCode(machine, "let x = []; x", "test", jac::EvalFlags::Global);
         auto object = value.to<jac::Object>();
 
-        object.set(1, jac::Value::from(machine._context, "Hello World"));
+        object.set(1, jac::Value::from(machine.context(), "Hello World"));
 
         evalCode(machine, "report(x[1])", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
@@ -218,11 +218,11 @@ TEST_CASE("Object create", "[base]") {
 
     Machine machine;
     machine.initialize();
-    jac::Object global = machine._context.getGlobalObject();
+    jac::Object global = machine.context().getGlobalObject();
 
     SECTION("create") {
-        auto object = jac::Object::create(machine._context);
-        object.set("a", jac::Value::from(machine._context, "Hello World"));
+        auto object = jac::Object::create(machine.context());
+        object.set("a", jac::Value::from(machine.context(), "Hello World"));
         global.defineProperty("x", object);
 
         evalCode(machine, "report(x.a)", "test", jac::EvalFlags::Global);
@@ -258,21 +258,21 @@ TEST_CASE("Object defineProperty", "[base]") {
     machine.initialize();
 
     SECTION("value") {
-        auto object = jac::Object::create(machine._context);
+        auto object = jac::Object::create(machine.context());
 
-        object.defineProperty("a", jac::Value::from(machine._context, "Hello World"));
+        object.defineProperty("a", jac::Value::from(machine.context(), "Hello World"));
         REQUIRE(object.hasProperty("a"));
         REQUIRE(object.get<std::string>("a") == "Hello World");
-        REQUIRE_THROWS_AS(object.set("a", jac::Value::from(machine._context, "Hallo Welt")), jac::Exception);
+        REQUIRE_THROWS_AS(object.set("a", jac::Value::from(machine.context(), "Hallo Welt")), jac::Exception);
     }
 
     SECTION("writable") {
-        auto object = jac::Object::create(machine._context);
+        auto object = jac::Object::create(machine.context());
 
-        object.defineProperty("a", jac::Value::from(machine._context, "Hello World"), jac::PropFlags::Writable);
+        object.defineProperty("a", jac::Value::from(machine.context(), "Hello World"), jac::PropFlags::Writable);
         REQUIRE(object.hasProperty("a"));
         REQUIRE(object.get<std::string>("a") == "Hello World");
-        object.set("a", jac::Value::from(machine._context, "Hallo Welt"));
+        object.set("a", jac::Value::from(machine.context(), "Hallo Welt"));
         REQUIRE(object.get<std::string>("a") == "Hallo Welt");
     }
 }
@@ -461,10 +461,10 @@ TEST_CASE("Promise", "[base]") {
 
     Machine machine;
     machine.initialize();
-    jac::Object global = machine._context.getGlobalObject();
+    jac::Object global = machine.context().getGlobalObject();
 
     SECTION("resolve") {
-        auto [promise, resolve, reject] = jac::Promise::create(machine._context);
+        auto [promise, resolve, reject] = jac::Promise::create(machine.context());
 
         global.defineProperty("x", promise);
 
@@ -478,16 +478,16 @@ TEST_CASE("Promise", "[base]") {
 
         resolve.call<void>("Hello World");
 
-        JSContext* context = machine._context;
-        int err = JS_ExecutePendingJob(JS_GetRuntime(machine._context), &context);
-        err = JS_ExecutePendingJob(JS_GetRuntime(machine._context), &context);
+        JSContext* context = machine.context();
+        int err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
+        err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
         REQUIRE(err == 0);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
     }
 
     SECTION("reject") {
-        auto [promise, resolve, reject] = jac::Promise::create(machine._context);
+        auto [promise, resolve, reject] = jac::Promise::create(machine.context());
 
         global.defineProperty("x", promise);
 
@@ -501,9 +501,9 @@ TEST_CASE("Promise", "[base]") {
 
         reject.call<void>("Hello World");
 
-        JSContext* context = machine._context;
-        int err = JS_ExecutePendingJob(JS_GetRuntime(machine._context), &context);
-        err = JS_ExecutePendingJob(JS_GetRuntime(machine._context), &context);
+        JSContext* context = machine.context();
+        int err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
+        err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
         REQUIRE(err == 0);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
@@ -554,35 +554,35 @@ TEST_CASE("json", "[base]") {
     machine.initialize();
 
     SECTION("parse object") {
-        auto value = jac::Value::fromJSON(machine._context, R"({"a": 42})");
+        auto value = jac::Value::fromJSON(machine.context(), R"({"a": 42})");
         REQUIRE(value.isObject());
         REQUIRE(value.to<jac::Object>().get<int>("a") == 42);
     }
 
     SECTION("parse array") {
-        auto value = jac::Value::fromJSON(machine._context, "[1, 2, 3]");
+        auto value = jac::Value::fromJSON(machine.context(), "[1, 2, 3]");
         REQUIRE(value.to<jac::Object>().get<int>(0) == 1);
         REQUIRE(value.to<jac::Object>().get<int>(1) == 2);
         REQUIRE(value.to<jac::Object>().get<int>(2) == 3);
     }
 
     SECTION("parse string") {
-        auto value = jac::Value::fromJSON(machine._context, R"("Hello World")");
+        auto value = jac::Value::fromJSON(machine.context(), R"("Hello World")");
         REQUIRE(value.to<std::string>() == "Hello World");
     }
 
     SECTION("parse number") {
-        auto value = jac::Value::fromJSON(machine._context, "42");
+        auto value = jac::Value::fromJSON(machine.context(), "42");
         REQUIRE(value.to<int>() == 42);
     }
 
     SECTION("parse boolean") {
-        auto value = jac::Value::fromJSON(machine._context, "true");
+        auto value = jac::Value::fromJSON(machine.context(), "true");
         REQUIRE(value.to<bool>() == true);
     }
 
     SECTION("stringify object") {
-        auto value = jac::Value::fromJSON(machine._context, R"({"a": 42})");
+        auto value = jac::Value::fromJSON(machine.context(), R"({"a": 42})");
         REQUIRE(value.stringify().to<std::string>() == R"({"a":42})");
 
         REQUIRE(value.stringify(4).to<std::string>() == "{\n    \"a\": 42\n}");
@@ -590,7 +590,7 @@ TEST_CASE("json", "[base]") {
     }
 
     SECTION("stringify array") {
-        auto value = jac::Value::fromJSON(machine._context, "[1, 2, 3]");
+        auto value = jac::Value::fromJSON(machine.context(), "[1, 2, 3]");
         REQUIRE(value.stringify().to<std::string>() == "[1,2,3]");
 
         REQUIRE(value.stringify(4).to<std::string>() == "[\n    1,\n    2,\n    3\n]");
@@ -607,10 +607,10 @@ TEST_CASE("ArrayBuffer", "[base]") {
 
     Machine machine;
     machine.initialize();
-    jac::Object global = machine._context.getGlobalObject();
+    jac::Object global = machine.context().getGlobalObject();
 
     SECTION("create") {
-        auto buffer = jac::ArrayBuffer::create(machine._context, 10);
+        auto buffer = jac::ArrayBuffer::create(machine.context(), 10);
         global.defineProperty("x", buffer);
 
         REQUIRE(buffer.size() == 10);

@@ -19,9 +19,9 @@ TEST_CASE("New function", "[functionFactory]") {
 
     Machine machine;
     machine.initialize();
-    jac::Object global = machine._context.getGlobalObject();
+    jac::Object global = machine.context().getGlobalObject();
 
-    jac::FunctionFactory ff(machine._context);
+    jac::FunctionFactory ff(machine.context());
 
     SECTION("void(void)") {
         auto f = ff.newFunction([]() {});
@@ -79,7 +79,7 @@ TEST_CASE("New function variadic", "[functionFactory]") {
     Machine machine;
     machine.initialize();
 
-    jac::FunctionFactory ff(machine._context);
+    jac::FunctionFactory ff(machine.context());
 
     SECTION("void(args)") {
         auto f = ff.newFunctionVariadic([](std::vector<jac::ValueWeak> args) {});
@@ -113,13 +113,13 @@ TEST_CASE("New function this", "[functionFactory]") {
     Machine machine;
     machine.initialize();
 
-    jac::FunctionFactory ff(machine._context);
+    jac::FunctionFactory ff(machine.context());
 
     SECTION("void(void)") {
         auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue) {
             thisValue.to<jac::Object>().set("test", jac::Value::from(ctx, 42));
         });
-        auto obj = jac::Object::create(machine._context);
+        auto obj = jac::Object::create(machine.context());
         f.callThis<void>(obj);
 
         REQUIRE(obj.get<int>("test") == 42);
@@ -129,8 +129,8 @@ TEST_CASE("New function this", "[functionFactory]") {
         auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue) {
             return thisValue.to<jac::Object>().get<int>("test");
         });
-        auto obj = jac::Object::create(machine._context);
-        obj.set("test", jac::Value::from(machine._context, 42));
+        auto obj = jac::Object::create(machine.context());
+        obj.set("test", jac::Value::from(machine.context(), 42));
 
         REQUIRE(f.callThis<int>(obj) == 42);
     }
@@ -141,8 +141,8 @@ TEST_CASE("New function this", "[functionFactory]") {
             obj.set("test", obj.get<int>("test") + a);
             return obj.get<int>("test");
         });
-        auto obj = jac::Object::create(machine._context);
-        obj.set("test", jac::Value::from(machine._context, 40));
+        auto obj = jac::Object::create(machine.context());
+        obj.set("test", jac::Value::from(machine.context(), 40));
 
         REQUIRE(f.callThis<int>(obj, 2) == 42);
         REQUIRE(obj.get<int>("test") == 42);
@@ -154,8 +154,8 @@ TEST_CASE("New function this", "[functionFactory]") {
             obj.set("test", (obj.get<int>("test") + a) * b);
             return obj.get<int>("test") * 10;
         });
-        auto obj = jac::Object::create(machine._context);
-        obj.set("test", jac::Value::from(machine._context, 20));
+        auto obj = jac::Object::create(machine.context());
+        obj.set("test", jac::Value::from(machine.context(), 20));
 
         REQUIRE(f.callThis<int>(obj, 1, 2) == 420);
         REQUIRE(obj.get<int>("test") == 42);
@@ -172,14 +172,14 @@ TEST_CASE("New function this variadic", "[functionFactory]") {
     Machine machine;
     machine.initialize();
 
-    jac::FunctionFactory ff(machine._context);
+    jac::FunctionFactory ff(machine.context());
 
     SECTION("void(args)") {
         auto f = ff.newFunctionThisVariadic([](jac::ContextRef ctx, jac::ValueWeak thisValue, std::vector<jac::ValueWeak> argv) {
             auto obj = thisValue.to<jac::Object>();
             obj.set("test", jac::Value::from(ctx, static_cast<int>(argv.size())));
         });
-        auto obj = jac::Object::create(machine._context);
+        auto obj = jac::Object::create(machine.context());
         f.callThis<void>(obj, 1, 2, 3);
 
         REQUIRE(obj.get<int>("test") == 3);
@@ -194,7 +194,7 @@ TEST_CASE("New function this variadic", "[functionFactory]") {
             }
             return result;
         });
-        auto obj = jac::Object::create(machine._context);
+        auto obj = jac::Object::create(machine.context());
         obj.set<std::string>("prefix", "__");
         auto result = f.callThis<std::string>(obj, "a", "b", "c");
 

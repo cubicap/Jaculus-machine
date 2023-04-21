@@ -48,6 +48,6 @@ public:
     void initialize() {
         Next::initialize();
 
-        JS_SetModuleLoaderFunc(this->_runtime, nullptr, moduleLoaderCbk, this);
+        JS_SetModuleLoaderFunc(this->runtime(), nullptr, moduleLoaderCbk, this);
     }
 };

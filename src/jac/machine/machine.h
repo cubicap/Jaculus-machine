@@ -109,9 +109,27 @@ private:
     std::chrono::milliseconds _watchdogTimeout = std::chrono::milliseconds(0);
     std::chrono::time_point<std::chrono::steady_clock> _watchdogNext;
     std::function<bool()> _wathdogCallback;
-public:
+
     JSRuntime* _runtime = nullptr;
     ContextRef _context = nullptr;
+public:
+    /**
+     * @brief Get the JSRuntime* for this machine
+     *
+     * @return The JSRuntime*
+     */
+    JSRuntime* runtime() {
+        return _runtime;
+    }
+
+    /**
+     * @brief Get the ContextRef for this machine
+     *
+     * @return The ContextRef
+     */
+    ContextRef context() {
+        return _context;
+    }
 
     /**
      * @brief Initialize the machine. Should be called after machine configuration

@@ -173,8 +173,8 @@ public:
             }
         });
 
-        jac::FunctionFactory ff(this->_context);
-        jac::Object global = this->_context.getGlobalObject();
+        jac::FunctionFactory ff(this->context());
+        jac::Object global = this->context().getGlobalObject();
 
         global.defineProperty("setInterval", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
             return setInterval([func]() mutable {
@@ -197,7 +197,7 @@ public:
         }), jac::PropFlags::Enumerable);
 
         global.defineProperty("sleep", ff.newFunction([this](int millis) {
-            auto [promise, resolve, _] = jac::Promise::create(this->_context);
+            auto [promise, resolve, _] = jac::Promise::create(this->context());
             setTimeout([resolve]() mutable {
                 static_cast<jac::Function&>(resolve).call<void>();
             }, std::chrono::milliseconds(millis));

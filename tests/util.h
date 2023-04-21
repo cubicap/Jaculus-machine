@@ -20,8 +20,8 @@ public:
 
     void initialize() {
         Next::initialize();
-        jac::FunctionFactory ff(this->_context);
-        jac::Object global = this->_context.getGlobalObject();
+        jac::FunctionFactory ff(this->context());
+        jac::Object global = this->context().getGlobalObject();
 
         global.defineProperty("report", ff.newFunction([this](jac::ValueWeak val) {
             this->report(val.to<std::string>());
@@ -40,7 +40,7 @@ jac::Value evalFile(auto& machine, std::string path_) {
         REQUIRE(false);
     }
 
-    return jac::Value::undefined(machine._context);
+    return jac::Value::undefined(machine.context());
 };
 
 
@@ -54,7 +54,7 @@ jac::Value evalCode(auto& machine, std::string code, std::string filename, jac::
         REQUIRE(false);
     }
 
-    return jac::Value::undefined(machine._context);
+    return jac::Value::undefined(machine.context());
 };
 
 
