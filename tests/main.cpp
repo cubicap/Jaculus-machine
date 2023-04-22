@@ -45,7 +45,7 @@ int main() {
 
         std::cout << "Exit code: " << machine.getExitCode() << std::endl;
     } catch (jac::Exception& e) {
-        std::cout << "Exception: " << e.toString() << std::endl;
+        std::cout << "Exception: " << e.what() << std::endl;
         std::cout << "Stack: " << e.stackTrace() << std::endl;
     } catch (std::exception& e) {
         std::cout << "Exception: " << e.what() << std::endl;

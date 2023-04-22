@@ -59,6 +59,10 @@ public:
             JS_FreeCString(_ctx, data());
         }
     }
+
+    operator std::string() const {
+        return std::string(data(), size());
+    }
 };
 
 

@@ -813,7 +813,7 @@ template<bool managed>
 std::string ExceptionWrapper<managed>::stackTrace() noexcept {
     try {
         ObjectWeak obj(*this);
-        return obj.get("stack").toString().c_str();
+        return obj.get("stack").toString();
     } catch (std::exception &e) {
         return "failed to get stack trace: " + std::string(e.what());
     }
