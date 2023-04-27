@@ -16,6 +16,16 @@
 namespace jac {
 
 
+template<class Base, template<typename> class... Features>
+struct ComposeMachine;
+
+template<class Base, template<class, typename...> class FirstFeature, template<typename> class... Features>
+struct ComposeMachine<Base, FirstFeature, Features...> : public ComposeMachine<FirstFeature<Base>, Features...> {};
+
+template<class Base>
+struct ComposeMachine<Base> : public Base {};
+
+
 enum class EvalFlags : int {
     Global = JS_EVAL_TYPE_GLOBAL,
     Module = JS_EVAL_TYPE_MODULE,

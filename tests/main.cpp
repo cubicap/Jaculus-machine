@@ -13,18 +13,17 @@
 #include <iostream>
 
 
-using Machine =
-    EventLoopTerminal<
-    TimersFeature<
-    ModuleLoaderFeature<
-    FilesystemFeature<
-    EventLoopFeature<
-    StdioFeature<
-    BasicStreamFeature<
-    EventQueueFeature<
-    jac::MachineBase
->>>>>>>>;
-
+using Machine = jac::ComposeMachine<
+    jac::MachineBase,
+    EventQueueFeature,
+    BasicStreamFeature,
+    StdioFeature,
+    EventLoopFeature,
+    FilesystemFeature,
+    ModuleLoaderFeature,
+    TimersFeature,
+    EventLoopTerminal
+>;
 
 const char* code = R"(
 console.log("Hello world!");
