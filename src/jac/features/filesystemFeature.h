@@ -10,6 +10,9 @@
 #include <noal_func.h>
 
 
+namespace jac {
+
+
 template<class Next>
 class FilesystemFeature : public Next {
 private:
@@ -72,15 +75,15 @@ private:
         }
     };
 
-    struct FileProtoBuilder : public jac::ProtoBuilder::Opaque<File>, public jac::ProtoBuilder::Properties {
-        static void addProperties(jac::ContextRef ctx, jac::Object proto) {
-            jac::FunctionFactory ff(ctx);
+    struct FileProtoBuilder : public ProtoBuilder::Opaque<File>, public ProtoBuilder::Properties {
+        static void addProperties(ContextRef ctx, Object proto) {
+            FunctionFactory ff(ctx);
 
-            addPropMember<std::string, &File::path_>(ctx, proto, "path", jac::PropFlags::Enumerable);
-            addMethodMember<bool(File::*)(), &File::isOpen>(ctx, proto, "isOpen", jac::PropFlags::Enumerable);
-            addMethodMember<void(File::*)(), &File::close>(ctx, proto, "close", jac::PropFlags::Enumerable);
-            addMethodMember<std::string(File::*)(int), &File::read>(ctx, proto, "read", jac::PropFlags::Enumerable);
-            addMethodMember<void(File::*)(std::string), &File::write>(ctx, proto, "write", jac::PropFlags::Enumerable);
+            addPropMember<std::string, &File::path_>(ctx, proto, "path", PropFlags::Enumerable);
+            addMethodMember<bool(File::*)(), &File::isOpen>(ctx, proto, "isOpen", PropFlags::Enumerable);
+            addMethodMember<void(File::*)(), &File::close>(ctx, proto, "close", PropFlags::Enumerable);
+            addMethodMember<std::string(File::*)(int), &File::read>(ctx, proto, "read", PropFlags::Enumerable);
+            addMethodMember<void(File::*)(std::string), &File::write>(ctx, proto, "write", PropFlags::Enumerable);
         }
     };
 
@@ -88,7 +91,7 @@ private:
     std::filesystem::path _workingDir = ".";
 
 public:
-    using FileClass = jac::Class<FileProtoBuilder>;
+    using FileClass = Class<FileProtoBuilder>;
 
     void setCodeDir(std::string path_) {
         this->_codeDir = std::filesystem::path(path_).lexically_normal();
@@ -193,13 +196,13 @@ public:
 
         FileClass::initContext(this->context());
 
-        jac::FunctionFactory ff(this->context());
+        FunctionFactory ff(this->context());
 
-        jac::Module& pathMod = this->newModule("path");
+        Module& pathMod = this->newModule("path");
         pathMod.addExport("normalize", ff.newFunction(noal::function(&Path::normalize, &(this->path))));
         pathMod.addExport("dirname", ff.newFunction(noal::function(&Path::dirname, &(this->path))));
         pathMod.addExport("basename", ff.newFunction(noal::function(&Path::basename, &(this->path))));
-        pathMod.addExport("join", ff.newFunctionVariadic([this](std::vector<jac::ValueWeak> paths) {
+        pathMod.addExport("join", ff.newFunctionVariadic([this](std::vector<ValueWeak> paths) {
             std::vector<std::string> paths_;
             for (auto& p : paths) {
                 paths_.push_back(p.to<std::string>());
@@ -207,7 +210,7 @@ public:
             return this->path.join(paths_);
         }));
 
-        jac::Module& fsMod = this->newModule("fs");
+        Module& fsMod = this->newModule("fs");
         fsMod.addExport("open", ff.newFunction([this](std::string path_, std::string flags) {
             return FileClass::createInstance(this->context(), new File(this->fs.open(path_, flags)));
         }));
@@ -220,3 +223,6 @@ public:
         fsMod.addExport("readdir", ff.newFunction(noal::function(&Fs::readdir, &(this->fs))));
     }
 };
+
+
+} // namespace jac

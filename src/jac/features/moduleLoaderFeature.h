@@ -3,6 +3,9 @@
 #include <jac/machine/machine.h>
 
 
+namespace jac {
+
+
 template<class Next>
 class ModuleLoaderFeature : public Next {
 private:
@@ -15,7 +18,7 @@ private:
         try {
             buffer = self.fs.loadCode(filename);
         } catch (std::exception &e) {
-            auto error = jac::Exception::create(jac::Exception::Type::Error, e.what());
+            auto error = Exception::create(Exception::Type::Error, e.what());
             error.throwJS(ctx);
             return nullptr;
         }
@@ -30,7 +33,7 @@ private:
 
         JSModuleDef *mdl = reinterpret_cast<JSModuleDef*>(JS_VALUE_GET_PTR(val));
 
-        jac::Object meta(ctx, JS_GetImportMeta(ctx, mdl));
+        Object meta(ctx, JS_GetImportMeta(ctx, mdl));
         meta.set("url", filename);
         meta.set("main", false);
 
@@ -38,10 +41,10 @@ private:
     }
 
 public:
-    jac::Value evalFile(std::string path_) {
+    Value evalFile(std::string path_) {
         auto buffer = this->fs.loadCode(path_);
 
-        jac::Value val = this->eval(std::move(buffer), path_, jac::EvalFlags::Module);
+        Value val = this->eval(std::move(buffer), path_, EvalFlags::Module);
         return val;
     }
 
@@ -51,3 +54,6 @@ public:
         JS_SetModuleLoaderFunc(this->runtime(), nullptr, moduleLoaderCbk, this);
     }
 };
+
+
+} // namespace jac

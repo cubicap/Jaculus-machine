@@ -13,8 +13,8 @@
 
 TEST_CASE("Eval file", "[moduleLoader]") {
     using Machine =
-        ModuleLoaderFeature<
-        FilesystemFeature<
+        jac::ModuleLoaderFeature<
+        jac::FilesystemFeature<
         TestReportFeature<
         jac::MachineBase
     >>>;
@@ -41,8 +41,8 @@ TEST_CASE("Eval file", "[moduleLoader]") {
 
 TEST_CASE("Import file", "[moduleLoader]") {
     using Machine =
-        ModuleLoaderFeature<
-        FilesystemFeature<
+        jac::ModuleLoaderFeature<
+        jac::FilesystemFeature<
         TestReportFeature<
         jac::MachineBase
     >>>;

@@ -11,6 +11,9 @@
 #include "eventLoopTerminal.h"
 
 
+namespace jac {
+
+
 template<class Next>
 class EventLoopFeature : public Next {
 private:
@@ -42,7 +45,7 @@ public:
                     int err = JS_ExecutePendingJob(rt, &ctx1);
                     if (err <= 0) {
                         if (err < 0) {
-                            throw jac::ContextRef(ctx1).getException();
+                            throw ContextRef(ctx1).getException();
                         }
                         break;
                     }
@@ -80,13 +83,16 @@ public:
 
     void initialize() {
         Next::initialize();
-        jac::FunctionFactory ff(this->context());
-        jac::Object global = this->context().getGlobalObject();
+        FunctionFactory ff(this->context());
+        Object global = this->context().getGlobalObject();
 
-        global.defineProperty("exit", ff.newFunction(noal::function(&EventLoopFeature::exit, this)), jac::PropFlags::Enumerable);
+        global.defineProperty("exit", ff.newFunction(noal::function(&EventLoopFeature::exit, this)), PropFlags::Enumerable);
     }
 
     void onEventLoop() {
         // last in stack
     }
 };
+
+
+} // namespace jac

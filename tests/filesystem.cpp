@@ -25,7 +25,7 @@ std::string readFile(auto f) {
 
 TEST_CASE("Filesystem", "[filesystem]") {
     using Machine =
-        FilesystemFeature<
+        jac::FilesystemFeature<
         jac::MachineBase
     >;
     Machine machine;
@@ -170,7 +170,7 @@ TEST_CASE("Filesystem", "[filesystem]") {
 
 TEST_CASE("Path", "[filesystem]") {
     using Machine =
-        FilesystemFeature<
+        jac::FilesystemFeature<
         jac::MachineBase
     >;
     Machine machine;
@@ -210,7 +210,7 @@ TEST_CASE("Path", "[filesystem]") {
 
 TEST_CASE("File class js", "[filesystem]") {
     using Machine =
-        FilesystemFeature<
+        jac::FilesystemFeature<
         TestReportFeature<
         jac::MachineBase
     >>;

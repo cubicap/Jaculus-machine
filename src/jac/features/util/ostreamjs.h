@@ -5,6 +5,9 @@
 #include <iostream>
 
 
+namespace jac {
+
+
 template<class Machine>
 class OsWritable : public Machine::Writable {
     std::ostream& _stream;
@@ -26,3 +29,6 @@ static inline void initializeIo(Machine& machine) {
         machine.stdio.err = std::make_unique<OsWritable<Machine>>(std::cerr);
     }
 }
+
+
+} // namespace jac

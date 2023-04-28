@@ -15,14 +15,14 @@
 
 using Machine = jac::ComposeMachine<
     jac::MachineBase,
-    EventQueueFeature,
-    BasicStreamFeature,
-    StdioFeature,
-    EventLoopFeature,
-    FilesystemFeature,
-    ModuleLoaderFeature,
-    TimersFeature,
-    EventLoopTerminal
+    jac::EventQueueFeature,
+    jac::BasicStreamFeature,
+    jac::StdioFeature,
+    jac::EventLoopFeature,
+    jac::FilesystemFeature,
+    jac::ModuleLoaderFeature,
+    jac::TimersFeature,
+    jac::EventLoopTerminal
 >;
 
 const char* code = R"(

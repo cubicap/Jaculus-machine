@@ -8,6 +8,9 @@
 #include <memory>
 
 
+namespace jac {
+
+
 template<class Next>
 class StdioFeature : public Next {
 private:
@@ -23,7 +26,7 @@ public:
     void initialize() {
         Next::initialize();
 
-        jac::FunctionFactory ff(this->context());
+        FunctionFactory ff(this->context());
 
         if (!this->stdio.out) {
             throw std::runtime_error("StdioFeature: stdio.out is not set");
@@ -32,7 +35,7 @@ public:
             throw std::runtime_error("StdioFeature: stdio.err is not set");
         }
 
-        jac::Object console = jac::Object::create(this->context());
+        Object console = Object::create(this->context());
         console.set("debug", ff.newFunction([this](std::string str) {
             this->stdio.out->write(str + "\n");
         }));
@@ -48,7 +51,7 @@ public:
         console.set("error", ff.newFunction([this](std::string str) {
             this->stdio.err->write(str + "\n");
         }));
-        jac::Object global = this->context().getGlobalObject();
+        Object global = this->context().getGlobalObject();
         global.defineProperty("console", console);
 
         auto& mdl = this->newModule("stdio");
@@ -59,3 +62,6 @@ public:
         }
     }
 };
+
+
+} // namespace jac

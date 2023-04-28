@@ -8,6 +8,9 @@
 #include <string>
 
 
+namespace jac {
+
+
 template<class Next>
 class BasicStreamFeature : public Next {
 public:
@@ -19,8 +22,8 @@ public:
         virtual ~Writable() = default;
     };
 
-    struct WritableProtoBuilder : public jac::ProtoBuilder::Opaque<Writable>, public jac::ProtoBuilder::Properties {
-        static void addProperties(jac::ContextRef ctx, jac::Object proto) {
+    struct WritableProtoBuilder : public ProtoBuilder::Opaque<Writable>, public ProtoBuilder::Properties {
+        static void addProperties(ContextRef ctx, Object proto) {
             addMethodMember<void(Writable::*)(std::string), &Writable::write>(ctx, proto, "write");
 
         }
@@ -34,35 +37,35 @@ public:
         virtual ~Readable() = default;
     };
 
-    struct ReadableProtoBuilder : public jac::ProtoBuilder::Opaque<Readable>, public jac::ProtoBuilder::Properties {
-        static void addProperties(jac::ContextRef ctx, jac::Object proto) {
-            jac::FunctionFactory ff(ctx);
+    struct ReadableProtoBuilder : public ProtoBuilder::Opaque<Readable>, public ProtoBuilder::Properties {
+        static void addProperties(ContextRef ctx, Object proto) {
+            FunctionFactory ff(ctx);
 
-            proto.defineProperty("get", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
+            proto.defineProperty("get", ff.newFunctionThis([](ContextRef ctx_, ValueWeak self) {
                 Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
-                auto [promise, resolve, reject] = jac::Promise::create(ctx_);
+                auto [promise, resolve, reject] = Promise::create(ctx_);
 
                 bool res = self_.get([resolve, ctx_](char data) mutable {
                     resolve.call<void>(std::string{static_cast<char>(data)});
                 });
 
                 if (!res) {
-                    reject.call<void>(jac::Exception::create(jac::Exception::Type::Error, "Stream is not readable"));
+                    reject.call<void>(Exception::create(Exception::Type::Error, "Stream is not readable"));
                 }
 
                 return promise;
             }));
 
-            proto.defineProperty("read", ff.newFunctionThis([](jac::ContextRef ctx_, jac::ValueWeak self) {
+            proto.defineProperty("read", ff.newFunctionThis([](ContextRef ctx_, ValueWeak self) {
                 Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
-                auto [promise, resolve, reject] = jac::Promise::create(ctx_);
+                auto [promise, resolve, reject] = Promise::create(ctx_);
 
                 bool res = self_.read([resolve, ctx_](std::string data) mutable {
                     resolve.call<void>(data);
                 });
 
                 if (!res) {
-                    reject.call<void>(jac::Exception::create(jac::Exception::Type::Error, "Stream is not readable"));
+                    reject.call<void>(Exception::create(Exception::Type::Error, "Stream is not readable"));
                 }
 
                 return promise;
@@ -96,8 +99,8 @@ public:
         }
     };
 
-    using WritableClass = jac::Class<WritableProtoBuilder>;
-    using ReadableClass = jac::Class<ReadableProtoBuilder>;
+    using WritableClass = Class<WritableProtoBuilder>;
+    using ReadableClass = Class<ReadableProtoBuilder>;
 
     BasicStreamFeature() {
         WritableClass::init("Writable");
@@ -111,3 +114,6 @@ public:
         ReadableClass::initContext(this->context());
     }
 };
+
+
+} // namespace jac

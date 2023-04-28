@@ -1,6 +1,9 @@
 #pragma once
 
 
+namespace jac {
+
+
 template<class Next>
 class EventLoopTerminal : public Next {
 public:
@@ -8,3 +11,6 @@ public:
         Next::onEventLoop();
     };
 };
+
+
+} // namespace jac

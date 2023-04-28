@@ -11,8 +11,11 @@
 #include <unordered_map>
 
 
+namespace jac {
+
+
 template<>
-struct jac::ConvTraits<std::chrono::milliseconds> {
+struct ConvTraits<std::chrono::milliseconds> {
     static std::chrono::milliseconds from(ContextRef ctx, ValueWeak value) {
         return std::chrono::milliseconds(value.to<int>());
     }
@@ -173,33 +176,33 @@ public:
             }
         });
 
-        jac::FunctionFactory ff(this->context());
-        jac::Object global = this->context().getGlobalObject();
+        FunctionFactory ff(this->context());
+        Object global = this->context().getGlobalObject();
 
-        global.defineProperty("setInterval", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
+        global.defineProperty("setInterval", ff.newFunction([this](Function func, std::chrono::milliseconds millis) {
             return setInterval([func]() mutable {
                 func.call<void>();
             }, millis);
-        }), jac::PropFlags::Enumerable);
+        }), PropFlags::Enumerable);
 
-        global.defineProperty("setTimeout", ff.newFunction([this](jac::Function func, std::chrono::milliseconds millis) {
+        global.defineProperty("setTimeout", ff.newFunction([this](Function func, std::chrono::milliseconds millis) {
             return setTimeout([func]() mutable {
                 func.call<void>();
             }, millis);
-        }), jac::PropFlags::Enumerable);
+        }), PropFlags::Enumerable);
 
         global.defineProperty("clearInterval", ff.newFunction([this](int id) {
             clearInterval(id);
-        }), jac::PropFlags::Enumerable);
+        }), PropFlags::Enumerable);
 
         global.defineProperty("clearTimeout", ff.newFunction([this](int id) {
             clearTimeout(id);
-        }), jac::PropFlags::Enumerable);
+        }), PropFlags::Enumerable);
 
         global.defineProperty("sleep", ff.newFunction([this](int millis) {
-            auto [promise, resolve, _] = jac::Promise::create(this->context());
+            auto [promise, resolve, _] = Promise::create(this->context());
             setTimeout([resolve]() mutable {
-                static_cast<jac::Function&>(resolve).call<void>();
+                static_cast<Function&>(resolve).call<void>();
             }, std::chrono::milliseconds(millis));
             return promise;
         }));
@@ -218,3 +221,6 @@ public:
         }
     }
 };
+
+
+} // namespace jac

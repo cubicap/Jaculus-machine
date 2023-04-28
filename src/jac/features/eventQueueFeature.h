@@ -5,6 +5,9 @@
 #include <condition_variable>
 
 
+namespace jac {
+
+
 template<class Next>
 class EventQueueFeature : public Next {
 private:
@@ -57,3 +60,6 @@ public:
         _scheduledFunctions.clear();
     }
 };
+
+
+} // namespace jac
