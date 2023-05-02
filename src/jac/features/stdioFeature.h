@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 
+#include "types/streams.h"
 
 namespace jac {
 
@@ -16,9 +17,9 @@ class StdioFeature : public Next {
 private:
     class Stdio {
     public:
-        std::unique_ptr<typename Next::Writable> out;
-        std::unique_ptr<typename Next::Writable> err;
-        std::unique_ptr<typename Next::Readable> in;
+        std::unique_ptr<Writable> out;
+        std::unique_ptr<Writable> err;
+        std::unique_ptr<Readable> in;
     };
 public:
     Stdio stdio;
@@ -55,10 +56,10 @@ public:
         global.defineProperty("console", console);
 
         auto& mdl = this->newModule("stdio");
-        mdl.addExport("stdout", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.out.get())));
-        mdl.addExport("stderr", Next::WritableClass::createInstance(this->context(), new Next::WritableRef(stdio.err.get())));
+        mdl.addExport("stdout", Next::WritableClass::createInstance(this->context(), new WritableRef(stdio.out.get())));
+        mdl.addExport("stderr", Next::WritableClass::createInstance(this->context(), new WritableRef(stdio.err.get())));
         if (stdio.in) {
-            mdl.addExport("stdin", Next::ReadableClass::createInstance(this->context(), new Next::ReadableRef(stdio.in.get())));
+            mdl.addExport("stdin", Next::ReadableClass::createInstance(this->context(), new ReadableRef(stdio.in.get())));
         }
     }
 };
