@@ -33,12 +33,12 @@ public:
         }
 
         if (openMode == static_cast<std::ios::openmode>(0)) {
-            throw std::runtime_error("Invalid file flags");
+            throw jac::Exception::create(jac::Exception::Type::Error, "Invalid file flags");
         }
 
         this->_file = std::fstream(path, openMode);
         if (!_file.is_open()) {
-            throw std::runtime_error("Could not open file: " + path);
+            throw jac::Exception::create(jac::Exception::Type::Error, "Could not open file: " + path);
         }
     }
     File(std::filesystem::path path, std::string flags): File(path.string(), flags) {}

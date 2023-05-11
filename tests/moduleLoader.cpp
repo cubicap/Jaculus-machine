@@ -36,6 +36,11 @@ TEST_CASE("Eval file", "[moduleLoader]") {
         machine.evalFile(machine.path.basename(path));
         REQUIRE(machine.getReports() == expected);
     }
+
+    SECTION("File not found") {
+        machine.initialize();
+        evalFileThrows(machine, "test_files/moduleLoader/notFound.js");
+    }
 }
 
 
@@ -74,5 +79,10 @@ TEST_CASE("Import file", "[moduleLoader]") {
         evalFile(machine, machine.path.basename(path));
 
         REQUIRE(machine.getReports() == expected);
+    }
+
+    SECTION("Import not found") {
+        machine.initialize();
+        evalFileThrows(machine, "test_files/moduleLoader/importNotFound/main.js");
     }
 }

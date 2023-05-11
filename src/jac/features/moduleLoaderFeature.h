@@ -17,9 +17,8 @@ private:
         std::string buffer;
         try {
             buffer = self.fs.loadCode(filename);
-        } catch (std::exception &e) {
-            auto error = Exception::create(Exception::Type::Error, e.what());
-            error.throwJS(ctx);
+        } catch (jac::Exception &e) {
+            e.throwJS(ctx);
             return nullptr;
         }
 

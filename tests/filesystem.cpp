@@ -45,7 +45,7 @@ TEST_CASE("Filesystem", "[filesystem]") {
         machine.setCodeDir(".");
         machine.initialize();
 
-        REQUIRE_THROWS_AS(machine.fs.loadCode(file), std::runtime_error);
+        REQUIRE_THROWS_AS(machine.fs.loadCode(file), jac::Exception);
     }
 
     SECTION("data - existing") {
@@ -61,7 +61,7 @@ TEST_CASE("Filesystem", "[filesystem]") {
         std::string file("not_existing.js");
         machine.initialize();
 
-        REQUIRE_THROWS_AS(readFile(machine.fs.open(file, "r")), std::runtime_error);
+        REQUIRE_THROWS_AS(readFile(machine.fs.open(file, "r")), jac::Exception);
     }
 
     SECTION("data - write") {

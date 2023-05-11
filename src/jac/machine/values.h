@@ -285,6 +285,8 @@ public:
 private:
     std::string _message;
     Type _type;
+
+    ExceptionWrapper(Type type, std::string message) : ValueWrapper<managed>(nullptr, JS_UNDEFINED), _message(std::move(message)), _type(type) {}
 protected:
     using ValueWrapper<managed>::_val;
     using ValueWrapper<managed>::_ctx;
@@ -327,12 +329,8 @@ public:
      * @return The resulting Exception
      */
     static Exception create(Type type, std::string message) {
-        Exception val = Value::null(nullptr).to<Exception>();
-        val._type = type;
-        val._message = message;
-        return val;
+        return ExceptionWrapper(type, message);
     }
-
 
     /**
      * @brief Throw the exception into JS.
