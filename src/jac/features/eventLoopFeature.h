@@ -3,6 +3,7 @@
 #include <jac/machine/machine.h>
 #include <jac/machine/functionFactory.h>
 #include <noal_func.h>
+#include <atomic>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -17,7 +18,7 @@ namespace jac {
 template<class Next>
 class EventLoopFeature : public Next {
 private:
-    bool _shouldExit = false;
+    std::atomic<bool> _shouldExit = false;
     int _exitCode = 1;
 public:
 
