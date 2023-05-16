@@ -15,6 +15,9 @@
 namespace jac {
 
 
+/**
+ * @note The EventLoopFeature must be companied by EventLoopTerminal at the top of the Machine stack.
+ */
 template<class Next>
 class EventLoopFeature : public Next {
 private:

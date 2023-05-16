@@ -16,11 +16,11 @@
 namespace jac {
 
 
-template<class Base, template<typename> class... Features>
+template<class Base, template<typename> class... MFeatures>
 struct ComposeMachine;
 
-template<class Base, template<class, typename...> class FirstFeature, template<typename> class... Features>
-struct ComposeMachine<Base, FirstFeature, Features...> : public ComposeMachine<FirstFeature<Base>, Features...> {};
+template<class Base, template<class, typename...> class FirstFeature, template<typename> class... MFeatures>
+struct ComposeMachine<Base, FirstFeature, MFeatures...> : public ComposeMachine<FirstFeature<Base>, MFeatures...> {};
 
 template<class Base>
 struct ComposeMachine<Base> : public Base {};
@@ -144,7 +144,7 @@ public:
     /**
      * @brief Initialize the machine. Should be called after machine configuration
      * is done and before any interaction with the javascript engine.
-     * Other features in the Machine stack can implement this method to
+     * Other MFeatures in the Machine stack can implement this method to
      * initialize themselves but the first call should be Next::initialize().
      */
     void initialize();

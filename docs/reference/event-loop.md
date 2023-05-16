@@ -3,15 +3,15 @@
 Although JavaScript programs are event-driven, the code is executed in a single thread. This is achieved by using an event loop, where asynchronous
 events are queued and executed in the order they are received.
 
-The default implementation of an event loop is provided by `EventLoopFeature`. It is a *Feature* that can be added to a *Machine* to provide
-an event loop and requires a *Feature* that provides an event queue. The default event queue implementation is provided by `EventQueueFeature`.
-To allow running code on an event loop tick, a virtual method `EventLoopFeature::onEventLoop` can be used. To define the top of the *Machine* stack,
-the `EventLoopTerminal` class must be used as the topmost *Feature*.
+The default implementation of an event loop is provided by `EventLoopFeature`. It is an MFeature that can be added to a Machine to provide
+an event loop and requires an MFeature that provides an event queue. The default event queue implementation is provided by `EventQueueFeature`.
+To allow running code on an event loop tick, a virtual method `EventLoopFeature::onEventLoop` can be used. To define the top of the Machine stack,
+the `EventLoopTerminal` class must be used as the topmost MFeature.
 
 
 ## Usage
 
-To use the event loop, the respective *Feature* must be added to the *Machine*. To start the event loop, use the `EventLoopFeature::run` method.
+To use the event loop, the MFeature must be added to the Machine. To start the event loop, use the `EventLoopFeature::run` method.
 
 ```cpp
 #include <jac/machine.h>
@@ -38,9 +38,9 @@ The event loop will run indefinitely until the `EventLoopFeature::exit` or `Even
 also be called from the JavaScript code by calling the `exit` function.
 
 
-## Event queue
+## Custom event queue
 
-The event queue *Feature* must be thread-safe and must provide the following methods:
+It is possible to implement a custom event queue MFeature with extended functionality. The MFeature must be thread-safe and must provide the following methods:
 
 ```cpp
 template<class Next>

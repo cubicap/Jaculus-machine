@@ -10,11 +10,16 @@ in the [Exceptions](./exceptions.md) section.
 Callable objects can be wrapped into JavaScript functions using the `jac::FunctionFactory` class. The call operator of the object
 must be unambiguous, and the arguments and return type must be convertible to and from JavaScript values.
 
-The methods `newFunctionVariadic` and `newFunctionThisVariadic` can be used to create variadic functions - all arguments that are
-passed to the function will be passed in a single `std::vector<jac::ValueWeak>`.
+To wrap a function, the user can use the `newFunction` and `newFunctionThis`. All arguments that are passed to the function call
+will be converted to the types of the function parameters. If the number of arguments does not match or if the values cannot be
+converted to the required types, a `TypeError` will be thrown.
 
-The methods `newFunctionThis` and `newFunctionThisVariadic` additionally give access to the `this` value of the function (for example,
-when the function is called as a method of an object)
+The methods `newFunctionVariadic` and `newFunctionThisVariadic` can be used to create variadic functions --- all arguments that
+are passed to the function call will be contained in a single `std::vector<ValueWeak>`.
+
+The methods `newFunctionThis` and `newFunctionThisVariadic` additionally give access to the `this` value of the function
+(for example, when the function is called as a method of an object).
+
 
 Here are some examples:
 

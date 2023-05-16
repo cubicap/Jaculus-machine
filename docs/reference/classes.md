@@ -5,8 +5,8 @@ classes defined in C++ can contain opaque C++ data, which can then be used throu
 
 ## Defining a class
 
-To create a class, you must first define a `ProtoBuilder` struct. A `ProtoBuilder` describes the class's behavior and prototype through a **static**
-interface. Features of the class are specified by inheriting from structs from the `jac::ProtoBuilder` namespace and overriding their **static** interfaces.
+To create a class, you must first define a `ProtoBuilder` structure. A `ProtoBuilder` describes the class's behavior and prototype through a **static**
+interface. Features of the class are specified by inheriting from the structures in the `jac::ProtoBuilder` namespace and overriding their **static** interfaces.
 These structs contain a default implementation of their interface and some convenience functions for describing the class.
 
 The following base structs are available (with all of their interface methods):
@@ -53,30 +53,29 @@ struct MyBuilder3 : public ProtoBuilder::Opaque<MyClass>, public ProtoBuilder::P
 };
 ```
 
-The `jac::Class` template can be instantiated with the `ProtoBuilder` struct to create a class definition and a name can be assigned using the `init` method.
+The `jac::Class` template can be instantiated with the `ProtoBuilder` struct to create a class definition, and a name can be assigned using the `init` method.
 The `init` method can be called repeatedly without any effect if called with the same name; otherwise, an exception will be thrown.
 
-The following code shows some examples:
-
 ```cpp
-using MyClass = Class<MyBuilder>;
+using MyClassJs = Class<MyBuilder>;
 
-MyClass::init("MyClass");
+MyClassJs::init("MyClass");
 ```
 
-To use the class in a given Context, the Context must be initialized with the class definition:
+To use the class in a given Context, the class must be initialized in the Context by calling the `initContext` method:
+
 
 ```cpp
 ContextRef ctx = ...;
 
-MyClass::initContext(ctx);
+MyClassJs::initContext(ctx);
 ```
 
-After the class and context are initialized you can get the class constructor and prototype and instantiate the class:
+After the class and context are initialized, you can get the class constructor and prototype and instantiate the class:
 
 ```cpp
-Value constructor = MyClass::getConstructor(ctx);
-Value prototype = MyClass::getPrototype(ctx);
+Value constructor = MyClassJs::getConstructor(ctx);
+Value prototype = MyClassJs::getPrototype(ctx);
 
 Value obj = constructor.to<Function>().callConstructor();
 ```
