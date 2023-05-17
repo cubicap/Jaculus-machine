@@ -56,7 +56,7 @@ machine.eval("print('Hello, world!');", "<eval>", jac::EvalFlags::Global);
 
 ## Defining a JavaScript module
 
-Often, an MFeature will want to define a JavaScript module. This can be done by using the `MachineBase::newModule` method.
+Often, an MFeatures will want to define a JavaScript module. This can be done by using the `MachineBase::newModule` method.
 
 ```cpp
 #include <jac/machine.h>

@@ -19,13 +19,13 @@ To use the event loop, the MFeature must be added to the Machine. To start the e
 #include <jac/features/eventQueueFeature.h>
 #include <jac/features/timersFeature.h>
 
-using Machine =
-    EventLoopTerminal<
-    TimersFeature<
-    EventLoopFeature<
-    EventQueueFeature<
+using Machine = jac::ComposeMachine<
+    jac::EventLoopTerminal,
+    jac::TimersFeature,
+    jac::EventLoopFeature,
+    jac::EventQueueFeature,
     jac::MachineBase
->>>>;
+>;
 
 Machine machine;
 machine.initialize();

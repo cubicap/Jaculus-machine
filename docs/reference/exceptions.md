@@ -11,11 +11,12 @@ When `std::exception` is thrown, an `InternalError` is thrown with the message `
 
 When any other exception is thrown, an `InternalError` is thrown with the message `"unknown error"`.
 
-If the JavaScript runtime throws an exception, a new `Exception` is constructed from the thrown value and thrown to the C++ side.
+If the JavaScript runtime throws an exception, a new `jac::Exception` is constructed from the thrown value and thrown to the C++ side.
 
 
-## `Exception` class
-One way `Exception` can be used, is to wrap any JavaScript value. It can be created by converting a `Value` to `Exception`:
+## `jac::Exception` class
+
+One way `jac::Exception` can be used, is to wrap any JavaScript value. It can be created by converting a `Value` to `Exception`:
 
 ```cpp
 Value value = ...;

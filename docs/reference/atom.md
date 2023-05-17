@@ -16,7 +16,7 @@ jac::Atom atom2 = jac::Atom::create(ctx, 123);
 
 ## Usage
 
-Most functions in Jaculus-machine that take a string identifier as an argument also have an overload that takes an `jac::Atom` as an argument.
+Most functions in Jaculus-machine that take a string identifier as an argument also have an overload that takes a `jac::Atom` argument.
 
 ```cpp
 jac::ContextRef ctx = ...;
