@@ -39,7 +39,6 @@ public:
      */
     Object getGlobalObject();
 
-    // XXX: remove implicit conversions?
     operator JSContext*() { return _ctx; }
     operator JSContext*() const { return _ctx; }
     operator bool() { return _ctx != nullptr; }

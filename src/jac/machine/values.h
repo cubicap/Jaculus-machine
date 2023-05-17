@@ -698,7 +698,9 @@ public:
      * @param val JSValue to wrap
      */
     PromiseWrapper(ObjectWrapper<managed> value) : ObjectWrapper<managed>(std::move(value)) {
-        // TODO: check if promise
+        // TODO: check if value is Promise
+        // not implemented, because a convenient check is not a part of QuickJS API
+        // different type being converted to promise may cause hard to find errors
     }
     PromiseWrapper(ContextRef ctx, JSValue val) : PromiseWrapper(ObjectWrapper<managed>(ctx, val)) {}
 
@@ -737,7 +739,10 @@ public:
      * @param val JSValue to wrap
      */
     ArrayBufferWrapper(ObjectWrapper<managed> value) : ObjectWrapper<managed>(std::move(value)) {
-        // TODO: check if array buffer
+        // TODO: check if value is ArrayBuffer
+        // not implemented, because a convenient check is not a part of QuickJS API
+        // different type being converted to promise may cause hard to find errors
+        // methods of ArrayBufferWrapper will throw exceptions if the type is not ArrayBuffer
     }
     ArrayBufferWrapper(ContextRef ctx, JSValue val) : ArrayBufferWrapper(ObjectWrapper<managed>(ctx, val)) {}
 
