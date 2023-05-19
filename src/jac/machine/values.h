@@ -323,7 +323,6 @@ public:
     /**
      * @brief Create a new Exception.
      *
-     * @param ctx context to work in
      * @param type type of the exception
      * @param message exception message
      * @return The resulting Exception
