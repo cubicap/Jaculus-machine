@@ -14,11 +14,11 @@ For example, a Machine with core MFeatures can be created like this:
 
 
 using Machine = jac::ComposeMachine<
-    jac::ModuleLoaderFeature,
-    jac::FilesystemFeature,
-    jac::StdioFeature,
-    jac::BasicStreamFeature,
     jac::MachineBase
+    jac::BasicStreamFeature,
+    jac::StdioFeature,
+    jac::FilesystemFeature,
+    jac::ModuleLoaderFeature,
 >;
 ```
 
