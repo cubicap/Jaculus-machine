@@ -44,7 +44,8 @@ struct MyBuilder3 : public ProtoBuilder::Opaque<MyClass>, public ProtoBuilder::P
     static void addProperties(ContextRef ctx, Object proto) {
         addPropMember<int, &MyClass::foo>(ctx, proto, "foo");
 
-        proto.defineProperty("bar", ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue) {
+        FunctionFactory ff(ctx);
+        proto.defineProperty("bar", ff.newFunctionThis([](ContextRef ctx, ValueWeak thisValue) {
             // get the opaque pointer from the thisValue
             MyClass& self = *getOpaque(ctx, thisValue);
             self.bar();
