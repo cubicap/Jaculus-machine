@@ -58,6 +58,17 @@ struct ConvTraits<double> {
 };
 
 template<>
+struct ConvTraits<float> {
+    static float from(ContextRef ctx, ValueWeak val) {
+        return static_cast<float>(ConvTraits<double>::from(ctx, val));
+    }
+
+    static Value to(ContextRef ctx, float val) {
+        return ConvTraits<double>::to(ctx, val);
+    }
+};
+
+template<>
 struct ConvTraits<const char*> {
     static Value to(ContextRef ctx, const char* val) {
         return Value(ctx, JS_NewString(ctx, val));
