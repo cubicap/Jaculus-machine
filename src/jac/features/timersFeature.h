@@ -158,11 +158,15 @@ public:
                 lock.unlock();
 
                 if (timer->isCancelled()) {
+                    int id = timer->getId();
+                    _timersById.erase(id);
                     continue;
                 }
 
                 this->scheduleEvent([timer, this]() mutable {
                     if (timer->isCancelled()) {
+                        int id = timer->getId();
+                        _timersById.erase(id);
                         return;
                     }
                     timer->getCallback()();
@@ -171,6 +175,10 @@ public:
                         timer->update();
                         _timers.push(timer);
                         _timersCondition.notify_one();
+                    }
+                    else {
+                        int id = timer->getId();
+                        _timersById.erase(id);
                     }
                 });
             }
