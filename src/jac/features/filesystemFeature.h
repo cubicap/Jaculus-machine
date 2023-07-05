@@ -17,8 +17,6 @@ namespace jac {
 
 struct FileProtoBuilder : public ProtoBuilder::Opaque<File>, public ProtoBuilder::Properties {
     static void addProperties(ContextRef ctx, Object proto) {
-        FunctionFactory ff(ctx);
-
         addPropMember<std::string, &File::path_>(ctx, proto, "path", PropFlags::Enumerable);
         addMethodMember<bool(File::*)(), &File::isOpen>(ctx, proto, "isOpen", PropFlags::Enumerable);
         addMethodMember<void(File::*)(), &File::close>(ctx, proto, "close", PropFlags::Enumerable);

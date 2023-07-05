@@ -15,7 +15,6 @@ namespace jac {
 struct WritableProtoBuilder : public ProtoBuilder::Opaque<Writable>, public ProtoBuilder::Properties {
     static void addProperties(ContextRef ctx, Object proto) {
         addMethodMember<void(Writable::*)(std::string), &Writable::write>(ctx, proto, "write");
-
     }
 };
 
