@@ -27,13 +27,11 @@ TEST_CASE("To JS value", "[base]") {
     auto values = GENERATE(
         val{"bool", [](jac::ContextRef ctx) { return jac::Value::from(ctx, true); }, "boolean", "true"},
         val{"int", [](jac::ContextRef ctx) { return jac::Value::from(ctx, 42); }, "number", "42"},
-        val{"int8_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int8_t(-42)); }, "number", "42"},
+        val{"int8_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int8_t(-42)); }, "number", "-42"},
         val{"uint8_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, uint8_t(42)); }, "number", "42"},
-        val{"int16_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int16_t(-42)); }, "number", "42"},
+        val{"int16_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int16_t(-42)); }, "number", "-42"},
         val{"uint16_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, uint16_t(42)); }, "number", "42"},
-        val{"int32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int32_t(-42)); }, "number", "42"},
-        val{"double", [](jac::ContextRef ctx) { return jac::Value::from(ctx, double(42.7)); }, "number", "42.7"},
-        val{"float", [](jac::ContextRef ctx) { return jac::Value::from(ctx, float(42.7)); }, "number", "42.7"},
+        val{"int32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int32_t(-42)); }, "number", "-42"},
         val{"const c string", [](jac::ContextRef ctx) { return jac::Value::from(ctx, "Hello World"); }, "string", "Hello World"},
         val{"non const c string", [](jac::ContextRef ctx) {
                 const char* str = "Hello World";
@@ -59,6 +57,28 @@ TEST_CASE("To JS value", "[base]") {
         evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{type, str});
+    }
+
+    SECTION("double") {
+        auto value = jac::Value::from(machine.context(), double(42.7));
+
+        global.defineProperty("value", value);
+        evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
+
+        auto reports = machine.getReports();
+        REQUIRE(reports[0] == "number");
+        REQUIRE(reports[1].substr(0, 4) == "42.7");
+    }
+
+    SECTION("float") {
+        auto value = jac::Value::from(machine.context(), float(42.7));
+
+        global.defineProperty("value", value);
+        evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
+
+        auto reports = machine.getReports();
+        REQUIRE(reports[0] == "number");
+        REQUIRE(reports[1].substr(0, 4) == "42.7");
     }
 
     SECTION("Invalid types") {
@@ -122,8 +142,13 @@ TEST_CASE("From JS value", "[base]") {
     using sgn = std::tuple<std::string, std::string, std::function<bool(jac::Value)>>;
     auto values = GENERATE(
         sgn{"bool", "true", [](jac::Value value) { return value.to<bool>(); }},
-        sgn{"int", "Number(42)", [](jac::Value value) { return value.to<int>() == 42; }},
-        sgn{"double", "Number(42.7)", [](jac::Value value) { return value.to<double>(); }},
+        sgn{"int8_t", "Number(42)", [](jac::Value value) { return value.to<int8_t>() == 42; }},
+        sgn{"uint8_t", "Number(42)", [](jac::Value value) { return value.to<uint8_t>() == 42; }},
+        sgn{"int16_t", "Number(42)", [](jac::Value value) { return value.to<int16_t>() == 42; }},
+        sgn{"uint16_t", "Number(42)", [](jac::Value value) { return value.to<uint16_t>() == 42; }},
+        sgn{"int32_t", "Number(42)", [](jac::Value value) { return value.to<int32_t>() == 42; }},
+        sgn{"float", "Number(42.7)", [](jac::Value value) { return approxEqual(value.to<float>(), 42.7f); }},
+        sgn{"double", "Number(42.7)", [](jac::Value value) { return approxEqual(value.to<double>(), 42.7); }},
         sgn{"std::string", "String('Hello World')", [](jac::Value value) { return value.to<std::string>() == "Hello World"; }},
         sgn{"null", "null", [](jac::Value value) { return value.isNull(); }},
         sgn{"undefined", "undefined", [](jac::Value value) { return value.isUndefined(); }},

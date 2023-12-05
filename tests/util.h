@@ -4,6 +4,14 @@
 #include <jac/machine/machine.h>
 #include <jac/machine/functionFactory.h>
 #include <noal_func.h>
+#include <cmath>
+
+
+
+template<typename T>
+bool approxEqual(T a, T b) {
+    return std::fabs(a - b) < std::numeric_limits<T>::epsilon();
+}
 
 
 template<class Next>
@@ -43,7 +51,6 @@ jac::Value evalFile(auto& machine, std::string path_) {
     return jac::Value::undefined(machine.context());
 };
 
-
 jac::Value evalCode(auto& machine, std::string code, std::string filename, jac::EvalFlags flags) {
     try {
         return machine.eval(code, filename, flags);
@@ -79,7 +86,6 @@ void evalFileThrows(auto& machine, std::string path_) {
     INFO("Expected jac::Exception, but no exception was thrown");
     REQUIRE(false);
 };
-
 
 void evalCodeThrows(auto& machine, std::string code, std::string filename, jac::EvalFlags flags) {
     try {
