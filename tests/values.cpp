@@ -27,7 +27,13 @@ TEST_CASE("To JS value", "[base]") {
     auto values = GENERATE(
         val{"bool", [](jac::ContextRef ctx) { return jac::Value::from(ctx, true); }, "boolean", "true"},
         val{"int", [](jac::ContextRef ctx) { return jac::Value::from(ctx, 42); }, "number", "42"},
-        val{"double", [](jac::ContextRef ctx) { return jac::Value::from(ctx, 42.7); }, "number", "42.7"},
+        val{"int8_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int8_t(-42)); }, "number", "42"},
+        val{"uint8_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, uint8_t(42)); }, "number", "42"},
+        val{"int16_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int16_t(-42)); }, "number", "42"},
+        val{"uint16_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, uint16_t(42)); }, "number", "42"},
+        val{"int32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int32_t(-42)); }, "number", "42"},
+        val{"double", [](jac::ContextRef ctx) { return jac::Value::from(ctx, double(42.7)); }, "number", "42.7"},
+        val{"float", [](jac::ContextRef ctx) { return jac::Value::from(ctx, float(42.7)); }, "number", "42.7"},
         val{"const c string", [](jac::ContextRef ctx) { return jac::Value::from(ctx, "Hello World"); }, "string", "Hello World"},
         val{"non const c string", [](jac::ContextRef ctx) {
                 const char* str = "Hello World";
@@ -53,6 +59,14 @@ TEST_CASE("To JS value", "[base]") {
         evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{type, str});
+    }
+
+    SECTION("Invalid types") {
+        static_assert(std::is_void_v<decltype(jac::ConvTraits<uint32_t>::from(std::declval<jac::ContextRef>(), std::declval<jac::ValueWeak>()))>, "Invalid type");
+        static_assert(std::is_void_v<decltype(jac::ConvTraits<uint32_t>::to(std::declval<jac::ContextRef>(), std::declval<uint32_t>()))>, "Invalid type");
+
+        static_assert(std::is_void_v<decltype(jac::ConvTraits<int64_t>::from(std::declval<jac::ContextRef>(), std::declval<jac::ValueWeak>()))>, "Invalid type");
+        static_assert(std::is_void_v<decltype(jac::ConvTraits<int64_t>::to(std::declval<jac::ContextRef>(), std::declval<int64_t>()))>, "Invalid type");
     }
 }
 

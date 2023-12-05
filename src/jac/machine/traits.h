@@ -10,9 +10,16 @@
 namespace jac {
 
 
-template<typename T>
-struct ConvTraits {};
+template<typename T, typename En = T>
+struct ConvTraits {
+    static void from(ContextRef ctx, ValueWeak val) {
+        static_assert(sizeof(T) == 0, "No conversion defined");
+    }
 
+    static void to(ContextRef ctx, T val) {
+        static_assert(sizeof(T) == 0, "No conversion defined");
+    }
+};
 
 template<>
 struct ConvTraits<bool> {
@@ -25,48 +32,60 @@ struct ConvTraits<bool> {
     }
 };
 
-template<>
-struct ConvTraits<int> {
-    static int from(ContextRef ctx, ValueWeak val) {
-        int32_t res;
-        int ex = JS_ToInt32(ctx, &res, val.getVal());
-        if (ex < 0) {
-            throw Exception::create(Exception::Type::TypeError, "Failed to convert to int");
+namespace detail {
+    template<typename T>
+    struct IntConvBase {
+        static T from(ContextRef ctx, ValueWeak val) {
+            int32_t res;
+            int ex = JS_ToInt32(ctx, &res, val.getVal());
+            if (ex < 0) {
+                throw Exception::create(Exception::Type::TypeError, "Failed to convert to int");
+            }
+            return res;
         }
-        return res;
-    }
 
-    static Value to(ContextRef ctx, int val) {
-        return Value(ctx, JS_NewInt32(ctx, val));
-    }
-};
-
-template<>
-struct ConvTraits<double> {
-    static double from(ContextRef ctx, ValueWeak val) {
-        double res;
-        int ex = JS_ToFloat64(ctx, &res, val.getVal());
-        if (ex < 0) {
-            throw Exception::create(Exception::Type::TypeError, "Failed to convert to double");
+        static Value to(ContextRef ctx, T val) {
+            return Value(ctx, JS_NewInt32(ctx, val));
         }
-        return res;
-    }
+    };
 
-    static Value to(ContextRef ctx, double val) {
-        return Value(ctx, JS_NewFloat64(ctx, val));
-    }
-};
+    template<typename T>
+    struct FloatConvBase {
+        static T from(ContextRef ctx, ValueWeak val) {
+            double res;
+            int ex = JS_ToFloat64(ctx, &res, val.getVal());
+            if (ex < 0) {
+                throw Exception::create(Exception::Type::TypeError, "Failed to convert to double");
+            }
+            return res;
+        }
 
-template<>
-struct ConvTraits<float> {
-    static float from(ContextRef ctx, ValueWeak val) {
-        return static_cast<float>(ConvTraits<double>::from(ctx, val));
-    }
+        static Value to(ContextRef ctx, T val) {
+            return Value(ctx, JS_NewFloat64(ctx, val));
+        }
+    };
+} // namespace detail
 
-    static Value to(ContextRef ctx, float val) {
-        return ConvTraits<double>::to(ctx, val);
-    }
-};
+
+template<typename T>
+struct ConvTraits<T, std::enable_if_t<
+           std::is_integral_v<T>
+        && std::is_signed_v<T>
+        && sizeof(T) <= sizeof(int32_t)
+, T>> : public detail::IntConvBase<T> {};
+
+template<typename T>
+struct ConvTraits<T, std::enable_if_t<
+           std::is_integral_v<T>
+        && std::is_unsigned_v<T>
+        && sizeof(T) < sizeof(int32_t)
+, T>> : public detail::IntConvBase<T> {};
+
+template<typename T>
+struct ConvTraits<T, std::enable_if_t<
+           std::is_floating_point_v<T>
+        && sizeof(T) <= sizeof(double)
+, T>> : public detail::FloatConvBase<T> {};
 
 template<>
 struct ConvTraits<const char*> {
