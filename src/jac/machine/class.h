@@ -170,8 +170,8 @@ namespace ProtoBuilder {
                 return JS_UNDEFINED;
             };
 
-            JSValue getter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(get), std::string("get " + name).c_str(), 0, JS_CFUNC_getter, 0);
-            JSValue setter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(set), std::string("set " + name).c_str(), 1, JS_CFUNC_setter, 0);
+            JSValue getter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(reinterpret_cast<void*>(get)), std::string("get " + name).c_str(), 0, JS_CFUNC_getter, 0);
+            JSValue setter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(reinterpret_cast<void*>(set)), std::string("set " + name).c_str(), 1, JS_CFUNC_setter, 0);
 
             Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
             JS_DefinePropertyGetSet(ctx, proto.getVal(), atom.get(), getter, setter, static_cast<int>(flags));
