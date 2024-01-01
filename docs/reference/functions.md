@@ -94,5 +94,5 @@ machine.initialize();
 
 jac::Function a = machine.eval("class A { constructor(x) { this.x = x } }", "<eval>", jac::EvalFlags::Global).to<jac::Function>();
 
-jac::Object obj = a.callConstructor<jac::Object>(5);  // calls new f(5) and returns the result as a jac::Object
+jac::Value obj = a.callConstructor(5);  // calls new f(5) and returns the result as a Value
 ```
