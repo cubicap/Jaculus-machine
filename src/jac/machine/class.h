@@ -216,6 +216,15 @@ namespace ProtoBuilder {
     };
 
     /**
+     * @brief A base class used to add handles for lifetime "events"
+     */
+    struct LifetimeHandles {
+        static void postConstruction(ContextRef ctx, Object thisVal, std::vector<ValueWeak> args) {
+            // do nothing
+        }
+    };
+
+    /**
      * @brief A class used as a base for javascript classes with callable instances
      */
     struct Callable {
@@ -278,19 +287,29 @@ class Class {
             else {
                 proto = Value(ctx, JS_GetPropertyStr(ctx, thisVal, "prototype"));
             }
-            Value obj(ctx, JS_NewObjectProtoClass(ctx, proto.getVal(), classId));
+            Object obj(ctx, JS_NewObjectProtoClass(ctx, proto.getVal(), classId));
 
             if constexpr (std::is_base_of_v<ProtoBuilder::Callable, Builder>) {
                 JS_SetConstructorBit(ctx, obj.getVal(), isConstructor);
             }
 
-            if constexpr (is_base_of_template_v<ProtoBuilder::Opaque, Builder>) {
+            constexpr bool isPbOpaque = is_base_of_template_v<ProtoBuilder::Opaque, Builder>;
+            constexpr bool isPbConstructor = std::is_base_of_v<ProtoBuilder::LifetimeHandles, Builder>;
+
+            if constexpr (isPbOpaque || isPbConstructor) {
                 std::vector<ValueWeak> args;
                 for (int i = 0; i < argc; i++) {
                     args.push_back(ValueWeak(ctx, argv[i]));
                 }
-                auto instance = Builder::constructOpaque(ctx, args);
-                JS_SetOpaque(obj.getVal(), instance);
+
+                if constexpr (isPbOpaque) {
+                    auto instance = Builder::constructOpaque(ctx, args);
+                    JS_SetOpaque(obj.getVal(), instance);
+                }
+
+                if constexpr (isPbConstructor) {
+                    Builder::postConstruction(ctx, obj, args);
+                }
             }
 
             return obj.loot().second;

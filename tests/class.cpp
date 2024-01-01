@@ -284,4 +284,75 @@ TEST_CASE("Class", "[class]") {
         )", "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"__", "pre", "prefixed"});
     }
+
+    SECTION("postConstruction + lifetime extension") {
+        struct Owner {
+            std::vector<jac::Object> objects;
+            std::vector<std::string> reports;
+        };
+
+        static Owner theOwner;
+
+        struct Opq {
+            Owner* owner;
+            int a;
+
+            Opq(int a_) : owner(&theOwner), a(a_) {
+                owner->reports.push_back("constructed");
+            }
+
+            ~Opq() {
+                owner->reports.push_back("destroyed");
+            }
+        };
+
+        struct ClassBuilder : jac::ProtoBuilder::Opaque<Opq>, jac::ProtoBuilder::LifetimeHandles {
+            static Opq* constructOpaque(jac::ContextRef ctx, std::vector<jac::ValueWeak> args) {
+                if (args.size() != 1) {
+                    throw jac::Exception::create(jac::Exception::Type::TypeError, "invalid number of arguments");
+                }
+                int a = args[0].to<int>();
+                return new Opq(a);
+            }
+
+            static void postConstruction(jac::ContextRef ctx, jac::Object thisVal, std::vector<jac::ValueWeak> args) {
+                auto& opq = *getOpaque(ctx, thisVal);
+                opq.owner->objects.push_back(thisVal);
+
+                opq.owner->reports.push_back("postConstructed");
+            }
+        };
+
+        using TestClass = jac::Class<ClassBuilder>;
+        TestClass::init("TestClass", false);
+
+        Opq* opq = nullptr;
+        {
+            // Create instance
+            auto instance = TestClass::getConstructor(machine.context()).callConstructor(42);
+            global.set("val", instance);
+
+            REQUIRE(theOwner.reports == std::vector<std::string>{ "constructed", "postConstructed" });
+            theOwner.reports.clear();
+
+            // Save pointer - valid only as long as the instance is alive
+            opq = ClassBuilder::getOpaque(machine.context(), instance);
+
+            // Forget the instance
+            global.set("val", jac::Value::undefined(machine.context()));
+
+        }
+        // The instance is still alive, but not reachable from JS
+        REQUIRE(theOwner.reports == std::vector<std::string>{});
+        REQUIRE(opq->a == 42);
+        opq->a = 43;
+
+        theOwner.reports.clear();
+        theOwner.objects.clear();
+
+        // Run GC, to make sure the instance is destroyed
+        JS_RunGC(JS_GetRuntime(machine.context()));
+
+        REQUIRE(theOwner.reports == std::vector<std::string>{ "destroyed" });
+    }
 }
