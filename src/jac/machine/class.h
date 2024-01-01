@@ -71,7 +71,10 @@ inline constexpr bool is_base_of_template_v = is_base_of_template<Base, Derived>
 namespace ProtoBuilder {
 
     /**
-     * @brief A class used as a base for javascript classes with opaque data
+     * @brief A base class for javascript classes with opaque data
+     *
+     * The functions `constructOpaque` and `destroyOpaque` can be overriden
+     * to provide custom construction and destruction of the opaque data.
      *
      * @tparam T The type of the opaque data
      */
@@ -216,7 +219,10 @@ namespace ProtoBuilder {
     };
 
     /**
-     * @brief A base class used to add handles for lifetime "events"
+     * @brief A base class used to add handles for lifetime events of an instance
+     *
+     * The functions `postConstruction` can be overriden to provide custom
+     * handling of the class instance after it's constructed.
      */
     struct LifetimeHandles {
         static void postConstruction(ContextRef ctx, Object thisVal, std::vector<ValueWeak> args) {
@@ -225,7 +231,11 @@ namespace ProtoBuilder {
     };
 
     /**
-     * @brief A class used as a base for javascript classes with callable instances
+     * @brief A base class for javascript classes with callable instances
+     *
+     * The functions `callFunction` and `callConstructor` can be overriden
+     * to provide custom handling of the class instance when it's called
+     * as a function or as a constructor (with `new`).
      */
     struct Callable {
         /**
@@ -256,7 +266,10 @@ namespace ProtoBuilder {
     };
 
     /**
-     * @brief A class used as a base for javascript classes added properties
+     * @brief A base class for javascript classes with added properties
+     *
+     * The function `addProperties` can be overriden to specify custom properties
+     * for the class prototype.
      */
     struct Properties {
         /**

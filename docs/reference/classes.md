@@ -9,53 +9,52 @@ To create a class, you must first define a `ProtoBuilder` structure. A `ProtoBui
 interface. Features of the class are specified by inheriting from the structures in the `jac::ProtoBuilder` namespace and overriding their **static** interfaces.
 These structs contain a default implementation of their interface and some convenience functions for describing the class.
 
-The following base structs are available (with all of their interface methods):
+The list of base structs and their interface/convenience functions can be found in the [API documentation](/doxygen/namespacejac_1_1ProtoBuilder/).
+
+An example of the `ProtoBuilder` structure is shown below:
 
 ```cpp
-using namespace jac;
+/* Describes a simple JavaScript class with opaque object of type MyClass */
+struct MyBuilder : public ProtoBuilder::Opaque<MyClass>, public ProtoBuilder::Properties {
 
-struct MyBuilder : public ProtoBuilder::Properties {
-    static void addProperties(ContextRef ctx, Object proto) {
-        proto.defineProperty("foo", Value::from(ctx, 42));
-    }
-};
-
-struct MyBuilder2 : public ProtoBuilder::Callable {
-    static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
-        return Value::from(ctx, static_cast<int>(args.size()));
-    }
-
-    // the default implementation - does not have to be overridden if not needed
-    static Value callConstructor(ContextRef ctx, ValueWeak funcObj, ValueWeak target, std::vector<ValueWeak> args) {
-        throw Exception::create(Exception::Type::TypeError, "Class cannot be called as a constructor");
-    }
-};
-
-struct MyBuilder3 : public ProtoBuilder::Opaque<MyClass>, public ProtoBuilder::Properties {
+    /* describes how to construct the opaque object */
     static MyClass* constructOpaque(ContextRef ctx, std::vector<ValueWeak> args) {
-        return new MyClass();
+        if (args.size() < 1) {
+            throw std::runtime_error("MyClass constructor expects 1 argument");
+        }
+        /* get the first argument as an integer */
+        int a = args[0].to<int>();
+        return new MyClass(a);
     }
 
-    // the default implementation - does not have to be overridden if not needed
-    static void destructOpaque(JSRuntime* rt, MyClass* ptr) {
+    /* describes how to destruct the opaque object, copy-pasted from the
+       default implementation provided by the base class (can be omited) */
+    static void destructOpaque(JSRuntime* rt, MyClass* ptr) noexcept {
         delete ptr;
     }
 
+    /* describes which properties should be added to the prototype */
     static void addProperties(ContextRef ctx, Object proto) {
+        /* a convenience function from ProtoBuilder::Opaque,
+           which allows simplified access to the opaque object */
         addPropMember<int, &MyClass::foo>(ctx, proto, "foo");
 
+        /* a convenience function from ProtoBuilder::Opaque */
+        addMethodMember<decltype(&MyClass::bar), &MyClass::bar>(ctx, proto, "bar");
+
+        /* a more roundabout way of adding a method to the prototype */
         FunctionFactory ff(ctx);
-        proto.defineProperty("bar", ff.newFunctionThis([](ContextRef ctx, ValueWeak thisValue) {
-            // get the opaque pointer from the thisValue
+        proto.defineProperty("baz", ff.newFunctionThis([](ContextRef ctx, ValueWeak thisValue) {
+            /* another convenience function from ProtoBuilder::Opaque */
             MyClass& self = *getOpaque(ctx, thisValue);
-            self.bar();
+            self.baz();
         }));
     }
 };
 ```
 
-The `jac::Class` template can be instantiated with the `ProtoBuilder` struct to create a class definition, and a name can be assigned using the `init` method.
-The `init` method can be called repeatedly without any effect if called with the same name; otherwise, an exception will be thrown.
+The `jac::Class` template can be then instantiated with the `ProtoBuilder` structure to create a class definition, and a name can be assigned to it
+using the `init` method. This method can be called repeatedly without any effect if called with the same name; otherwise, an exception will be thrown.
 
 ```cpp
 using MyClassJs = Class<MyBuilder>;
