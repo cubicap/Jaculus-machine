@@ -12,10 +12,10 @@ namespace jac {
  *
  * About exceptions propagation:
  *
- * When jac::Exception is thrown, the wrapped value or given error
- * type is thrown. When std::exception is thrown, an InternalError
- * is thrown. When any other exception is thrown, an InternalError
- * is thrown with the message "unknown error".
+ * When jac::Exception is thrown, the wrapped value or given error type is
+ * thrown. When std::exception is thrown, an InternalError is thrown. When any
+ * other exception is thrown, an InternalError is thrown with the message
+ * "unknown error".
  */
 class FunctionFactory {
 
@@ -38,10 +38,10 @@ public:
     /**
      * @brief Wraps a C++ function into a javascript function object
      *
-     * The expected signature of the function object is Res(Args...).
-     * Arguments and the result of the function call are automatically
-     * converted to and from javascript values. Exceptions thrown within
-     * the function are automatically propagated to the javascript side.
+     * The expected signature of the function object is Res(Args...). Arguments
+     * and the result of the function call are automatically converted to and
+     * from javascript values. Exceptions thrown within the function are
+     * automatically propagated to the javascript side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
@@ -55,12 +55,11 @@ public:
     /**
      * @brief Wraps a C++ function into a javascript function object
      *
-     * The expected signature of the function object is
-     * Res(std::vector<@ref ValueWeak>). The vector will contain all
-     * arguments passed to the function. The result of the function
-     * call is automatically converted from a javascript value.
-     * Exceptions thrown within the function are automatically
-     * propagated to the javascript side.
+     * The expected signature of the function object is Res(std::vector<@ref
+     * ValueWeak>). The vector will contain all arguments passed to the
+     * function. The result of the function call is automatically converted from
+     * a javascript value. Exceptions thrown within the function are
+     * automatically propagated to the javascript side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
@@ -74,10 +73,11 @@ public:
     /**
      * @brief Wraps a C++ function into a javascript function object
      *
-     * The expected signature of the function object is Res(@ref ValueWeak, Args...).
-     * Arguments and the result of the function call are automatically
-     * converted to and from javascript values. Exceptions thrown within
-     * the function are automatically propagated to the javascript side.
+     * The expected signature of the function object is Res(@ref ContextRef,
+     * @ref ValueWeak, Args...). Arguments and the result of the function call
+     * are automatically converted to and from javascript values. Exceptions
+     * thrown within the function are automatically propagated to the javascript
+     * side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
@@ -91,12 +91,11 @@ public:
     /**
      * @brief Wraps a C++ function into a javascript function object
      *
-     * The expected signature of the function object is
-     * Res(@ref ValueWeak, std::vector<@ref ValueWeak>). The vector will
-     * contain all arguments passed to the function. The the result of the
-     * function call is automatically converted from a javascript value.
-     * Exceptions thrown within the function are automatically
-     * propagated to the javascript side.
+     * The expected signature of the function object is Res(@ref ContextRef,
+     * @ref ValueWeak, std::vector<@ref ValueWeak>). The vector will contain all
+     * arguments passed to the function. The the result of the function call is
+     * automatically converted from a javascript value. Exceptions thrown within
+     * the function are automatically propagated to the javascript side.
      *
      * @tparam Func type of the function to be wrapped
      * @param func the function object to be wrapped
