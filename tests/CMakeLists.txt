@@ -29,6 +29,7 @@ add_test_executable(machineBase)
 add_test_executable(values)
 add_test_executable(functionFactory)
 add_test_executable(class)
+add_test_executable(plugins)
 add_test_executable(regression)
 
 file(COPY test_files DESTINATION "./")
