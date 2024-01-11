@@ -1,13 +1,15 @@
 # Custom MFeatures
 
-As shown in the [Getting started](/getting-started) section, a Machine is parametrized by MFeatures that provide functionality to the
-Machine and the JavaScript runtime.
+As shown in the [Getting started](/getting-started) section, a Machine is parametrized by MFeatures that
+define the core functionality of the Machine and the JavaScript runtime.
 
-An MFeature is a class, that follows the stack inheritance and provides functionality to the Machine either by providing a public C++ API
-that can be used by other MFeatures or the user, or by adding functionality directly to the JavaScript runtime.
+An MFeature is a class, that follows the stack inheritance and provides functionality to the Machine either
+by providing a public C++ API that can be used by other MFeatures or the user, or by adding functionality
+directly to the JavaScript runtime.
 
-The MFeature must not interact with the JavaScript runtime in any way in its constructor, as it is not yet initialized at that point.
-Initialization of the MFeature involving the JavaScript runtime should be done in the `initialize` method.
+The MFeature must not interact with the JavaScript runtime in any way in its constructor, as it is not yet
+initialized at that point. Initialization of the MFeature involving the JavaScript runtime should be done
+in the `initialize` method.
 
 ## Modifying the global object
 
@@ -39,7 +41,8 @@ public:
 };
 ```
 
-The MFeature lets the user set the output stream of the `print` function by setting the `out` field. The `initialize` method then adds the `print` function to the global JavaScript object.
+The MFeature lets the user set the output stream of the `print` function by setting the `out` field.
+The `initialize` method then adds the `print` function to the global JavaScript object.
 
 The MFeature can be used like this:
 
@@ -56,7 +59,8 @@ machine.eval("print('Hello, world!');", "<eval>", jac::EvalFlags::Global);
 
 ## Defining a JavaScript module
 
-Often, an MFeatures will want to define a JavaScript module. This can be done by using the `MachineBase::newModule` method.
+Often, an MFeatures will want to define a JavaScript module. This can be done by using the
+`MachineBase::newModule` method.
 
 ```cpp
 #include <jac/machine.h>

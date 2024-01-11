@@ -51,7 +51,7 @@ public:
 
 /**
  * @brief An MFeature that allows for inserting plugins into the machine
- * and retrieving them by index.
+ * and retrieving them using PluginHandeles.
  */
 template<typename Next>
 class PluginHolderFeature : public Next {
@@ -96,7 +96,7 @@ public:
      * @note The initialization of the plugin is to be performed by the constructor.
      * @tparam Plugin_t The type of the plugin to add
      * @return The offset of the plugin in the group. Can be added to the PluginHandle
-     * returned by initialize() to get the handle to the plugin.
+     * returned by initialize() to get a handle to the plugin instance inside the Machine.
      */
     template<typename Plugin_t>
     size_t addPlugin() {

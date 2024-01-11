@@ -1,8 +1,10 @@
 # Getting started
 
-The core concept of Jaculus-machine is a Machine type. A Machine is parametrized by MFeatures that should be part of it.
-Machine is created using stack inheritance. At the bottom of the stack, there is always `jac::MachineBase` which provides the basic functionality.
-For example, a Machine with core MFeatures can be created like this:
+The core concept of Jaculus-machine is a Machine type. A Machine is parametrized by MFeatures
+which specify the core functionality of the Machine and the JavaScript runtime. MFeatures are
+added to the Machine using stack inheritance. At the bottom of the stack, there is always
+a `jac::MachineBase` which provides the most basic functionality.
+For example, a Machine with some built-in MFeatures can be created like this:
 
 ```cpp
 #include <jaculus/machine.h>
@@ -22,7 +24,10 @@ using Machine = jac::ComposeMachine<
 >;
 ```
 
-After the Machine type is defined, we can create its instance:
+To further extend the functionality of the Machine, we can use Plugins. Plugins are added to the
+runtime dynamically after the runtime initialization.
+
+After the Machine type is defined, we can instantiate it:
 
 ```cpp
 Machine machine;
@@ -42,6 +47,8 @@ any way. For that, we first need to initialize the Machine:
 machine.initialize();
 ```
 
+At this point, we can add any Plugins to the Machine.
+
 After the Machine is initialized, we can finally run some JavaScript code:
 
 ```cpp
@@ -54,12 +61,14 @@ Or we can evaluate a JavaScript file using `ModuleLoaderFeature::evalFile` metho
 jac::Value result = machine.evalFile("./main.js", jac::EvalFlags::Global);
 ```
 
-Both `eval` and `evalFile`, however, only evaluate the code and do not control the event loop. For that, we would need `EventLoopFeature`.
+Both `eval` and `evalFile`, however, only evaluate the code and do not control the event loop.
+For that, we need to use the `EventLoopFeature`.
 
 
 ## MFeatures
-MFeatures are the building blocks of a Machine. The stack design of Machine allows interfacing with different MFeatures in C++ directly
-and to implement new MFeatures on top of existing ones without a large performance penalty.
+MFeatures are the core building blocks of a Machine. The stack design of a Machine allows interfacing with
+different MFeatures in C++ directly and to implement new MFeatures on top of existing ones without
+a large performance penalty.
 
 Only the most basic and necessary MFeatures are included with the library:
 
@@ -69,5 +78,13 @@ Only the most basic and necessary MFeatures are included with the library:
 - `jac::FileystemFeature` - provides filesystem access through `fs` and `path` modules
 - `jac::ModuleLoaderFeature` - provides module loading through `import`, and `evalFile` method
 - `jac::BasicStreamFeature` - provides `Readable` and `Writable` abstract classes
-- `jac::StdioFeature` - provides stdio streams and `console` interface
+- `jac::StdioFeature` - provides standard io streams and a simplified `console` interface
 - `jac::TimersFeature` - provides typical JavaScript timers (with a slight difference) and a `sleep` function
+
+## Plugins
+
+Plugins are the primary way to extend the functionality of the JavaScript runtime. They are added to
+the machine dynamically after the runtime initialization.
+
+Compared to MFeatures, Plugins are more high-level and should be used to implement functionality that
+is not directly related to the JavaScript runtime.
