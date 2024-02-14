@@ -4,6 +4,3 @@ repository: "https://github.com/cubicap/Jaculus-machine.git"
 url: "https://machine.jaculus.org"
 dependencies:
   idf: ">=5.0"
-  quickjs:
-    git: https://github.com/cubicap/quickjs.git
-    version: 669afd182b5707eb8b70104bc942309506033697
