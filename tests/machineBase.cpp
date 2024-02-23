@@ -92,12 +92,12 @@ TEST_CASE("watchdog", "[base]") {
             return true;
         }));
 
-        evalCodeThrows(machine, R"(
+        evalCodeGlobalThrows(machine, R"(
             report('start');
             let until = Date.now() + 100;
             while (Date.now() < until) {}
             report('end');
-        )", "test", jac::EvalFlags::Module);
+        )", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"start"});
     }

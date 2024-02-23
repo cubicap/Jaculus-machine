@@ -66,7 +66,23 @@ jac::Value evalCode(auto& machine, std::string code, std::string filename, jac::
 
 
 
-void evalFileThrows(auto& machine, std::string path_) {
+void evalFileThrowsJS(auto& machine, std::string path_) {
+    try {
+        jac::Value res = machine.evalFile(path_);
+        REQUIRE(res.to<jac::Promise>().state() == jac::Promise::Rejected);
+    }
+    catch (std::exception& e) {
+        std::string message(e.what());
+        INFO("Expected exception in JS, got \"" + message + "\"");
+        REQUIRE(false);
+    }
+    catch (...) {
+        INFO("Expected exception in JS, got unknown exception");
+        REQUIRE(false);
+    }
+};
+
+void evalFileThrowsOut(auto& machine, std::string path_) {
     try {
         machine.evalFile(path_);
     }
@@ -87,9 +103,9 @@ void evalFileThrows(auto& machine, std::string path_) {
     REQUIRE(false);
 };
 
-void evalCodeThrows(auto& machine, std::string code, std::string filename, jac::EvalFlags flags) {
+void evalCodeGlobalThrows(auto& machine, std::string code, std::string filename) {
     try {
-        machine.eval(code, filename, flags);
+        machine.eval(code, filename, jac::EvalFlags::Global);
     }
     catch (jac::Exception& e) {
         return;
@@ -106,4 +122,21 @@ void evalCodeThrows(auto& machine, std::string code, std::string filename, jac::
 
     INFO("Expected jac::Exception, but no exception was thrown");
     REQUIRE(false);
+};
+
+
+void evalCodeModuleThrows(auto& machine, std::string code, std::string filename) {
+    try {
+        jac::Value res = machine.eval(code, filename, jac::EvalFlags::Module);
+        REQUIRE(res.to<jac::Promise>().state() == jac::Promise::Rejected);
+    }
+    catch (std::exception& e) {
+        std::string message(e.what());
+        INFO("Expected exception in JS, got \"" + message + "\"");
+        REQUIRE(false);
+    }
+    catch (...) {
+        INFO("Expected exception in JS, got unknown exception");
+        REQUIRE(false);
+    }
 };

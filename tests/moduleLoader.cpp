@@ -39,7 +39,7 @@ TEST_CASE("Eval file", "[moduleLoader]") {
 
     SECTION("File not found") {
         machine.initialize();
-        evalFileThrows(machine, "test_files/moduleLoader/notFound.js");
+        evalFileThrowsOut(machine, "test_files/moduleLoader/notFound.js");
     }
 }
 
@@ -83,6 +83,16 @@ TEST_CASE("Import file", "[moduleLoader]") {
 
     SECTION("Import not found") {
         machine.initialize();
-        evalFileThrows(machine, "test_files/moduleLoader/importNotFound/main.js");
+        evalFileThrowsOut(machine, "test_files/moduleLoader/importNotFound/main.js");
+    }
+
+    SECTION("Neighbor exception") {
+        machine.initialize();
+        evalFileThrowsJS(machine, "test_files/moduleLoader/importException/main.js");
+    }
+
+    SECTION("Main exception") {
+        machine.initialize();
+        evalFileThrowsJS(machine, "test_files/moduleLoader/exception.js");
     }
 }

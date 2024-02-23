@@ -74,7 +74,7 @@ TEST_CASE("Class", "[class]") {
         global.defineProperty("TestClass", ctor);
 
         auto result = evalCode(machine, "let val = new TestClass(); report(val(1, 2, 3));", "test", jac::EvalFlags::Global);
-        evalCodeThrows(machine, "let val = new TestClass(); report(new val(1, 2, 3));", "test", jac::EvalFlags::Global);
+        evalCodeGlobalThrows(machine, "let val = new TestClass(); report(new val(1, 2, 3));", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
     }
@@ -93,7 +93,7 @@ TEST_CASE("Class", "[class]") {
         global.defineProperty("TestClass", ctor);
 
         auto result = evalCode(machine, "let val = new TestClass(); report(new val(1, 2, 3));", "test", jac::EvalFlags::Global);
-        evalCodeThrows(machine, "let val = new TestClass(); report(val(1, 2, 3));", "test", jac::EvalFlags::Global);
+        evalCodeGlobalThrows(machine, "let val = new TestClass(); report(val(1, 2, 3));", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
     }

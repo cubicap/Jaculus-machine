@@ -52,9 +52,22 @@ TEST_CASE("Timer leak", "[timers]") {
 
     machine.initialize();
 
-    machine.eval("async () => { for (let i = 0; i < 100000; i++) { await sleep(0); }; exit(0); }()", "<eval>");
+    machine.eval("( async () => { for (let i = 0; i < 100000; i++) { await sleep(0); }; exit(0); } )()", "<eval>");
 
     machine.runEventLoop();
 
     REQUIRE(machine.getReports() == std::vector<std::string> {});
+}
+
+
+
+TEST_CASE("Exception", "[values]") {
+    using Machine = jac::MachineBase;
+
+    Machine machine;
+
+    machine.initialize();
+
+    evalCodeModuleThrows(machine, "throw new Error('test');", "<eval>");
+    evalCodeGlobalThrows(machine, "throw new Error('test');", "<eval>");
 }

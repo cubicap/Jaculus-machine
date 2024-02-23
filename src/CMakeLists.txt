@@ -23,7 +23,7 @@ endif()
 Include(FetchContent)
 FetchContent_Declare(
     QuickJS
-    URL               https://github.com/bellard/quickjs/archive/b5e62895c619d4ffc75c9d822c8d85f1ece77e5b.tar.gz
+    URL               https://github.com/bellard/quickjs/archive/27928ce49170a17170bb01649fc27624c0494b05.tar.gz
     PATCH_COMMAND     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/quickjs.CMakeLists.txt <SOURCE_DIR>/CMakeLists.txt
     CMAKE_ARGS        -DESP_PLATFORM=${ESP_PLATFORM} -DQUICKJS_ENABLE_BIGNUM_EXT=${QUICKJS_ENABLE_BIGNUM_EXT}
 )

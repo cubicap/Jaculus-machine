@@ -685,6 +685,13 @@ public:
  */
 template<bool managed>
 class PromiseWrapper : public ObjectWrapper<managed> {
+public:
+    enum State {
+        Pending = JS_PROMISE_PENDING,
+        Fulfilled = JS_PROMISE_FULFILLED,
+        Rejected = JS_PROMISE_REJECTED
+    };
+
 protected:
     using ObjectWrapper<managed>::_val;
     using ObjectWrapper<managed>::_ctx;
@@ -697,11 +704,23 @@ public:
      * @param val JSValue to wrap
      */
     PromiseWrapper(ObjectWrapper<managed> value) : ObjectWrapper<managed>(std::move(value)) {
-        // TODO: check if value is Promise
-        // not implemented, because a convenient check is not a part of QuickJS API
-        // different type being converted to promise may cause hard to find errors
+        state(); // will throw if not a promise
     }
     PromiseWrapper(ContextRef ctx, JSValue val) : PromiseWrapper(ObjectWrapper<managed>(ctx, val)) {}
+
+    /**
+     * @brief Get the state of the promise
+     *
+     * @return The state
+     */
+    State state() {
+        int state = JS_PromiseState(_ctx, _val);
+        if (state < 0) {
+            throw Exception::create(Exception::Type::TypeError, "not a promise");
+        }
+        return static_cast<State>(state);
+    }
+
 
     /**
      * @brief Create a new Promise object
