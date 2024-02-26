@@ -33,5 +33,6 @@ add_test_executable(plugins)
 add_test_executable(regression)
 
 add_test_executable(scanner)
+add_test_executable(parser)
 
 file(COPY test_files DESTINATION "./")
