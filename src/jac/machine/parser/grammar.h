@@ -109,7 +109,7 @@ struct BinaryExpression {
 
 template<bool In, bool Yield, bool Await>
 struct ShortCircuitExpression {
-
+    BinaryExpression<In, Yield, Await> expression;
 };
 
 template<bool In, bool Yield, bool Await>
@@ -122,18 +122,6 @@ struct ConditionalExpression {
             AssignmentExpressionPtr<In, Yield, Await>
         >
     > value;
-};
-
-template<bool In, bool Yield, bool Await>
-struct AssignmentExpression {
-    std::variant<
-        // ConditionalExpression<In, Yield, Await>,
-        // YieldExpression<In, Yield, Await>,
-        // ArrowFunction<In, Yield, Await>,
-        // AsyncArrowFunction<In, Yield, Await>,
-        Assignment<In, Yield, Await>
-    > value;
-
 };
 
 struct Elision {};
@@ -661,16 +649,24 @@ struct PrimaryExpression {
 
 template<bool Yield, bool Await>
 struct SuperProperty {
-    // TODO
+    std::variant<
+        IdentifierName,  // dot
+        Expression<true, Yield, Await>  // bracket
+    > value;
 };
 
 struct MetaProperty {
-    // TODO
+    enum Kind {
+        NewTarget,
+        ImportMeta
+    };
+
+    Kind kind;
 };
 
 template<bool Yield, bool Await>
 struct Arguments {
-    // TODO
+    std::vector<std::pair<bool, AssignmentExpressionPtr<true, Yield, Await>>> arguments;  // bool: spread
 };
 
 template<bool Yield, bool Await>
@@ -700,13 +696,63 @@ struct NewExpression {
 };
 
 template<bool Yield, bool Await>
+struct SuperCall {
+    Arguments<Yield, Await> arguments;
+};
+
+template<bool Yield, bool Await>
+struct ImportCall {
+    Expression<true, Yield, Await> expression;
+};
+
+template<bool Yield, bool Await>
+struct CoverCallExpressionAndAsyncArrowHead {
+    std::variant<
+        MemberExpression<Yield, Await>,
+        Arguments<Yield, Await>
+    > value;
+};
+
+template<bool Yield, bool Await>
 struct CallExpression {
-    // TODO
+    using CallExpressionPtr = std::unique_ptr<CallExpression<Yield, Await>>;
+
+    std::variant<
+        CoverCallExpressionAndAsyncArrowHead<Yield, Await>,
+        SuperCall<Yield, Await>,
+        ImportCall<Yield, Await>,
+        std::pair<CallExpressionPtr, Arguments<Yield, Await>>,
+        std::pair<CallExpressionPtr, Expression<true, Yield, Await>>,  // bracket
+        std::pair<CallExpressionPtr, IdentifierName>,  // dot
+        std::pair<CallExpressionPtr, PrivateIdentifier>,  // dot
+        std::pair<CallExpressionPtr, TemplateLiteral<Yield, Await, true>>  // tag
+    > value;
+};
+
+template<bool Yield, bool Await>
+struct OptionalChain {
+    using OptionalChainPtr = std::unique_ptr<OptionalChain<Yield, Await>>;
+
+    std::optional<OptionalChainPtr> chain;
+    std::variant<
+        Arguments<Yield, Await>,  // ?.
+        Expression<true, Yield, Await>,  // ?.[
+        IdentifierName,  // ?.identifier
+        PrivateIdentifier,  // ?.#identifier
+        TemplateLiteral<Yield, Await, true>  // ?.tag
+    > value;
 };
 
 template<bool Yield, bool Await>
 struct OptionalExpression {
-    // TODO
+    using OptionalExpressionPtr = std::unique_ptr<OptionalExpression<Yield, Await>>;
+
+    std::variant<
+        MemberExpression<Yield, Await>,
+        CallExpression<Yield, Await>,
+        OptionalExpressionPtr
+    > value;
+    OptionalChain<Yield, Await> chain;
 };
 
 template<bool Yield, bool Await>
@@ -715,6 +761,62 @@ struct LeftHandSideExpression {
         NewExpression<Yield, Await>,
         CallExpression<Yield, Await>,
         OptionalExpression<Yield, Await>
+    > value;
+};
+
+template<bool In, bool Yield, bool Await>
+struct YieldExpression {
+    bool star;
+    std::optional<AssignmentExpressionPtr<In, Yield, Await>> expression;
+};
+
+template<bool Yield, bool Await>
+struct ArrowParameters {
+    std::variant<
+        BindingIdentifier<Yield, Await>,
+        CoverParenthesizedExpressionAndArrowParameterList<Yield, Await>
+    > value;
+};
+
+template<bool In>
+struct ConciseBody {
+    std::variant<
+        AssignmentExpressionPtr<In, false, false>,  // lookahead not {
+        FunctionBody<false, false>
+    > value;
+};
+
+template<bool In, bool Yield, bool Await>
+struct ArrowFunction {
+    ArrowParameters<Yield, Await> parameters;
+    ConciseBody<In> body;
+};
+
+template<bool In>
+struct AsyncConciseBody {
+    std::variant<
+        AssignmentExpressionPtr<In, false, true>,  // lookahead not {
+        AsyncFunctionBody
+    > value;
+};
+
+template<bool In, bool Yield, bool Await>
+struct AsyncArrowFunction {
+    std::variant<
+        BindingIdentifier<Yield, true>,
+        CoverCallExpressionAndAsyncArrowHead<Yield, Await>
+    > parameters;
+    AsyncConciseBody<In> body;
+};
+
+template<bool In, bool Yield, bool Await>
+struct AssignmentExpression {
+    std::variant<
+        ConditionalExpression<In, Yield, Await>,
+        YieldExpression<In, Yield, Await>,  // only when [+Yield]
+        ArrowFunction<In, Yield, Await>,
+        AsyncArrowFunction<In, Yield, Await>,
+        Assignment<In, Yield, Await>
     > value;
 };
 
