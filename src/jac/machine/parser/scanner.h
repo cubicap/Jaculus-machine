@@ -3,6 +3,8 @@
 #include <functional>
 #include <string>
 
+#include "language.h"
+
 
 namespace jac {
 
@@ -11,6 +13,7 @@ struct Token {
     enum Kind {
         NoToken = 0,  // used as a sentinel
         IdentifierName,
+        Keyword,
         Punctuator,
         NumericLiteral,
         StringLiteral,
@@ -372,6 +375,10 @@ class Scanner {
 
         while (std::isalnum(peek()) || peek() == '$' || peek() == '_') {
             advance();
+        }
+
+        if (keywords.contains(std::string_view(start, _pos))) {
+            return Token(_line, startColumn, std::string_view(start, _pos), Token::Keyword);
         }
 
         return Token(_line, startColumn, std::string_view(start, _pos), Token::IdentifierName);
