@@ -8,7 +8,7 @@ namespace jac {
 
 
 struct Token {
-    enum Type {
+    enum Kind {
         NoToken = 0,  // used as a sentinel
         IdentifierName,
         Punctuator,
@@ -22,14 +22,14 @@ struct Token {
     int line;
     int column;
     std::string_view text;
-    Type type;
+    Kind kind;
 
-    Token(int line_, int column_, std::string_view text_, Type type_):
-        line(line_), column(column_), text(text_), type(type_)
+    Token(int line_, int column_, std::string_view text_, Kind kind_):
+        line(line_), column(column_), text(text_), kind(kind_)
     {}
 
     operator bool() const {
-        return type != NoToken;
+        return kind != NoToken;
     }
 };
 
@@ -392,11 +392,15 @@ public:
 
         skipWhitespace();
         while (!isAtEnd()) {
-            _tokens.push_back(scanToken());
+            Token tok = scanToken();
+            skipWhitespace();
+            if (tok.kind == Token::Comment) {
+                continue;
+            }
+            _tokens.push_back(tok);
             if (!_tokens.back()) {
                 break;
             }
-            skipWhitespace();
         }
 
         return _tokens;

@@ -9,7 +9,7 @@
 template<>
 struct Catch::StringMaker<jac::Token> {
     static std::string convert(jac::Token const& value) {
-        return std::string("Token(") + std::to_string(value.line) + ", " + std::to_string(value.column) + ", " + std::string(value.text) + ", " + std::to_string(value.type) + ")";
+        return std::string("Token(") + std::to_string(value.line) + ", " + std::to_string(value.column) + ", " + std::string(value.text) + ", " + std::to_string(value.kind) + ")";
     }
 };
 
@@ -25,7 +25,7 @@ void report(int line, int column, std::string message) {
 using TokenVector = std::vector<jac::Token>;
 
 
-TEST_CASE("Punctuator", "[parser]") {
+TEST_CASE("Punctuator", "[scanner]") {
     SECTION("Empty") {
         std::string input("");
         jac::Scanner scanner(input, report);
@@ -214,14 +214,16 @@ TEST_CASE("Comments", "[scanner]") {
     SECTION("Single line") {
         std::string input("// test");
         jac::Scanner scanner(input, report);
-        REQUIRE(scanner.scan() == TokenVector({jac::Token(1, 1, input, jac::Token::Comment)}));
+        REQUIRE(scanner.scan() == TokenVector({
+            // jac::Token(1, 1, input, jac::Token::Comment)
+        }));
     }
 
     SECTION("Single line with newline") {
         std::string input("// comment\n 'string'");
         jac::Scanner scanner(input, report);
         REQUIRE(scanner.scan() == TokenVector({
-            jac::Token(1, 1, "// comment", jac::Token::Comment),
+            // jac::Token(1, 1, "// comment", jac::Token::Comment),
             jac::Token(2, 2, "'string'", jac::Token::StringLiteral)
         }));
     }
@@ -229,14 +231,16 @@ TEST_CASE("Comments", "[scanner]") {
     SECTION("Multi line") {
         std::string input("/* test */");
         jac::Scanner scanner(input, report);
-        REQUIRE(scanner.scan() == TokenVector({jac::Token(1, 1, input, jac::Token::Comment)}));
+        REQUIRE(scanner.scan() == TokenVector({
+            // jac::Token(1, 1, input, jac::Token::Comment)
+        }));
     }
 
     SECTION("Multi line with newline") {
         std::string input("/* comment\nline2 */ 'string'");
         jac::Scanner scanner(input, report);
         REQUIRE(scanner.scan() == TokenVector({
-            jac::Token(1, 1, "/* comment\nline2 */", jac::Token::Comment),
+            // jac::Token(1, 1, "/* comment\nline2 */", jac::Token::Comment),
             jac::Token(2, 2, "'string'", jac::Token::StringLiteral)
         }));
     }
@@ -351,6 +355,33 @@ TEST_CASE("IdentifierName", "[scanner]") {
             jac::Token(1, 14, "#priv_", jac::Token::IdentifierName),
             jac::Token(1, 21, "#priv1", jac::Token::IdentifierName),
             jac::Token(1, 28, "#$", jac::Token::IdentifierName)
+        }));
+    }
+}
+
+
+TEST_CASE("Mixed", "[scanner]") {
+    SECTION("Function") {
+        std::string input(
+R"(function test(a, b) {
+    return a + b;
+})");
+        jac::Scanner scanner(input, report);
+        REQUIRE(scanner.scan() == TokenVector({
+            jac::Token(1, 1, "function", jac::Token::IdentifierName),
+            jac::Token(1, 10, "test", jac::Token::IdentifierName),
+            jac::Token(1, 14, "(", jac::Token::Punctuator),
+            jac::Token(1, 15, "a", jac::Token::IdentifierName),
+            jac::Token(1, 16, ",", jac::Token::Punctuator),
+            jac::Token(1, 18, "b", jac::Token::IdentifierName),
+            jac::Token(1, 19, ")", jac::Token::Punctuator),
+            jac::Token(1, 21, "{", jac::Token::Punctuator),
+            jac::Token(2, 5, "return", jac::Token::IdentifierName),
+            jac::Token(2, 12, "a", jac::Token::IdentifierName),
+            jac::Token(2, 14, "+", jac::Token::Punctuator),
+            jac::Token(2, 16, "b", jac::Token::IdentifierName),
+            jac::Token(2, 17, ";", jac::Token::Punctuator),
+            jac::Token(3, 1, "}", jac::Token::Punctuator)
         }));
     }
 }
