@@ -4,59 +4,472 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <span>
+#include <cassert>
+#include <cmath>
 
 #include "scanner.h"
+#include "language.h"
 
 
 namespace jac {
 
 
+class ParserState {
+    std::span<Token> _tokens;
+    std::span<Token>::iterator _pos;
+
+    Token _errorToken = Token(0, 0, "", Token::NoToken);
+    std::string_view _errorMessage;
+
+public:
+    ParserState(std::span<Token> tokens):
+        _tokens(tokens),
+        _pos(_tokens.begin())
+    {}
+
+    void error(std::string_view message) {
+        _errorToken = current();
+        _errorMessage = message;
+    }
+
+    Token& current() {
+        return *_pos;
+    }
+
+    void advance() {
+        if (_pos == _tokens.end()) {
+            error("Unexpected end of input");
+            return;
+        }
+        ++_pos;
+    }
+
+    void backtrack() {
+        assert(_pos != _tokens.begin());
+        --_pos;
+    }
+
+    bool isEnd() {
+        return _pos == _tokens.end();
+    }
+
+    auto getPosition() const {
+        return _pos;
+    }
+
+    void restorePosition(auto position) {
+        _pos = position;
+    }
+
+    std::string_view getErrorMessage() const {
+        return _errorMessage;
+    }
+
+    Token getErrorToken() const {
+        return _errorToken;
+    }
+};
+
+
 struct IdentifierName {
     std::string name;
+
+    static std::optional<IdentifierName> parse(ParserState& state) {
+        if (state.isEnd()) {
+            state.error("Unexpected end of input");
+            return std::nullopt;
+        }
+
+        if (state.current().kind == Token::IdentifierName) {
+            IdentifierName id;
+            id.name = state.current().text;
+            state.advance();
+            return id;
+        }
+
+        return std::nullopt;
+    }
 };
 
 struct Identifier {
     IdentifierName name;
+
+    static std::optional<Identifier> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (auto id = IdentifierName::parse(state); id) {
+            if (keywords.contains(id->name)) {
+                state.restorePosition(start);
+                state.error("Reserved word used as identifier");
+                return std::nullopt;
+            }
+            return Identifier{*id};
+        }
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct IdentifierReference {
     Identifier identifier;
+
+    static std::optional<IdentifierReference<Yield, Await>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (auto id = Identifier::parse(state); id) {
+            if (Yield && id->name.name == "yield") {
+                state.restorePosition(start);
+                state.error("Unexpected yield");
+                return std::nullopt;
+            }
+            if (Await && id->name.name == "await") {
+                state.restorePosition(start);
+                state.error("Unexpected await");
+                return std::nullopt;
+            }
+            return IdentifierReference<Yield, Await>{*id};
+        }
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct BindingIdentifier {
     Identifier identifier;
+
+    static std::optional<BindingIdentifier<Yield, Await>> parse(ParserState& state) {
+        if (auto id = Identifier::parse(state); id) {
+            return BindingIdentifier<Yield, Await>{*id};
+        }
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct LabelIdentifier {
     Identifier identifier;
+
+    static std::optional<LabelIdentifier<Yield, Await>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (auto id = Identifier::parse(state); id) {
+            if (Yield && id->name.name == "yield") {
+                state.restorePosition(start);
+                state.error("Unexpected yield");
+                return std::nullopt;
+            }
+            if (Await && id->name.name == "await") {
+                state.restorePosition(start);
+                state.error("Unexpected await");
+                return std::nullopt;
+            }
+            return LabelIdentifier<Yield, Await>{*id};
+        }
+
+        return std::nullopt;
+    }
 };
 
 struct PrivateIdentifier {
     IdentifierName name;
+
+    static std::optional<PrivateIdentifier> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (auto id = IdentifierName::parse(state); id) {
+            if (id->name.size() < 2 || id->name[0] != '#') {
+                state.restorePosition(start);
+                state.error("Private identifier must start with #");
+                return std::nullopt;
+            }
+            return PrivateIdentifier{*id};
+        }
+
+        return std::nullopt;
+    }
 };
 
 
-struct ThisExpr {};
+struct ThisExpr {
+    static std::optional<ThisExpr> parse(ParserState& state) {
+        if (state.current().kind == Token::IdentifierName && state.current().text == "this") {
+            state.advance();
+            return ThisExpr{};
+        }
 
-struct NullLiteral {};
+        return std::nullopt;
+    }
+};
+
+struct NullLiteral {
+    static std::optional<NullLiteral> parse(ParserState& state) {
+        if (state.current().kind == Token::IdentifierName && state.current().text == "null") {
+            state.advance();
+            return NullLiteral{};
+        }
+
+        return std::nullopt;
+    }
+};
 
 struct BooleanLiteral {
     bool value;
+
+    static std::optional<BooleanLiteral> parse(ParserState& state) {
+        if (state.current().kind == Token::IdentifierName) {
+            if (state.current().text == "true") {
+                state.advance();
+                return BooleanLiteral{true};
+            }
+            if (state.current().text == "false") {
+                state.advance();
+                return BooleanLiteral{false};
+            }
+        }
+
+        return std::nullopt;
+    }
 };
 
 struct NumericLiteral {
     std::variant<int32_t, double> value;  // TODO: bigint
+
+    static std::optional<NumericLiteral> parse(ParserState& state) {
+        if (state.current().kind != Token::NumericLiteral) {
+            return std::nullopt;
+        }
+        std::string_view text = state.current().text;
+        int32_t num = 0;
+        double dnum = 0;
+
+        bool legacyOctal = text[0] == '0';
+        int base = 10;
+        if (text.size() >= 2 && true && text[0] == '0') {
+            char baseChar = std::tolower(text[1]);
+            if (baseChar == 'b') {
+                base = 2;
+            } else if (baseChar == 'o') {
+                base = 8;
+            } else if (baseChar == 'x') {
+                base = 16;
+            }
+            if (base != 10) {
+                text = text.substr(2);
+                legacyOctal = false;
+                if (text.empty()) {
+                    state.error("Invalid numeric literal");
+                    return std::nullopt;
+                }
+            }
+        }
+
+        int exponent = 0;
+        bool decimalPoint = false;
+        bool isFloatingPoint = false;
+        auto suffixStart = text.end();
+
+        for (auto it = text.begin(); it != text.end(); ++it) {
+            char c = *it;
+            if (c == '_') {
+                continue;
+            }
+
+            if (std::isdigit(c)) {
+                if (decimalPoint) {
+                    exponent -= 1;
+                }
+                legacyOctal &= c < '8';
+
+                if (!isFloatingPoint) {
+                    int64_t tmp = static_cast<int64_t>(num) * base + (c - '0');
+                    if (static_cast<int32_t>(tmp) != tmp) {
+                        isFloatingPoint = true;
+                        dnum = tmp;
+                    }
+                    else {
+                        num = tmp;
+                    }
+                }
+                else {
+                    dnum = dnum * base + (c - '0');
+                }
+            }
+            else if (std::isxdigit(c) && base == 16) {
+                if (decimalPoint) {
+                    exponent -= 1;
+                }
+                if (!isFloatingPoint) {
+                    int64_t tmp = static_cast<int64_t>(num) * base + (std::tolower(c) - 'a' + 10);
+                    if (static_cast<int32_t>(tmp) != tmp) {
+                        isFloatingPoint = true;
+                        dnum = tmp;
+                    }
+                    else {
+                        num = tmp;
+                    }
+                }
+                else {
+                    dnum = dnum * base + (std::tolower(c) - 'a' + 10);
+                }
+            }
+            else if (c == '.') {
+                decimalPoint = true;
+                isFloatingPoint = true;
+                dnum = num;
+            }
+            else if (suffixStart == text.end()) {
+                suffixStart = it;
+                break;
+            }
+        }
+
+        if (legacyOctal && num != 0) {
+            // TODO: fix base
+            state.error("Legacy octal literals are not supported");
+            return std::nullopt;
+        }
+
+        if (suffixStart != text.end() && std::tolower(*suffixStart) == 'e' && base == 10) {
+            std::string_view exponentText = text.substr(suffixStart - text.begin() + 1);
+            int exp = 0;
+            bool negative = false;
+            if (exponentText.empty()) {
+                state.error("Invalid numeric literal");
+                return std::nullopt;
+            }
+            if (exponentText[0] == '+' || exponentText[0] == '-') {
+                negative = exponentText[0] == '-';
+                exponentText = exponentText.substr(1);
+            }
+            if (exponentText.empty()) {
+                state.error("Invalid numeric literal");
+                return std::nullopt;
+            }
+            for (char c : exponentText) {
+                if (c == '_') {
+                    continue;
+                }
+                exp = exp * 10 + (c - '0');
+            }
+
+            if (negative) {
+                exp = -exp;
+            }
+
+
+            exponent += exp;
+        }
+        else if (suffixStart != text.end()) {
+            // TODO: different suffix - bigint
+        }
+
+        if (exponent != 0) {
+            if (isFloatingPoint) {
+                dnum *= std::pow(10, exponent);
+            }
+            else {
+                // TODO: check overflow
+                num *= std::pow(10, exponent);
+            }
+        }
+
+        state.advance();
+        if (isFloatingPoint) {
+            return NumericLiteral{dnum};
+        }
+        return NumericLiteral{num};
+    }
 };
 
 struct StringLiteral {
     std::string value;
+
+    static std::optional<StringLiteral> parse(ParserState& state) {
+        if (state.current().kind != Token::StringLiteral) {
+            return std::nullopt;
+        }
+        std::string_view text = state.current().text;
+        text = text.substr(1, text.size() - 2);  // remove quotes
+
+        int length = 0;
+        for (char c : text) {
+            if (c != '\\') {
+                length += 1;
+            }
+            // TODO: handle more complex escape sequences
+        }
+
+        std::string str;
+        str.reserve(length);
+
+        for (auto it = text.begin(); it != text.end(); ++it) {
+            if (*it != '\\') {
+                str.push_back(*it);
+                continue;
+            }
+            else {
+                ++it;
+                if (it == text.end()) {
+                    state.error("Invalid escape sequence");
+                    return std::nullopt;
+                }
+                char c = *it;
+                switch (c) {
+                    case 'b':
+                        str.push_back('\b');
+                        break;
+                    case 'f':
+                        str.push_back('\f');
+                        break;
+                    case 'n':
+                        str.push_back('\n');
+                        break;
+                    case 'r':
+                        str.push_back('\r');
+                        break;
+                    case 't':
+                        str.push_back('\t');
+                        break;
+                    case 'v':
+                        str.push_back('\v');
+                        break;
+                    case '0':
+                        str.push_back('\0');
+                        break;
+                    case '\'':
+                    case '"':
+                    case '\\':
+                    default:
+                        str.push_back(c);
+                        break;
+                }
+            }
+        }
+
+        state.advance();
+        return StringLiteral{str};
+    }
 };
 
 struct Literal {
     std::variant<NullLiteral, BooleanLiteral, NumericLiteral, StringLiteral> value;
+
+    static std::optional<Literal> parse(ParserState& state) {
+        if (auto null = NullLiteral::parse(state); null) {
+            return Literal{*null};
+        }
+        if (auto boolean = BooleanLiteral::parse(state); boolean) {
+            return Literal{*boolean};
+        }
+        if (auto numeric = NumericLiteral::parse(state); numeric) {
+            return Literal{*numeric};
+        }
+        if (auto string = StringLiteral::parse(state); string) {
+            return Literal{*string};
+        }
+
+        return std::nullopt;
+    }
 };
 
 template<bool In, bool Yield, bool Await>
@@ -237,6 +650,13 @@ struct StatementListItem;
 template<bool Yield, bool Await, bool Return>
 struct StatementList {
     std::vector<StatementListItem<Yield, Await, Return>> items;
+
+    static std::optional<StatementList<Yield, Await, Return>> parse(ParserState& state);
+
+    ~StatementList();
+    StatementList();
+    StatementList(StatementList&&);
+    StatementList(const StatementList&) = delete;
 };
 
 template<bool Yield, bool Await>
@@ -262,12 +682,77 @@ struct LexicalBinding {
         std::pair<BindingIdentifier<Yield, Await>, InitializerPtr<In, Yield, Await>>,
         std::pair<BindingPattern<Yield, Await>, InitializerPtr<In, Yield, Await>>
     > value;
+
+    static std::optional<LexicalBinding<In, Yield, Await>> parse(ParserState& state) {
+        if (auto id = BindingIdentifier<Yield, Await>::parse(state); id) {
+            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+                state.advance();
+                if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state); initializer) {
+                    auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
+                    return LexicalBinding<In, Yield, Await>{std::pair{std::move(*id), std::move(ptr)}};
+                }
+                state.backtrack();
+                return std::nullopt;
+            }
+            return LexicalBinding<In, Yield, Await>{std::move(*id)};
+        }
+
+        // TODO: rest
+        return std::nullopt;
+    }
 };
 
 template<bool In, bool Yield, bool Await>
 struct LexicalDeclaration {
     bool isConst;
     std::vector<LexicalBinding<In, Yield, Await>> bindings;
+
+    static std::optional<LexicalDeclaration<In, Yield, Await>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != Token::Keyword) {
+            state.error("Expected let or const");
+            return std::nullopt;
+        }
+        bool isConst;
+        if (state.current().text == "let") {
+            isConst = false;
+        }
+        else if (state.current().text == "const") {
+            isConst = true;
+        }
+        else {
+            state.error("Expected let or const");
+            return std::nullopt;
+        }
+        state.advance();
+
+        LexicalDeclaration<In, Yield, Await> declaration{ isConst, {} };
+
+        while (true) {
+            if (auto binding = LexicalBinding<In, Yield, Await>::parse(state); binding) {
+                declaration.bindings.push_back(std::move(*binding));
+            }
+            else {
+                state.restorePosition(start);
+                return std::nullopt;
+            }
+
+
+            if (state.current().kind == Token::Punctuator && state.current().text == ",") {
+                state.advance();
+                continue;
+            }
+            if (state.current().kind == Token::Punctuator && state.current().text == ";") {
+                state.advance();
+                break;
+            }
+            state.error("Unexpected token");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        return std::move(declaration);
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -397,7 +882,7 @@ struct FunctionDeclaration {
 };
 
 template<bool Yield, bool Await, bool Return>
-struct LabelledStatement {
+struct LabeledStatement {
     LabelIdentifier<Yield, Await> label;
     std::variant<
         StatementPtr<Yield, Await, Return>,
@@ -446,11 +931,16 @@ struct Statement {
         BreakStatement<Yield, Await>,
         ReturnStatement<Yield, Await>, // [+Return]
         WithStatement<Yield, Await, Return>,
-        LabelledStatement<Yield, Await, Return>,
+        LabeledStatement<Yield, Await, Return>,
         ThrowStatement<Yield, Await>,
         TryStatement<Yield, Await, Return>,
         DebuggerStatement
     > value;
+
+    static std::optional<Statement<Yield, Await, Return>> parse(ParserState& state) {
+        // TODO
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Default>
@@ -543,6 +1033,13 @@ struct Declaration {
         ClassDeclaration<Yield, Await, false>,
         LexicalDeclaration<true, Yield, Await>
     > value;
+
+    static std::optional<Declaration<Yield, Await, Return>> parse(ParserState& state) {
+        if (auto lexical = LexicalDeclaration<true, Yield, Await>::parse(state); lexical) {
+            return Declaration<Yield, Await, Return>{std::move(*lexical)};
+        }
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -551,6 +1048,20 @@ struct StatementListItem {
         Statement<Yield, Await, Return>,
         Declaration<Yield, Await, Return>
     > value;
+
+    StatementListItem(Statement<Yield, Await, Return> statement): value(std::move(statement)) {}
+    StatementListItem(Declaration<Yield, Await, Return> declaration): value(std::move(declaration)) {}
+
+    static std::optional<StatementListItem<Yield, Await, Return>> parse(ParserState& state) {
+        if (auto statement = Statement<Yield, Await, Return>::parse(state); statement) {
+            return StatementListItem<Yield, Await, Return>{std::move(*statement)};
+        }
+        if (auto declaration = Declaration<Yield, Await, Return>::parse(state); declaration) {
+            return StatementListItem<Yield, Await, Return>{std::move(*declaration)};
+        }
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -671,9 +1182,11 @@ struct Arguments {
 
 template<bool Yield, bool Await>
 struct MemberExpression {
+    using MemberExpressionPtr = std::unique_ptr<MemberExpression<Yield, Await>>;
+
     std::variant<
         PrimaryExpression<Yield, Await>,
-        std::pair<MemberExpression<Yield, Await>, std::variant<
+        std::pair<MemberExpressionPtr, std::variant<
             Expression<true, Yield, Await>,  // bracket
             IdentifierName, // dot
             PrivateIdentifier,  // dot
@@ -818,7 +1331,79 @@ struct AssignmentExpression {
         AsyncArrowFunction<In, Yield, Await>,
         Assignment<In, Yield, Await>
     > value;
+
+    static std::optional<AssignmentExpression<In, Yield, Await>> parse(ParserState& state) {
+        state.error("Not implemented");
+        return std::nullopt;
+    }
 };
+
+
+struct Script {
+    std::optional<StatementList<false, false, false>> statementList;
+
+    static std::optional<Script> parse(ParserState& state) {
+        if (state.isEnd()) {
+            // return Script{};
+        }
+
+        if (auto statementList = StatementList<false, false, false>::parse(state); statementList) {
+            return Script{std::move(*statementList)};
+        }
+
+        return std::nullopt;
+    }
+};
+
+struct ImportDeclaration {
+    // XXX: ignore for now
+};
+
+struct ExportDeclaration {
+    // XXX: ignore for now
+};
+
+struct ModuleItem {
+    std::variant<
+        ImportDeclaration,
+        ExportDeclaration,
+        StatementListItem<false, true, false>
+    > value;
+};
+
+struct ModuleItemList {
+    std::vector<ModuleItem> items;
+};
+
+struct Module {
+    std::optional<ModuleItemList> moduleItemList;
+};
+
+template<bool Yield, bool Await, bool Return>
+std::optional<StatementList<Yield, Await, Return>> StatementList<Yield, Await, Return>::parse(ParserState& state) {
+    StatementList<Yield, Await, Return> list;
+    while (true) {
+        if (auto item = StatementListItem<Yield, Await, Return>::parse(state); item) {
+            list.items.push_back(std::move(*item));
+        }
+        else {
+            break;
+        }
+    }
+    if (list.items.empty()) {
+        return std::nullopt;
+    }
+    return std::move(list);
+}
+
+template<bool Yield, bool Await, bool Return>
+StatementList<Yield, Await, Return>::~StatementList() = default;
+
+template<bool Yield, bool Await, bool Return>
+StatementList<Yield, Await, Return>::StatementList() = default;
+
+template<bool Yield, bool Await, bool Return>
+StatementList<Yield, Await, Return>::StatementList(StatementList&& other) = default;
 
 
 }  // namespace jac
