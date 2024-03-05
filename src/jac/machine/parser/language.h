@@ -19,31 +19,45 @@ const std::unordered_set<std::string_view> keywords = {
 };
 
 const std::unordered_map<std::string_view, int> binaryPrecedence = {
-    { "**", 1 }, // note: left not result of prefix unary operator
-    { "*", 2 },
-    { "/", 2 },
-    { "%", 2 },
-    { "+", 3 },
-    { "-", 3 },
-    { "<<", 4 },
-    { ">>", 4 },
-    { ">>>", 4 },
-    { "<", 5 },
-    { "<=", 5 },
-    { ">", 5 },
-    { ">=", 5 },
-    { "in", 5 },
-    { "instanceof", 5 },
+    { "??", 1 },  // note: neither operand is result of && or ||
+    { "||", 1 },
+    { "&&", 2 },
+    { "|", 3 },
+    { "^", 4 },
+    { "&", 5 },
     { "==", 6 },
     { "!=", 6 },
     { "===", 6 },
     { "!==", 6 },
-    { "&", 7 },
-    { "^", 8 },
-    { "|", 9 },
-    { "&&", 10 },
-    { "||", 11 },
-    { "??", 11 }  // note: neither operand is result of && or ||
+    { "instanceof", 7 },
+    { "<", 7 },
+    { "<=", 7 },
+    { ">", 7 },
+    { ">=", 7 },
+    { "in", 7 },
+    { "<<", 8 },
+    { ">>", 8 },
+    { ">>>", 8 },
+    { "+", 9 },
+    { "-", 9 },
+    { "*", 10 },
+    { "/", 10 },
+    { "%", 10 },
+    { "**", 11 }, // note: left not result of prefix unary operator
+};
+const int binaryPrecedenceMax = 11;
+
+const std::unordered_set<std::string_view> unaryOperator = {
+    "!",      "~",    "+",      "-",
+    "typeof", "void", "delete", "await"
+};
+
+
+const std::unordered_set<std::string_view> updateOperator = {
+    "++x",  // note: "AssignmentTargetType must be simple"
+    "--x",
+    "x++",
+    "x--"
 };
 
 } // namespace jac
