@@ -20,19 +20,21 @@ bool floatEq(auto a, auto b) {
 }
 
 
-jac::PrimaryExpression<true, true>& unaryExpPrimary(jac::UnaryExpression<true, true>& expr) {
-    return std::get<jac::PrimaryExpression<true, true>>(
-      std::get<jac::MemberExpression<true, true>>(
-        std::get<jac::NewExpression<true, true>>(
-          std::get<jac::LeftHandSideExpressionPtr<true, true>>(
-            std::get<jac::UpdateExpression<true, true>>(expr.value)
+template<bool Yield, bool Await>
+jac::PrimaryExpression<Yield, Await>& unaryExpPrimary(jac::UnaryExpression<Yield, Await>& expr) {
+    return std::get<jac::PrimaryExpression<Yield, Await>>(
+      std::get<jac::MemberExpression<Yield, Await>>(
+        std::get<jac::NewExpression<Yield, Await>>(
+          std::get<jac::LeftHandSideExpressionPtr<Yield, Await>>(
+            std::get<jac::UpdateExpression<Yield, Await>>(expr.value)
           .value)
         ->value)
       .value)
     .value);
 }
 
-jac::Literal& unaryExpLiteral(jac::UnaryExpression<true, true>& expr) {
+template<bool Yield, bool Await>
+jac::Literal& unaryExpLiteral(jac::UnaryExpression<Yield, Await>& expr) {
     return std::get<jac::Literal>(
         unaryExpPrimary(expr)
     .value);
@@ -45,17 +47,19 @@ std::int32_t literalI32(jac::Literal& lit) {
       .value);
 }
 
-std::int32_t unaryExpI32(jac::UnaryExpression<true, true>& expr) {
+template<bool Yield, bool Await>
+std::int32_t unaryExpI32(jac::UnaryExpression<Yield, Await>& expr) {
     return literalI32(unaryExpLiteral(expr));
 }
 
-std::string_view unaryExpIdentifier(jac::UnaryExpression<true, true>& expr) {
-    return std::get<jac::IdentifierReference<true, true>>(
-      std::get<jac::PrimaryExpression<true, true>>(
-        std::get<jac::MemberExpression<true, true>>(
-          std::get<jac::NewExpression<true, true>>(
-            std::get<jac::LeftHandSideExpressionPtr<true, true>>(
-              std::get<jac::UpdateExpression<true, true>>(expr.value)
+template<bool Yield, bool Await>
+std::string_view unaryExpIdentifier(jac::UnaryExpression<Yield, Await>& expr) {
+    return std::get<jac::IdentifierReference<Yield, Await>>(
+      std::get<jac::PrimaryExpression<Yield, Await>>(
+        std::get<jac::MemberExpression<Yield, Await>>(
+          std::get<jac::NewExpression<Yield, Await>>(
+            std::get<jac::LeftHandSideExpressionPtr<Yield, Await>>(
+              std::get<jac::UpdateExpression<Yield, Await>>(expr.value)
             .value)
           ->value)
         .value)
@@ -63,14 +67,16 @@ std::string_view unaryExpIdentifier(jac::UnaryExpression<true, true>& expr) {
     .value).identifier.name.name;
 }
 
-jac::BinaryExpression<true, true, true>& assignExpBinary(jac::AssignmentExpression<true, true, true>& expr) {
-    return std::get<jac::BinaryExpression<true, true, true>>(
-        std::get<jac::ConditionalExpression<true, true, true>>(expr.value)
+template<bool In, bool Yield, bool Await>
+jac::BinaryExpression<In, Yield, Await>& assignExpBinary(jac::AssignmentExpression<In, Yield, Await>& expr) {
+    return std::get<jac::BinaryExpression<In, Yield, Await>>(
+        std::get<jac::ConditionalExpression<In, Yield, Await>>(expr.value)
     .value);
 }
 
-jac::UnaryExpression<true, true>& assignExpUnary(jac::AssignmentExpression<true, true, true>& expr) {
-    return std::get<jac::UnaryExpression<true, true>>(assignExpBinary(expr).value);
+template<bool In, bool Yield, bool Await>
+jac::UnaryExpression<Yield, Await>& assignExpUnary(jac::AssignmentExpression<In, Yield, Await>& expr) {
+    return std::get<jac::UnaryExpression<Yield, Await>>(assignExpBinary(expr).value);
 }
 
 using TokenVector = std::vector<jac::Token>;
@@ -1081,5 +1087,142 @@ TEST_CASE("ConditionalExpression", "[parser]") {
         REQUIRE((std::get<2>(addTuple) == "+"));
         REQUIRE((unaryExpIdentifier(std::get<jac::UnaryExpression<true, true>>(std::get<0>(addTuple)->value)) == "d"));
         REQUIRE((unaryExpIdentifier(std::get<jac::UnaryExpression<true, true>>(std::get<1>(addTuple)->value)) == "e"));
+    }
+}
+
+
+TEST_CASE("FunctionDeclaration", "[parser]") {
+
+    SECTION("function f() {}") {
+        auto tokens = TokenVector{
+            jac::Token(1, 1, "function", jac::Token::Keyword),
+            jac::Token(1, 10, "f", jac::Token::IdentifierName),
+            jac::Token(1, 11, "(", jac::Token::Punctuator),
+            jac::Token(1, 12, ")", jac::Token::Punctuator),
+            jac::Token(1, 14, "{", jac::Token::Punctuator),
+            jac::Token(1, 15, "}", jac::Token::Punctuator)
+        };
+
+        jac::ParserState state(tokens);
+
+        auto result = jac::FunctionDeclaration<true, true, false>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+        REQUIRE((result->name->identifier.name.name == "f"));
+        REQUIRE(result->parameters.parameterList.size() == 0);
+        REQUIRE_FALSE(result->parameters.restParameter);
+        REQUIRE(!result->body);
+    }
+
+    SECTION("function fun(a, b) { const x = 3; let y = 4; return x + y; }") {
+        auto tokens = TokenVector{
+            jac::Token(1, 1, "function", jac::Token::Keyword),
+            jac::Token(1, 10, "fun", jac::Token::IdentifierName),
+            jac::Token(1, 13, "(", jac::Token::Punctuator),
+            jac::Token(1, 14, "a", jac::Token::IdentifierName),
+            jac::Token(1, 15, ",", jac::Token::Punctuator),
+            jac::Token(1, 17, "b", jac::Token::IdentifierName),
+            jac::Token(1, 18, ")", jac::Token::Punctuator),
+            jac::Token(1, 20, "{", jac::Token::Punctuator),
+            jac::Token(1, 22, "const", jac::Token::Keyword),
+            jac::Token(1, 28, "x", jac::Token::IdentifierName),
+            jac::Token(1, 30, "=", jac::Token::Punctuator),
+            jac::Token(1, 32, "3", jac::Token::NumericLiteral),
+            jac::Token(1, 33, ";", jac::Token::Punctuator),
+            jac::Token(1, 35, "let", jac::Token::Keyword),
+            jac::Token(1, 39, "y", jac::Token::IdentifierName),
+            jac::Token(1, 41, "=", jac::Token::Punctuator),
+            jac::Token(1, 43, "4", jac::Token::NumericLiteral),
+            jac::Token(1, 44, ";", jac::Token::Punctuator),
+            jac::Token(1, 46, "return", jac::Token::Keyword),
+            jac::Token(1, 53, "x", jac::Token::IdentifierName),
+            jac::Token(1, 55, "+", jac::Token::Punctuator),
+            jac::Token(1, 57, "y", jac::Token::IdentifierName),
+            jac::Token(1, 58, ";", jac::Token::Punctuator),
+            jac::Token(1, 60, "}", jac::Token::Punctuator)
+        };
+
+        jac::ParserState state(tokens);
+
+        auto result = jac::FunctionDeclaration<true, true, false>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+        REQUIRE((result->name->identifier.name.name == "fun"));
+        REQUIRE(result->parameters.parameterList.size() == 2);
+        REQUIRE_FALSE(result->parameters.restParameter);
+        REQUIRE(result->body);
+
+        auto& argIdentA = std::get<jac::BindingIdentifier<false, false>>(result->parameters.parameterList[0].value);
+        REQUIRE((argIdentA.identifier.name.name == "a"));
+        auto& argIdentB = std::get<jac::BindingIdentifier<false, false>>(result->parameters.parameterList[1].value);
+        REQUIRE((argIdentB.identifier.name.name == "b"));
+
+
+        auto& body = *(result->body);
+        REQUIRE((body.items.size() == 3));
+
+        auto& declXStat = std::get<jac::Declaration<false, false, true>>(body.items[0].value);
+        auto& declX = std::get<jac::LexicalDeclaration<true, false,  false>>(declXStat.value);
+        REQUIRE((declX.isConst == true));
+        REQUIRE((declX.bindings.size() == 1));
+        auto& bindingX = std::get<std::pair<jac::BindingIdentifier<false, false>, jac::InitializerPtr<true, false, false>>>(declX.bindings[0].value);
+        REQUIRE((std::get<0>(bindingX).identifier.name.name == "x"));
+
+        auto& declYStat = std::get<jac::Declaration<false, false, true>>(body.items[1].value);
+        auto& declY = std::get<jac::LexicalDeclaration<true, false,  false>>(declYStat.value);
+        REQUIRE((declY.isConst == false));
+        REQUIRE((declY.bindings.size() == 1));
+        auto& bindingY = std::get<std::pair<jac::BindingIdentifier<false, false>, jac::InitializerPtr<true, false, false>>>(declY.bindings[0].value);
+        REQUIRE((std::get<0>(bindingY).identifier.name.name == "y"));
+
+        auto& retStat = std::get<jac::Statement<false, false, true>>(body.items[2].value);
+        auto& ret = std::get<jac::ReturnStatement<false, false>>(retStat.value);
+        REQUIRE(ret.expression);
+        REQUIRE(ret.expression->items.size() == 1);
+
+        auto& addExp = assignExpBinary(*ret.expression->items[0]);
+        auto& addVar = std::get<std::tuple<jac::BinaryExpressionPtr<true, false, false>, jac::BinaryExpressionPtr<true, false, false>, std::string_view>>(addExp.value);
+        REQUIRE((std::get<2>(addVar) == "+"));
+        REQUIRE((unaryExpIdentifier(std::get<jac::UnaryExpression<false, false>>(std::get<0>(addVar)->value)) == "x"));
+        REQUIRE((unaryExpIdentifier(std::get<jac::UnaryExpression<false, false>>(std::get<1>(addVar)->value)) == "y"));
+    }
+
+    SECTION("function fun(a, b=3) {}") {
+        auto tokens = TokenVector{
+            jac::Token(1, 1, "function", jac::Token::Keyword),
+            jac::Token(1, 10, "fun", jac::Token::IdentifierName),
+            jac::Token(1, 13, "(", jac::Token::Punctuator),
+            jac::Token(1, 14, "a", jac::Token::IdentifierName),
+            jac::Token(1, 15, ",", jac::Token::Punctuator),
+            jac::Token(1, 17, "b", jac::Token::IdentifierName),
+            jac::Token(1, 18, "=", jac::Token::Punctuator),
+            jac::Token(1, 19, "3", jac::Token::NumericLiteral),
+            jac::Token(1, 20, ")", jac::Token::Punctuator),
+            jac::Token(1, 22, "{", jac::Token::Punctuator),
+            jac::Token(1, 23, "}", jac::Token::Punctuator)
+        };
+
+        jac::ParserState state(tokens);
+
+        auto result = jac::FunctionDeclaration<true, true, false>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+        REQUIRE((result->name->identifier.name.name == "fun"));
+        REQUIRE(result->parameters.parameterList.size() == 2);
+        REQUIRE_FALSE(result->parameters.restParameter);
+        REQUIRE(!result->body);
+
+        auto& argIdentA = std::get<jac::BindingIdentifier<false, false>>(result->parameters.parameterList[0].value);
+        REQUIRE((argIdentA.identifier.name.name == "a"));
+
+        auto& argB = std::get<std::pair<jac::BindingIdentifier<false, false>, jac::InitializerPtr<true, false, false>>>(result->parameters.parameterList[1].value);
+        REQUIRE((argB.first.identifier.name.name == "b"));
+        REQUIRE(unaryExpI32(assignExpUnary(*argB.second)) == 3);
     }
 }

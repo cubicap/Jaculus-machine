@@ -34,6 +34,9 @@ public:
     }
 
     Token& current() {
+        if (_pos == _tokens.end()) {
+            return _tokens.back();
+        }
         return *_pos;
     }
 
@@ -726,6 +729,35 @@ struct BindingElement {
         BindingPattern<Yield, Await>,
         std::pair<BindingPattern<Yield, Await>, InitializerPtr<true, Yield, Await>>
     > value;
+
+    static std::optional<BindingElement<Yield, Await>> parse(ParserState& state) {
+        if (auto id = BindingIdentifier<Yield, Await>::parse(state); id) {
+            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+                state.advance();
+                if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state); initializer) {
+                    auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
+                    return BindingElement<Yield, Await>{std::pair{std::move(*id), std::move(ptr)}};
+                }
+                state.backtrack();
+                return std::nullopt;
+            }
+            return BindingElement<Yield, Await>{std::move(*id)};
+        }
+        if (auto pattern = BindingPattern<Yield, Await>::parse(state); pattern) {
+            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+                state.advance();
+                if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state); initializer) {
+                    auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
+                    return BindingElement<Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}};
+                }
+                state.backtrack();
+                return std::nullopt;
+            }
+            return BindingElement<Yield, Await>{std::move(*pattern)};
+        }
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -746,12 +778,43 @@ struct BindingRestElement {
         BindingIdentifier<Yield, Await>,
         BindingPattern<Yield, Await>
     > value;
+
+    static std::optional<BindingRestElement<Yield, Await>> parse(ParserState& state) {
+        // TODO
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct FormalParameters {
     std::vector<FormalParameter<Yield, Await>> parameterList;
     std::optional<BindingRestElement<Yield, Await>> restParameter;
+
+    static std::optional<FormalParameters<Yield, Await>> parse(ParserState& state) {
+        FormalParameters params;
+
+        bool canContinue = true;
+        while (true) {
+            if (auto param = FormalParameter<Yield, Await>::parse(state); param) {
+                params.parameterList.push_back(std::move(*param));
+                if (state.current().kind == Token::Punctuator && state.current().text == ",") {
+                    state.advance();
+                    continue;
+                }
+            }
+
+            canContinue = false;
+            break;
+        }
+
+        if (canContinue) {
+            if (auto rest = BindingRestElement<Yield, Await>::parse(state); rest) {
+                params.restParameter = std::move(*rest);
+            }
+        }
+
+        return params;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -839,7 +902,18 @@ struct LexicalBinding {
             return LexicalBinding<In, Yield, Await>{std::move(*id)};
         }
 
-        // TODO: rest
+        auto start = state.getPosition();
+        if (auto pattern = BindingPattern<Yield, Await>::parse(state); pattern) {
+            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+                state.advance();
+                if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state); initializer) {
+                    auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
+                    return LexicalBinding<In, Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}};
+                }
+            }
+        }
+
+        state.restorePosition(start);
         return std::nullopt;
     }
 };
@@ -1010,6 +1084,29 @@ struct BreakStatement {
 template<bool Yield, bool Await>
 struct ReturnStatement {
     std::optional<Expression<true, Yield, Await>> expression;
+
+    static std::optional<ReturnStatement<Yield, Await>> parse(ParserState& state) {
+        if (state.current().kind != Token::Keyword || state.current().text != "return") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        ReturnStatement<Yield, Await> statement;
+
+        auto start = state.getPosition();
+        if (auto expr = Expression<true, Yield, Await>::parse(state); expr) {
+            statement.expression = std::move(*expr);
+        }
+
+        if (state.current().kind != Token::Punctuator || state.current().text != ";") {
+            state.error("Expected ;");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        state.advance();
+        return statement;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1021,7 +1118,65 @@ template<bool Yield, bool Await, bool Default>
 struct FunctionDeclaration {
     std::optional<BindingIdentifier<Yield, Await>> name;  // optional only when [+Default]
     FormalParameters<false, false> parameters;
-    FunctionBody<false, false> body;
+    std::optional<FunctionBody<false, false>> body;
+
+    static std::optional<FunctionDeclaration<Yield, Await, Default>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != Token::Keyword || state.current().text != "function") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        std::optional<BindingIdentifier<Yield, Await>> name;
+        if (!Default) {
+            if (auto id = BindingIdentifier<Yield, Await>::parse(state); id) {
+                name = std::move(*id);
+            }
+            else {
+                state.error("Expected identifier");
+                state.restorePosition(start);
+                return std::nullopt;
+            }
+        }
+
+        if (state.current().kind != Token::Punctuator || state.current().text != "(") {
+            state.error("Expected (");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto params = FormalParameters<false, false>::parse(state);
+        if (!params) {
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        if (state.current().kind != Token::Punctuator || state.current().text != ")") {
+            state.error("Expected )");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        if (state.current().kind != Token::Punctuator || state.current().text != "{") {
+            state.error("Expected {");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto body = FunctionBody<false, false>::parse(state);
+
+        if (state.current().kind != Token::Punctuator || state.current().text != "}") {
+            state.error("Expected }");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        return FunctionDeclaration<Yield, Await, Default>{std::move(name), std::move(*params), std::move(body)};
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1081,7 +1236,11 @@ struct Statement {
     > value;
 
     static std::optional<Statement<Yield, Await, Return>> parse(ParserState& state) {
-        // TODO
+        if (auto ret = ReturnStatement<Yield, Await>::parse(state); ret) {
+            return Statement<Yield, Await, Return>{std::move(*ret)};
+        }
+
+        // TODO: rest
         return std::nullopt;
     }
 };
@@ -1115,6 +1274,16 @@ struct HoistableDeclaration {
         AsyncFunctionDeclaration<Yield, Await, Default>,
         AsyncGeneratorDeclaration<Yield, Await, Default>
     > value;
+
+    static std::optional<HoistableDeclaration<Yield, Await, Default>> parse(ParserState& state) {
+        if (auto function = FunctionDeclaration<Yield, Await, Default>::parse(state); function) {
+            return HoistableDeclaration<Yield, Await, Default>{std::move(*function)};
+        }
+
+        // TODO: rest
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -1167,6 +1336,11 @@ struct ClassDeclaration {
     std::optional<BindingIdentifier<Yield, Await>> name;  // optional only when [+Default]
     std::optional<ClassHeritage<Yield, Await>> heritage;
     ClassBody<Yield, Await> body;
+
+    static std::optional<ClassDeclaration<Yield, Await, Default>> parse(ParserState& state) {
+        // TODO
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1178,6 +1352,12 @@ struct Declaration {
     > value;
 
     static std::optional<Declaration<Yield, Await, Return>> parse(ParserState& state) {
+        if (auto hoistable = HoistableDeclaration<Yield, Await, false>::parse(state); hoistable) {
+            return Declaration<Yield, Await, Return>{std::move(*hoistable)};
+        }
+        if (auto klass = ClassDeclaration<Yield, Await, false>::parse(state); klass) {
+            return Declaration<Yield, Await, Return>{std::move(*klass)};
+        }
         if (auto lexical = LexicalDeclaration<true, Yield, Await>::parse(state); lexical) {
             return Declaration<Yield, Await, Return>{std::move(*lexical)};
         }
@@ -1705,7 +1885,7 @@ struct Script {
 
     static std::optional<Script> parse(ParserState& state) {
         if (state.isEnd()) {
-            // return Script{};
+            return Script{};
         }
 
         if (auto statementList = StatementList<false, false, false>::parse(state); statementList) {
