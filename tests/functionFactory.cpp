@@ -3,10 +3,10 @@
 
 #include <string>
 
+#include <jac/features/filesystemFeature.h>
+#include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
-#include <jac/features/moduleLoaderFeature.h>
-#include <jac/features/filesystemFeature.h>
 
 #include "util.h"
 
@@ -126,7 +126,7 @@ TEST_CASE("New function this", "[functionFactory]") {
     }
 
     SECTION("int(void)") {
-        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue) {
+        auto f = ff.newFunctionThis([](jac::ContextRef, jac::ValueWeak thisValue) {
             return thisValue.to<jac::Object>().get<int>("test");
         });
         auto obj = jac::Object::create(machine.context());
@@ -136,7 +136,7 @@ TEST_CASE("New function this", "[functionFactory]") {
     }
 
     SECTION("int(int)") {
-        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue, int a) {
+        auto f = ff.newFunctionThis([](jac::ContextRef, jac::ValueWeak thisValue, int a) {
             auto obj = thisValue.to<jac::Object>();
             obj.set("test", obj.get<int>("test") + a);
             return obj.get<int>("test");
@@ -149,7 +149,7 @@ TEST_CASE("New function this", "[functionFactory]") {
     }
 
     SECTION("int(int, int)") {
-        auto f = ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisValue, int a, int b) {
+        auto f = ff.newFunctionThis([](jac::ContextRef, jac::ValueWeak thisValue, int a, int b) {
             auto obj = thisValue.to<jac::Object>();
             obj.set("test", (obj.get<int>("test") + a) * b);
             return obj.get<int>("test") * 10;
@@ -186,9 +186,9 @@ TEST_CASE("New function this variadic", "[functionFactory]") {
     }
 
     SECTION("string(args)") {
-        auto f = ff.newFunctionThisVariadic([](jac::ContextRef ctx, jac::ValueWeak thisValue, std::vector<jac::ValueWeak> argv) {
+        auto f = ff.newFunctionThisVariadic([](jac::ContextRef, jac::ValueWeak thisValue, std::vector<jac::ValueWeak> argv) {
             auto obj = thisValue.to<jac::Object>();
-            std::string result = obj.get<std::string>("prefix");
+            auto result = obj.get<std::string>("prefix");
             for (auto& arg : argv) {
                 result += arg.to<std::string>();
             }

@@ -3,8 +3,8 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
-#include <stdexcept>
 
+#include <jac/machine/values.h>
 
 namespace jac {
 
@@ -15,7 +15,7 @@ public:
     std::string path_;
 
     File(std::string path, std::string flags): path_(path) {
-        std::ios::openmode openMode = static_cast<std::ios::openmode>(0);
+        auto openMode = static_cast<std::ios::openmode>(0);
         if (flags.find('r') != std::string::npos) {
             openMode |= std::ios::in;
         }

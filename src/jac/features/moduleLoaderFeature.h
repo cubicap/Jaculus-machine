@@ -10,7 +10,7 @@ template<class Next>
 class ModuleLoaderFeature : public Next {
 private:
     static JSModuleDef *moduleLoaderCbk(JSContext* ctx, const char *module_name, void *_self) {
-        auto &self = *reinterpret_cast<ModuleLoaderFeature<Next>*>(_self);
+        auto &self = *static_cast<ModuleLoaderFeature<Next>*>(_self);
 
         std::string filename = module_name;
 
@@ -30,7 +30,7 @@ private:
             return nullptr;
         }
 
-        JSModuleDef *mdl = reinterpret_cast<JSModuleDef*>(JS_VALUE_GET_PTR(val));
+        auto mdl = static_cast<JSModuleDef*>(JS_VALUE_GET_PTR(val));
 
         Object meta(ctx, JS_GetImportMeta(ctx, mdl));
         meta.set("url", filename);

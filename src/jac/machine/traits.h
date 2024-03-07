@@ -3,8 +3,8 @@
 #include <vector>
 
 #include "context.h"
-#include "values.h"
 #include "stringView.h"
+#include "values.h"
 
 
 namespace jac {
@@ -12,11 +12,11 @@ namespace jac {
 
 template<typename T, typename En = T>
 struct ConvTraits {
-    static void from(ContextRef ctx, ValueWeak val) {
+    static void from(ContextRef, ValueWeak) {
         static_assert(sizeof(T) == 0, "No conversion defined");
     }
 
-    static void to(ContextRef ctx, T val) {
+    static void to(ContextRef, T) {
         static_assert(sizeof(T) == 0, "No conversion defined");
     }
 };
@@ -125,7 +125,7 @@ struct ConvTraits<std::string> {
 
 template<>
 struct ConvTraits<ValueWeak> {
-    static ValueWeak from(ContextRef ctx, ValueWeak val) {
+    static ValueWeak from(ContextRef, ValueWeak val) {
         return val;
     }
 
@@ -142,7 +142,7 @@ struct ConvTraits<Value> {
         return Value(ctx, val.getVal());
     }
 
-    static Value to(ContextRef ctx, Value val) {
+    static Value to(ContextRef, Value val) {
         return val;
     }
 };
@@ -166,7 +166,7 @@ struct ConvTraits<Object> {
         return Object(ctx, val.getVal());
     }
 
-    static Value to(ContextRef ctx, Object val) {
+    static Value to(ContextRef, Object val) {
         return static_cast<Value>(val);
     }
 };
@@ -190,7 +190,7 @@ struct ConvTraits<Function> {
         return Function(ctx, val.getVal());
     }
 
-    static Value to(ContextRef ctx, Function val) {
+    static Value to(ContextRef, Function val) {
         return static_cast<Value>(val);
     }
 };
@@ -214,7 +214,7 @@ struct ConvTraits<Array> {
         return Array(ctx, val.getVal());
     }
 
-    static Value to(ContextRef ctx, Array val) {
+    static Value to(ContextRef, Array val) {
         return static_cast<Value>(val);
     }
 };
@@ -238,7 +238,7 @@ struct ConvTraits<Promise> {
         return Promise(ctx, val.getVal());
     }
 
-    static Value to(ContextRef ctx, Promise val) {
+    static Value to(ContextRef, Promise val) {
         return static_cast<Value>(val);
     }
 };
@@ -262,7 +262,7 @@ struct ConvTraits<Exception> {
         return Exception(ctx, val.getVal());
     }
 
-    static Value to(ContextRef ctx, Exception val) {
+    static Value to(ContextRef, Exception val) {
         return static_cast<Value>(val);
     }
 };
@@ -274,7 +274,7 @@ struct ConvTraits<ArrayBuffer> {
         return ArrayBuffer(ctx, val.getVal());
     }
 
-    static Value to(ContextRef ctx, ArrayBuffer val) {
+    static Value to(ContextRef, ArrayBuffer val) {
         return static_cast<Value>(val);
     }
 };
@@ -293,8 +293,8 @@ struct ConvTraits<ArrayBufferWeak> {
 
 template<typename T>
 struct ConvTraits<std::vector<T>> {
-    static std::vector<T> from(ContextRef ctx, ValueWeak val) {
-        Array arr = val.to<Array>();
+    static std::vector<T> from(ContextRef, ValueWeak val) {
+        auto arr = val.to<Array>();
         std::vector<T> res;
         for (int i = 0; i < arr.length(); i++) {
             try {
@@ -319,8 +319,8 @@ struct ConvTraits<std::vector<T>> {
 template<typename... Args>
 struct ConvTraits<std::tuple<Args...>> {
     template<std::size_t... Is>
-    static std::tuple<Args...> unwrapHelper(ContextRef ctx, ValueWeak val, std::index_sequence<Is...>) {
-        Array arr = val.to<Array>();
+    static std::tuple<Args...> unwrapHelper(ContextRef, ValueWeak val, std::index_sequence<Is...>) {
+        auto arr = val.to<Array>();
         if (arr.length() < static_cast<int>(sizeof...(Args))) {
             throw Exception::create(Exception::Type::TypeError, "Tuple size mismatch");
         }

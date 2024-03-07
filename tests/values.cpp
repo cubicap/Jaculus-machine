@@ -1,14 +1,15 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
-#include <string>
-#include <memory>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <string_view>
 
+#include <jac/features/filesystemFeature.h>
+#include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
-#include <jac/features/moduleLoaderFeature.h>
-#include <jac/features/filesystemFeature.h>
 
 #include "util.h"
 
@@ -34,9 +35,10 @@ TEST_CASE("To JS value", "[base]") {
         val{"int32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int32_t(-42)); }, "number", "-42"},
         val{"const c string", [](jac::ContextRef ctx) { return jac::Value::from(ctx, "Hello World"); }, "string", "Hello World"},
         val{"non const c string", [](jac::ContextRef ctx) {
-                const char* str = "Hello World";
-                std::unique_ptr<char[]> strCopy(new char[strlen(str) + 1]);
-                strcpy(strCopy.get(), str);
+                std::string_view str = "Hello World";
+                std::unique_ptr<char[]> strCopy(new char[str.size() + 1]);
+                std::copy(str.begin(), str.end(), strCopy.get());
+                strCopy[str.size()] = '\0';
 
                 return jac::Value::from(ctx, strCopy.get());
         }, "string", "Hello World"},
@@ -60,7 +62,7 @@ TEST_CASE("To JS value", "[base]") {
     }
 
     SECTION("double") {
-        auto value = jac::Value::from(machine.context(), double(42.7));
+        auto value = jac::Value::from(machine.context(), 42.7);
 
         global.defineProperty("value", value);
         evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
@@ -71,7 +73,7 @@ TEST_CASE("To JS value", "[base]") {
     }
 
     SECTION("float") {
-        auto value = jac::Value::from(machine.context(), float(42.7));
+        auto value = jac::Value::from(machine.context(), 42.7f);
 
         global.defineProperty("value", value);
         evalCode(machine, "report(typeof value); report(String(value));", "test", jac::EvalFlags::Global);
@@ -109,7 +111,7 @@ TEST_CASE("toString", "[base]") {
         val{"non const c string", [](jac::ContextRef ctx) {
                 const char* str = "Hello World";
                 std::unique_ptr<char[]> strCopy(new char[strlen(str) + 1]);
-                strcpy(strCopy.get(), str);
+                std::copy(str, str + strlen(str) + 1, strCopy.get());
 
                 return jac::Value::from(ctx, strCopy.get());
         }, "string", "Hello World"},
@@ -513,13 +515,13 @@ TEST_CASE("Promise", "[base]") {
             });
         )", "test", jac::EvalFlags::Global);
 
-        REQUIRE(machine.getReports() == std::vector<std::string>{});
+        REQUIRE(machine.getReports().empty());
 
         resolve.call<void>("Hello World");
 
         JSContext* context = machine.context();
+        JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
         int err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
-        err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
         REQUIRE(err == 0);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});
@@ -536,13 +538,13 @@ TEST_CASE("Promise", "[base]") {
             });
         )", "test", jac::EvalFlags::Global);
 
-        REQUIRE(machine.getReports() == std::vector<std::string>{});
+        REQUIRE(machine.getReports().empty());
 
         reject.call<void>("Hello World");
 
         JSContext* context = machine.context();
-        int err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
-        err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
+        JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
+        auto err = JS_ExecutePendingJob(JS_GetRuntime(machine.context()), &context);
         REQUIRE(err == 0);
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"Hello World"});

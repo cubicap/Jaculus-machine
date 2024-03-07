@@ -4,11 +4,9 @@
 
 #include <string>
 #include <tuple>
-#include <variant>
 #include <vector>
 
 #include "funcUtil.h"
-#include "machine.h"
 #include "values.h"
 
 
@@ -50,7 +48,7 @@ namespace detail {
 
         using value_t = check<is_callable_t>;
     };
-}
+} // namespace detail
 
 /**
  * @brief Checks if a type is derived from a template class
@@ -91,7 +89,7 @@ namespace ProtoBuilder {
          * @param args arguments passed to the constructor
          * @return A pointer to the opaque data
          */
-        static T* constructOpaque(ContextRef ctx, std::vector<ValueWeak> args) {
+        static T* constructOpaque(ContextRef /*ctx*/, std::vector<ValueWeak> /*args*/) {
             throw Exception::create(Exception::Type::TypeError, "Class cannot be instantiated");
         }
 
@@ -102,7 +100,7 @@ namespace ProtoBuilder {
          * @param rt runtime to work in
          * @param ptr pointer to the opaque data
          */
-        static void destroyOpaque(JSRuntime* rt, T* ptr) noexcept {
+        static void destroyOpaque(JSRuntime* /*rt*/, T* ptr) noexcept {
             delete ptr;
         }
 
@@ -113,8 +111,8 @@ namespace ProtoBuilder {
          * @param thisVal the instance of the class
          * @return A pointer to the opaque data
          */
-        static T* getOpaque(ContextRef ctx, ValueWeak thisVal) {
-            T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal.getVal(), classId));
+        static T* getOpaque(ContextRef /*ctx*/, ValueWeak thisVal) {
+            T* ptr = static_cast<T*>(JS_GetOpaque(thisVal.getVal(), classId));
             if (!ptr) {
                 throw Exception::create(Exception::Type::TypeError, "Invalid opaque data");
             }
@@ -139,7 +137,7 @@ namespace ProtoBuilder {
 
             return [&]<typename Res, typename... Args>(SgnUnwrap<Res(Args...)>) {
                 auto f = [&](Args... args) -> Res {
-                    T* ptr = reinterpret_cast<T*>(JS_GetOpaque(funcObj.getVal(), classId));
+                    T* ptr = static_cast<T*>(JS_GetOpaque(funcObj.getVal(), classId));
                     return (ptr->*member)(args...);
                 };
 
@@ -164,17 +162,17 @@ namespace ProtoBuilder {
             using SetRaw = JSValue(*)(JSContext* ctx_, JSValueConst thisVal, JSValueConst val);
 
             GetRaw get = [](JSContext* ctx_, JSValueConst thisVal) -> JSValue {
-                T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal, classId));
+                T* ptr = static_cast<T*>(JS_GetOpaque(thisVal, classId));
                 return Value::from(ctx_, ptr->*member).loot().second;
             };
             SetRaw set = [](JSContext* ctx_, JSValueConst thisVal, JSValueConst val) -> JSValue {
-                T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal, classId));
+                T* ptr = static_cast<T*>(JS_GetOpaque(thisVal, classId));
                 ptr->*member = ValueWeak(ctx_, val).to<U>();
                 return JS_UNDEFINED;
             };
 
-            JSValue getter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(reinterpret_cast<void*>(get)), std::string("get " + name).c_str(), 0, JS_CFUNC_getter, 0);
-            JSValue setter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(reinterpret_cast<void*>(set)), std::string("set " + name).c_str(), 1, JS_CFUNC_setter, 0);
+            JSValue getter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(reinterpret_cast<void*>(get)), ("get " + name).c_str(), 0, JS_CFUNC_getter, 0); // NOLINT
+            JSValue setter = JS_NewCFunction2(ctx, reinterpret_cast<JSCFunction*>(reinterpret_cast<void*>(set)), ("set " + name).c_str(), 1, JS_CFUNC_setter, 0); // NOLINT
 
             Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
             JS_DefinePropertyGetSet(ctx, proto.getVal(), atom.get(), getter, setter, static_cast<int>(flags));
@@ -199,7 +197,7 @@ namespace ProtoBuilder {
 
             [&]<typename Res, typename... Args>(SgnUnwrap<Res(Args...)>) {
                 MethodRaw func = [](JSContext* ctx_, JSValueConst thisVal, int argc, JSValueConst* argv) -> JSValue {
-                    T* ptr = reinterpret_cast<T*>(JS_GetOpaque(thisVal, classId));
+                    T* ptr = static_cast<T*>(JS_GetOpaque(thisVal, classId));
 
                     auto f = [ptr](Args... args) -> Res {
                         return (ptr->*member)(args...);
@@ -210,7 +208,7 @@ namespace ProtoBuilder {
                     });
                 };
 
-                JSValue funcVal = JS_NewCFunction(ctx, reinterpret_cast<JSCFunction*>(func), name.c_str(), 0);
+                JSValue funcVal = JS_NewCFunction(ctx, static_cast<JSCFunction*>(func), name.c_str(), 0);
 
                 Atom atom = Atom(ctx, JS_NewAtom(ctx, name.c_str()));
                 JS_DefinePropertyValue(ctx, proto.getVal(), atom.get(), funcVal, static_cast<int>(flags));
@@ -247,7 +245,7 @@ namespace ProtoBuilder {
          * @param args arguments passed to the function
          * @return result of the call
          */
-        static Value callFunction(ContextRef ctx, ValueWeak funcObj, ValueWeak thisVal, std::vector<ValueWeak> args) {
+        static Value callFunction(ContextRef /*ctx*/, ValueWeak /*funcObj*/, ValueWeak /*thisVal*/, std::vector<ValueWeak> /*args*/) {
             throw Exception::create(Exception::Type::TypeError, "Class cannot be called as a function");
         }
 
@@ -260,7 +258,7 @@ namespace ProtoBuilder {
          * @param args arguments passed to the function
          * @return Result of the call
          */
-        static Value callConstructor(ContextRef ctx, ValueWeak funcObj, ValueWeak target, std::vector<ValueWeak> args) {
+        static Value callConstructor(ContextRef /*ctx*/, ValueWeak /*funcObj*/, ValueWeak /*target*/, std::vector<ValueWeak> /*args*/) {
             throw Exception::create(Exception::Type::TypeError, "Class cannot be called as a constructor");
         }
     };
@@ -281,7 +279,7 @@ namespace ProtoBuilder {
          */
         static void addProperties(ContextRef ctx, Object proto) {}
     };
-}
+} // namespace ProtoBuilder
 
 
 template<class Builder>
@@ -312,7 +310,7 @@ class Class {
             if constexpr (isPbOpaque || isPbConstructor) {
                 std::vector<ValueWeak> args;
                 for (int i = 0; i < argc; i++) {
-                    args.push_back(ValueWeak(ctx, argv[i]));
+                    args.emplace_back(ctx, argv[i]);
                 }
 
                 if constexpr (isPbOpaque) {
@@ -357,7 +355,7 @@ public:
             Builder::classId = classId;
             finalizer = [](JSRuntime* rt, JSValue val) noexcept {
                 static_assert(noexcept(Builder::destroyOpaque(rt, static_cast<typename Builder::OpaqueType*>(nullptr))));
-                Builder::destroyOpaque(rt, reinterpret_cast<typename Builder::OpaqueType*>(JS_GetOpaque(val, classId)));
+                Builder::destroyOpaque(rt, static_cast<typename Builder::OpaqueType*>(JS_GetOpaque(val, classId)));
             };
         }
 
@@ -366,7 +364,7 @@ public:
                 std::vector<ValueWeak> args;
                 args.reserve(argc);
                 for (int i = 0; i < argc; i++) {
-                    args.push_back(ValueWeak(ctx, argv[i]));
+                    args.emplace_back(ctx, argv[i]);
                 }
 
                 return propagateExceptions(ctx, [&]() -> JSValue {

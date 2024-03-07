@@ -6,7 +6,6 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -16,10 +15,10 @@
 namespace jac {
 
 
-template<class Base, template<typename> class... MFeatures>
+template<class Base, template<class> class... MFeatures>
 struct ComposeMachine;
 
-template<class Base, template<class, typename...> class FirstFeature, template<typename> class... MFeatures>
+template<class Base, template<class> class FirstFeature, template<class> class... MFeatures>
 struct ComposeMachine<Base, FirstFeature, MFeatures...> : public ComposeMachine<FirstFeature<Base>, MFeatures...> {};
 
 template<class Base>
@@ -62,11 +61,11 @@ class Module {
     std::vector<std::tuple<std::string, Value>> exports;
 
     inline MachineBase& base() {
-        return *reinterpret_cast<MachineBase*>(JS_GetContextOpaque(_ctx));
+        return *static_cast<MachineBase*>(JS_GetContextOpaque(_ctx));
     }
 
     static inline MachineBase& base(ContextRef ctx) {
-        return *reinterpret_cast<MachineBase*>(JS_GetContextOpaque(ctx));
+        return *static_cast<MachineBase*>(JS_GetContextOpaque(ctx));
     }
 public:
     /**

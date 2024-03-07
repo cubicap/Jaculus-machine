@@ -1,11 +1,11 @@
 #pragma once
 
+#include <jac/machine/functionFactory.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
-#include <jac/machine/functionFactory.h>
-#include <vector>
-#include <string>
+
 #include <memory>
+#include <string>
 
 #include "types/streams.h"
 

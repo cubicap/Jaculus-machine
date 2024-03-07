@@ -3,13 +3,13 @@
 
 #include <string>
 
+#include <jac/features/eventLoopFeature.h>
+#include <jac/features/eventQueueFeature.h>
+#include <jac/features/filesystemFeature.h>
+#include <jac/features/moduleLoaderFeature.h>
+#include <jac/features/timersFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
-#include <jac/features/moduleLoaderFeature.h>
-#include <jac/features/filesystemFeature.h>
-#include <jac/features/timersFeature.h>
-#include <jac/features/eventQueueFeature.h>
-#include <jac/features/eventLoopFeature.h>
 
 #include "util.h"
 
@@ -56,5 +56,5 @@ TEST_CASE("Timer leak", "[timers]") {
 
     machine.runEventLoop();
 
-    REQUIRE(machine.getReports() == std::vector<std::string> {});
+    REQUIRE(machine.getReports().empty());
 }

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <quickjs.h>
 #include <exception>
+#include <quickjs.h>
+
 #include "values.h"
 
 namespace jac {
@@ -36,7 +37,7 @@ inline JSValue propagateExceptions(ContextRef ctx, Func&& f) noexcept {
 }
 
 template<typename Func, typename Res, typename... Args>
-inline JSValue processCallRaw(ContextRef ctx, JSValueConst thisVal, int argc, JSValueConst* argv, Func& f) {
+inline JSValue processCallRaw(ContextRef ctx, JSValueConst, int argc, JSValueConst* argv, Func& f) {
     std::tuple<Args...> args = convertArgs<Args...>(ctx, argv, argc, std::make_index_sequence<sizeof...(Args)>());
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -49,7 +50,7 @@ inline JSValue processCallRaw(ContextRef ctx, JSValueConst thisVal, int argc, JS
 }
 
 template<typename Func, typename Res, typename... Args>
-inline Value processCall(ContextRef ctx, ValueWeak thisVal, std::vector<ValueWeak> argv, Func& f) {
+inline Value processCall(ContextRef ctx, ValueWeak, std::vector<ValueWeak> argv, Func& f) {
     std::tuple<Args...> args = convertArgs<Args...>(ctx, argv, std::make_index_sequence<sizeof...(Args)>());
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -62,10 +63,10 @@ inline Value processCall(ContextRef ctx, ValueWeak thisVal, std::vector<ValueWea
 }
 
 template<typename Func, typename Res>
-inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst thisVal, int argc, JSValueConst* argv, Func& f) {
+inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst, int argc, JSValueConst* argv, Func& f) {
     std::vector<ValueWeak> args;
     for (int i = 0; i < argc; i++) {
-        args.push_back(ValueWeak(ctx, argv[i]));
+        args.emplace_back(ctx, argv[i]);
     }
 
     if constexpr (std::is_same_v<Res, void>) {
@@ -78,7 +79,7 @@ inline JSValue processCallVariadicRaw(ContextRef ctx, JSValueConst thisVal, int 
 }
 
 template<typename Func, typename Res>
-inline Value processCallVariadic(ContextRef ctx, ValueWeak thisVal, std::vector<ValueWeak> argv, Func& f) {
+inline Value processCallVariadic(ContextRef ctx, ValueWeak, std::vector<ValueWeak> argv, Func& f) {
     if constexpr (std::is_same_v<Res, void>) {
         f(argv);
         return Value::undefined(ctx);
@@ -114,7 +115,7 @@ inline Value processCallThisVariadic(ContextRef ctx, ValueWeak thisVal, std::vec
 }
 
 template<typename... Args, std::size_t... Is>
-constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, std::vector<ValueWeak> argv, std::index_sequence<Is...>) {
+inline std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, std::vector<ValueWeak> argv, std::index_sequence<Is...>) {
     if (argv.size() != sizeof...(Args)) {
         throw Exception::create(Exception::Type::TypeError, "invalid number of arguments");
     }
@@ -123,7 +124,7 @@ constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, std::v
 }
 
 template<typename... Args, std::size_t... Is>
-constexpr std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, JSValueConst* argv, int argc, std::index_sequence<Is...>) {
+inline std::tuple<Args...> convertArgs([[maybe_unused]]ContextRef ctx, JSValueConst* argv, int argc, std::index_sequence<Is...>) {
     if (argc != sizeof...(Args)) {
         throw Exception::create(Exception::Type::TypeError, "invalid number of arguments");
     }

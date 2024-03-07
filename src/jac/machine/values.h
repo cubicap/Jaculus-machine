@@ -1,18 +1,15 @@
 #pragma once
 
 #include <quickjs.h>
-#include <cassert>
 #include <span>
-#include <stdexcept>
 #include <string>
-#include <string_view>
 #include <tuple>
 #include <vector>
 
-#include "internal/declarations.h"
-#include "context.h"
-#include "stringView.h"
 #include "atom.h"
+#include "context.h"
+#include "internal/declarations.h"
+#include "stringView.h"
 
 
 namespace jac {
@@ -63,11 +60,7 @@ public:
      * @param ctx context to work in
      * @param val JSValue to wrap
      */
-    ValueWrapper(ContextRef ctx, JSValue val) : _ctx(ctx), _val(val) {
-        if (JS_IsException(_val)) {
-            throw ctx.getException();
-        }
-    }
+    ValueWrapper(ContextRef ctx, JSValue val);
     ValueWrapper(const ValueWrapper &other):
         _ctx(other._ctx),
         _val(managed ? JS_DupValue(_ctx, other._val) : other._val)
@@ -429,7 +422,7 @@ public:
      * @return The resulting value
      */
     template<typename Res, typename... Args>
-    Res invoke(Atom prop, Args... args);
+    Res invoke(Atom key, Args... args);
 
     template<typename Res, typename... Args>
     Res invoke(const std::string& key, Args... args) {
@@ -726,8 +719,8 @@ protected:
     using ObjectWrapper<managed>::_val;
     using ObjectWrapper<managed>::_ctx;
 
-    static void freeArrayBuffer(JSRuntime *rt, void *opaque, void *ptr) {
-        delete[] reinterpret_cast<uint8_t*>(ptr);
+    static void freeArrayBuffer(JSRuntime*, void*, void *ptr) {
+        delete[] static_cast<uint8_t*>(ptr);
     }
 public:
     /**
@@ -751,7 +744,7 @@ public:
      * @return Pointer to the data
      */
     uint8_t* data() {
-        return reinterpret_cast<uint8_t*>(JS_GetArrayBuffer(_ctx, nullptr, _val));
+        return static_cast<uint8_t*>(JS_GetArrayBuffer(_ctx, nullptr, _val));
     }
 
     /**
@@ -777,7 +770,7 @@ public:
             throw Exception::create(Exception::Type::TypeError, "size is not a multiple of the element size");
         }
         size_t size;
-        T* ptr = reinterpret_cast<T*>(JS_GetArrayBuffer(_ctx, &size, _val));
+        T* ptr = static_cast<T*>(JS_GetArrayBuffer(_ctx, &size, _val));
         return std::span<T>(ptr, size / sizeof(T));
     }
 
@@ -803,6 +796,13 @@ public:
         return ArrayBuffer(ctx, JS_NewArrayBufferCopy(ctx, data.data(), data.size()));
     }
 };
+
+template<bool managed>
+ValueWrapper<managed>::ValueWrapper(ContextRef ctx, JSValue val) : _ctx(ctx), _val(val) {
+    if (JS_IsException(_val)) {
+        throw ctx.getException();
+    }
+}
 
 template<bool managed>
 template<typename Res, typename... Args>

@@ -1,16 +1,17 @@
-#include <jac/machine/machine.h>
-#include <jac/machine/values.h>
-#include <jac/machine/class.h>
+#include <iostream>
+#include <string>
+
 #include <jac/features/basicStreamFeature.h>
-#include <jac/features/stdioFeature.h>
 #include <jac/features/eventLoopFeature.h>
 #include <jac/features/eventQueueFeature.h>
-#include <jac/features/timersFeature.h>
-#include <jac/features/moduleLoaderFeature.h>
 #include <jac/features/filesystemFeature.h>
+#include <jac/features/moduleLoaderFeature.h>
+#include <jac/features/stdioFeature.h>
+#include <jac/features/timersFeature.h>
 #include <jac/features/util/ostreamjs.h>
-#include <string>
-#include <iostream>
+#include <jac/machine/class.h>
+#include <jac/machine/machine.h>
+#include <jac/machine/values.h>
 
 
 using Machine = jac::ComposeMachine<
