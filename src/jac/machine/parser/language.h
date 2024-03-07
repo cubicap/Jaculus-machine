@@ -60,4 +60,23 @@ const std::unordered_set<std::string_view> updateOperator = {
     "x--"
 };
 
+const std::unordered_set<std::string_view> assignmentOperator = {
+    "=",
+    "+=",
+    "-=",
+    "**=",
+    "*=",
+    "/=",
+    "%=",
+    "<<=",
+    ">>=",
+    ">>>=",
+    "&=",
+    "^=",
+    "|=",
+    "&&=",
+    "||=",
+    "\?\?="
+};
+
 } // namespace jac
