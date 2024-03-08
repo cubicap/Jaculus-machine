@@ -42,8 +42,8 @@ class Scanner {
     std::function<void(int, int, std::string)> _report;
 
     std::string_view::iterator _pos;
-    int _line;
-    int _column;
+    int _line = 1;
+    int _column = 1;
 
     void report(std::string message) {
         _report(_line, _column, message);
@@ -392,7 +392,7 @@ class Scanner {
 
 public:
     Scanner(std::string_view input, std::function<void(int, int, std::string)> report):
-        _input(input), _report(report), _pos(input.begin()), _line(1), _column(1) {}
+        _input(input), _report(report), _pos(input.begin()) {}
 
     std::vector<Token> scan() {
         std::vector<Token> _tokens;

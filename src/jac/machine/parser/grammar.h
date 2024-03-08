@@ -1,15 +1,15 @@
 #pragma once
 
-#include <memory>
-#include <optional>
-#include <string>
-#include <variant>
-#include <span>
 #include <cassert>
 #include <cmath>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <variant>
 
-#include "scanner.h"
 #include "language.h"
+#include "scanner.h"
 
 
 namespace jac {
@@ -250,7 +250,7 @@ struct NumericLiteral {
 
         bool legacyOctal = text[0] == '0';
         int base = 10;
-        if (text.size() >= 2 && true && text[0] == '0') {
+        if (text.size() >= 2 && text[0] == '0') {
             char baseChar = std::tolower(text[1]);
             if (baseChar == 'b') {
                 base = 2;
@@ -492,38 +492,6 @@ struct LeftHandSideExpression;
 template<bool Yield, bool Await>
 using LeftHandSideExpressionPtr = std::unique_ptr<LeftHandSideExpression<Yield, Await>>;
 
-template<bool In, bool Yield, bool Await>
-struct Assignment {
-    LeftHandSideExpression<Yield, Await> lhs;
-    AssignmentExpressionPtr<In, Yield, Await> rhs;
-    std::string_view op;
-
-    static std::optional<Assignment<In, Yield, Await>> parse(ParserState& state) {
-        auto start = state.getPosition();
-        auto lhs = LeftHandSideExpression<Yield, Await>::parse(state);
-        if (!lhs) {
-            return std::nullopt;
-        }
-
-        if (state.current().kind != Token::Punctuator || !assignmentOperator.contains(state.current().text)) {
-            state.restorePosition(start);
-            state.error("Expected assignment operator");
-            return std::nullopt;
-        }
-
-        std::string_view op = state.current().text;
-        state.advance();
-
-        auto rhs = AssignmentExpression<In, Yield, Await>::parse(state);
-        if (!rhs) {
-            state.restorePosition(start);
-            return std::nullopt;
-        }
-
-        return Assignment<In, Yield, Await>{std::move(*lhs), std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*rhs)), op};
-    }
-};
-
 template<bool Yield, bool Await>
 struct UnaryExpression;
 
@@ -539,36 +507,7 @@ struct UpdateExpression {
 
     std::string_view op;
 
-    static std::optional<UpdateExpression> parse(ParserState& state) {
-        // TODO: handle situations like multiple ++ or -- operators
-        // TODO: check that "AssignmentTargetType" is simple
-        if (state.current().kind == Token::Punctuator) {
-            std::string_view op = state.current().text;
-            if (op == "++" || op == "--") {
-                state.advance();
-                if (auto expr = UnaryExpression<Yield, Await>::parse(state); expr) {
-                    auto ptr = std::make_unique<UnaryExpression<Yield, Await>>(std::move(*expr));
-                    return UpdateExpression{std::move(ptr), (op == "++" ? "++x" : "--x")};
-                }
-                state.backtrack();
-            }
-        }
-
-
-        if (auto expr = LeftHandSideExpression<Yield, Await>::parse(state); expr) {
-            auto ptr = std::make_unique<LeftHandSideExpression<Yield, Await>>(std::move(*expr));
-            if (state.current().kind == Token::Punctuator) {
-                std::string_view op = state.current().text;
-                if (op == "++" || op == "--") {
-                    state.advance();
-                    return UpdateExpression{std::move(ptr), (op == "++" ? "x++" : "x--")};
-                }
-            }
-            return UpdateExpression{std::move(ptr), ""};
-        }
-
-        return std::nullopt;
-    }
+    static std::optional<UpdateExpression> parse(ParserState& state);
 };
 
 template<bool Yield, bool Await>
@@ -742,6 +681,9 @@ struct BindingPattern {
         // TODO
         return std::nullopt;
     }
+
+    BindingPattern(BindingPattern&&);
+    ~BindingPattern();
 };
 
 template<bool Yield, bool Await>
@@ -832,7 +774,7 @@ struct FormalParameters {
 
         if (canContinue) {
             if (auto rest = BindingRestElement<Yield, Await>::parse(state); rest) {
-                params.restParameter = std::move(*rest);
+                params.restParameter.emplace(BindingRestElement<Yield, Await>{std::move(*rest)});
             }
         }
 
@@ -863,7 +805,6 @@ struct StatementList {
     ~StatementList();
     StatementList();
     StatementList(StatementList&&);
-    StatementList(const StatementList&) = delete;
 };
 
 template<bool Yield, bool Await>
@@ -1516,7 +1457,7 @@ struct AsyncGeneratorExpression {
 struct RegularExpressionLiteral {
     // XXX: ignore for now
 
-    static std::optional<RegularExpressionLiteral> parse(ParserState& state) {
+    static std::optional<RegularExpressionLiteral> parse(ParserState&) {
         return std::nullopt;
     }
 };
@@ -1525,7 +1466,7 @@ template<bool Yield, bool Await, bool Tagged>
 struct TemplateLiteral {
     // XXX: ignore for now
 
-    static std::optional<TemplateLiteral<Yield, Await, Tagged>> parse(ParserState& state) {
+    static std::optional<TemplateLiteral<Yield, Await, Tagged>> parse(ParserState&) {
         return std::nullopt;
     }
 };
@@ -1569,11 +1510,11 @@ struct CoverParenthesizedExpressionAndArrowParameterList {
                 state.advance();
                 if (auto binding = BindingIdentifier<Yield, Await>::parse(state); binding) {
                     canContinue = false;
-                    result.parameters = std::move(*binding);
+                    result.parameters.template emplace<BindingIdentifier<Yield, Await>>(std::move(*binding));
                 }
                 else if (auto pattern = BindingPattern<Yield, Await>::parse(state); pattern) {
                     canContinue = false;
-                    result.parameters = std::move(*pattern);
+                    result.parameters.template emplace<BindingPattern<Yield, Await>>(std::move(*pattern));
                 }
                 else {
                     state.error("Invalid binding");
@@ -1714,13 +1655,13 @@ struct MemberExpression {
         }
         std::optional<MemberExpression<Yield, Await>> member;
         if (auto primary = PrimaryExpression<Yield, Await>::parse(state); primary) {
-            member.emplace(std::move(*primary));
+            member.emplace(MemberExpression{ std::move(*primary) });
         }
         else if (auto super = SuperProperty<Yield, Await>::parse(state); super) {
-            member.emplace(std::move(*super));
+            member.emplace(MemberExpression{ std::move(*super) });
         }
         else if (auto meta = MetaProperty::parse(state); meta) {
-            member.emplace(std::move(*meta));
+            member.emplace(MemberExpression{ std::move(*meta) });
         }
         else {
             return std::nullopt;
@@ -1844,9 +1785,9 @@ struct OptionalExpression {
 template<bool Yield, bool Await>
 struct LeftHandSideExpression {
     std::variant<
-        NewExpression<Yield, Await>,
-        CallExpression<Yield, Await>,
-        OptionalExpression<Yield, Await>
+        NewExpression<Yield, Await>
+        // CallExpression<Yield, Await>,
+        // OptionalExpression<Yield, Await>
     > value;
 
     static std::optional<LeftHandSideExpression> parse(ParserState& state) {
@@ -1920,6 +1861,38 @@ struct AsyncArrowFunction {
 };
 
 template<bool In, bool Yield, bool Await>
+struct Assignment {
+    LeftHandSideExpression<Yield, Await> lhs;
+    AssignmentExpressionPtr<In, Yield, Await> rhs;
+    std::string_view op;
+
+    static std::optional<Assignment<In, Yield, Await>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        auto lhs = LeftHandSideExpression<Yield, Await>::parse(state);
+        if (!lhs) {
+            return std::nullopt;
+        }
+
+        if (state.current().kind != Token::Punctuator || !assignmentOperator.contains(state.current().text)) {
+            state.restorePosition(start);
+            state.error("Expected assignment operator");
+            return std::nullopt;
+        }
+
+        std::string_view op = state.current().text;
+        state.advance();
+
+        auto rhs = AssignmentExpression<In, Yield, Await>::parse(state);
+        if (!rhs) {
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        return Assignment<In, Yield, Await>{std::move(*lhs), std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*rhs)), op};
+    }
+};
+
+template<bool In, bool Yield, bool Await>
 struct AssignmentExpression {
     std::variant<
         ConditionalExpression<In, Yield, Await>,
@@ -1930,7 +1903,7 @@ struct AssignmentExpression {
     > value;
 
     static std::optional<AssignmentExpression<In, Yield, Await>> parse(ParserState& state) {
-        if (auto yield = YieldExpression<In, Yield, Await>::parse(state); yield) {
+        if (auto yield = YieldExpression<In, Yield, Await>::parse(state)) {
             return AssignmentExpression<In, Yield, Await>{std::move(*yield)};
         }
         if (auto arrow = ArrowFunction<In, Yield, Await>::parse(state); arrow) {
@@ -2007,6 +1980,39 @@ std::optional<StatementList<Yield, Await, Return>> StatementList<Yield, Await, R
     return std::move(list);
 }
 
+
+template<bool Yield, bool Await>
+std::optional<UpdateExpression<Yield, Await>> UpdateExpression<Yield, Await>::parse(ParserState& state) {
+    // TODO: handle situations like multiple ++ or -- operators
+    // TODO: check that "AssignmentTargetType" is simple
+    if (state.current().kind == Token::Punctuator) {
+        std::string_view op = state.current().text;
+        if (op == "++" || op == "--") {
+            state.advance();
+            if (auto expr = UnaryExpression<Yield, Await>::parse(state); expr) {
+                auto ptr = std::make_unique<UnaryExpression<Yield, Await>>(std::move(*expr));
+                return UpdateExpression{std::move(ptr), (op == "++" ? "++x" : "--x")};
+            }
+            state.backtrack();
+        }
+    }
+
+
+    if (auto expr = LeftHandSideExpression<Yield, Await>::parse(state); expr) {
+        auto ptr = std::make_unique<LeftHandSideExpression<Yield, Await>>(std::move(*expr));
+        if (state.current().kind == Token::Punctuator) {
+            std::string_view op = state.current().text;
+            if (op == "++" || op == "--") {
+                state.advance();
+                return UpdateExpression{std::move(ptr), (op == "++" ? "x++" : "x--")};
+            }
+        }
+        return UpdateExpression{std::move(ptr), ""};
+    }
+
+    return std::nullopt;
+}
+
 template<bool Yield, bool Await, bool Return>
 StatementList<Yield, Await, Return>::~StatementList() = default;
 
@@ -2014,7 +2020,13 @@ template<bool Yield, bool Await, bool Return>
 StatementList<Yield, Await, Return>::StatementList() = default;
 
 template<bool Yield, bool Await, bool Return>
-StatementList<Yield, Await, Return>::StatementList(StatementList&& other) = default;
+StatementList<Yield, Await, Return>::StatementList(StatementList&&) = default;
+
+template<bool Yield, bool Await>
+BindingPattern<Yield, Await>::~BindingPattern() = default;
+
+template<bool Yield, bool Await>
+BindingPattern<Yield, Await>::BindingPattern(BindingPattern&&) = default;
 
 
 }  // namespace jac

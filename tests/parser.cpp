@@ -1123,7 +1123,7 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
         REQUIRE((result->name->identifier.name.name == "f"));
-        REQUIRE(result->parameters.parameterList.size() == 0);
+        REQUIRE(result->parameters.parameterList.empty());
         REQUIRE_FALSE(result->parameters.restParameter);
         REQUIRE(!result->body);
     }

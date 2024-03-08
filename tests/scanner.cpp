@@ -27,9 +27,9 @@ using TokenVector = std::vector<jac::Token>;
 
 TEST_CASE("Punctuator", "[scanner]") {
     SECTION("Empty") {
-        std::string input("");
+        std::string input(""); // NOLINT
         jac::Scanner scanner(input, report);
-        REQUIRE(scanner.scan() == TokenVector());
+        REQUIRE(scanner.scan().empty());
     }
 
     SECTION("{[(<>)]}") {
