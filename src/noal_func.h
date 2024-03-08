@@ -1,6 +1,9 @@
 #pragma once
 
-#include <stddef.h>
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
 
 namespace noal {
@@ -14,13 +17,13 @@ public:
         return _func(std::forward<Args>(args)...);
     }
     static Res call(void* self, Args... args) {
-        return (reinterpret_cast<funcptr*>(self))->operator()(std::forward<Args>(args)...);
+        return (static_cast<funcptr*>(self))->operator()(std::forward<Args>(args)...);
     }
 };
 
 template<typename Res, typename... Args>
 Res invoker(void* func, Args... args) {
-    return (*reinterpret_cast<Res(**)(Args...)>(func))(std::forward<Args>(args)...);
+    return (*static_cast<Res(**)(Args...)>(func))(std::forward<Args>(args)...);
 }
 
 template<class Class, typename Res, typename... Args>
@@ -33,7 +36,7 @@ public:
         return (_self->*_func)(std::forward<Args>(args)...);
     }
     static Res call(void* self, Args... args) {
-        return reinterpret_cast<memberfuncptr*>(self)->operator()(std::forward<Args>(args)...);
+        return static_cast<memberfuncptr*>(self)->operator()(std::forward<Args>(args)...);
     }
 };
 
@@ -47,7 +50,7 @@ public:
         return _func(std::forward<Args>(args)...);
     }
     static Res call(void* self, Args... args) {
-        return reinterpret_cast<memberconstfuncptr*>(self)->operator()(std::forward<Args>(args)...);
+        return static_cast<memberconstfuncptr*>(self)->operator()(std::forward<Args>(args)...);
     }
 };
 
@@ -89,7 +92,7 @@ public:
         return func(std::forward<Args>(args)...);
     }
     static Res call(void* self, Args... args) {
-        return reinterpret_cast<callableany<Func, Res(Args...)>*>(self)->operator()(std::forward<Args>(args)...);
+        return static_cast<callableany<Func, Res(Args...)>*>(self)->operator()(std::forward<Args>(args)...);
     }
 };
 template<typename Func, typename Sign = typename signatureHelper<decltype(&Func::operator())>::type>
@@ -113,8 +116,8 @@ public:
         static_assert(otherSize <= dataSize, "Other function object is too large");
         // static_assert(sizeof(other) <= sizeof(*this), "Other function object is too large");
 
-        std::copy(reinterpret_cast<uint8_t*>(&other), reinterpret_cast<uint8_t*>(&other) + sizeof(other), reinterpret_cast<uint8_t*>(this));
-        std::fill(reinterpret_cast<uint8_t*>(this) + sizeof(other), reinterpret_cast<uint8_t*>(this) + sizeof(*this), 0);  // possibly unnecessary - prevent data leaks?
+        std::copy(static_cast<uint8_t*>(&other), static_cast<uint8_t*>(&other) + sizeof(other), static_cast<uint8_t*>(this));
+        std::fill(static_cast<uint8_t*>(this) + sizeof(other), static_cast<uint8_t*>(this) + sizeof(*this), 0);  // possibly unnecessary - prevent data leaks?
         return *this;
     }
     template<size_t otherSize>
@@ -137,10 +140,10 @@ public:
     explicit function(Res (*func)(Args...)) {
         // new (data) funcptr<Res, Args...>(func);
         // call = funcptr<Res, Args...>::call;
-        std::copy(reinterpret_cast<uint8_t*>(&func), reinterpret_cast<uint8_t*>(&func) + sizeof(func), data);
+        std::copy(static_cast<uint8_t*>(&func), static_cast<uint8_t*>(&func) + sizeof(func), data);
         call = invoker<Res, Args...>;
     }
-    function& operator=(Res (*func)(Args...)) { return *(new (this) function(func)); }
+    function& operator=(Res (*func)(Args...)) { new (this) function(func); return *this; }
 
     template<class Class>
     function(Res (Class::*func)(Args...), Class* self) {
@@ -159,7 +162,7 @@ public:
         call = callableany<Func, Sign>::call;
     }
     template<typename Func, typename Sign = typename signatureHelper<decltype(&Func::operator())>::type>
-    function& operator=(Func func) { return *(new (this) function(func)); }
+    function& operator=(Func func) { new (this) function(func); return *this; }
 };
 
 // template<typename Res, typename... Args>
@@ -176,4 +179,4 @@ function(Res (Class::*)(Args...) const, Class*) -> function<Res(Args...), sizeof
 template<typename Func, typename Sign = typename signatureHelper<decltype(&Func::operator())>::type>
 function(Func) -> function<Sign, sizeof(callableany<Func, Sign>)>;
 
-} // namespace function
+} // namespace noal

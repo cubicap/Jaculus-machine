@@ -42,7 +42,7 @@ public:
     operator JSContext*() { return _ctx; }
     operator JSContext*() const { return _ctx; }
     operator bool() { return _ctx != nullptr; }
-    ContextRef operator=(JSContext* ctx) { _ctx = ctx; return *this; }
+    ContextRef& operator=(JSContext* ctx) { _ctx = ctx; return *this; }
 };
 
 

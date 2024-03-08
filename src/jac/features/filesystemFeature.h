@@ -1,12 +1,10 @@
 #pragma once
 
-#include <jac/machine/machine.h>
 #include <jac/machine/class.h>
 #include <jac/machine/functionFactory.h>
-#include <noal_func.h>
+#include <jac/machine/machine.h>
 
 #include <filesystem>
-#include <fstream>
 #include <noal_func.h>
 
 #include "types/file.h"
@@ -49,25 +47,25 @@ public:
     public:
         Path(FilesystemFeature& feature): _feature(feature) {}
 
-        std::string normalize(std::string path) {
-            return std::filesystem::path(path).lexically_normal().string();
+        std::string normalize(std::string path_) {
+            return std::filesystem::path(path_).lexically_normal().string();
         }
 
-        std::string dirname(std::string path) {
-            auto res = std::filesystem::path(path).parent_path().string();
+        std::string dirname(std::string path_) {
+            auto res = std::filesystem::path(path_).parent_path().string();
             return res.empty() ? "." : res;
         }
 
-        std::string basename(std::string path) {
-            return std::filesystem::path(path).filename().string();
+        std::string basename(std::string path_) {
+            return std::filesystem::path(path_).filename().string();
         }
 
         std::string join(std::vector<std::string> paths) {
-            std::filesystem::path path;
+            std::filesystem::path path_;
             for (auto& p : paths) {
-                path /= p;
+                path_ /= p;
             }
-            return path.string();
+            return path_.string();
         }
     };
 
@@ -81,7 +79,7 @@ private:
             std::string buffer;
             File file(_feature._codeDir / filename, "r");
             std::string read = file.read();
-            while (read.size() > 0) {
+            while (!read.empty()) {
                 buffer += read;
                 read = file.read();
             }

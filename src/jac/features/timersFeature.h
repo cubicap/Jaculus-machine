@@ -1,12 +1,13 @@
 #pragma once
 
-#include <jac/machine/machine.h>
 #include <jac/machine/functionFactory.h>
+#include <jac/machine/machine.h>
+
 #include <atomic>
 #include <chrono>
-#include <queue>
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
+#include <queue>
 #include <thread>
 #include <unordered_map>
 
@@ -16,7 +17,7 @@ namespace jac {
 
 template<>
 struct ConvTraits<std::chrono::milliseconds> {
-    static std::chrono::milliseconds from(ContextRef ctx, ValueWeak value) {
+    static std::chrono::milliseconds from(ContextRef, ValueWeak value) {
         return std::chrono::milliseconds(value.to<int>());
     }
 
@@ -209,8 +210,8 @@ public:
 
         global.defineProperty("sleep", ff.newFunction([this](int millis) {
             auto [promise, resolve, _] = Promise::create(this->context());
-            setTimeout([resolve]() mutable {
-                static_cast<Function&>(resolve).call<void>();
+            setTimeout([resolve_ = resolve]() mutable {
+                static_cast<Function&>(resolve_).call<void>();
             }, std::chrono::milliseconds(millis));
             return promise;
         }));

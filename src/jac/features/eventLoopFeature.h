@@ -1,13 +1,10 @@
 #pragma once
 
-#include <jac/machine/machine.h>
 #include <jac/machine/functionFactory.h>
-#include <noal_func.h>
+#include <jac/machine/machine.h>
+
 #include <atomic>
-#include <condition_variable>
-#include <deque>
-#include <mutex>
-#include <optional>
+#include <noal_func.h>
 
 #include "eventLoopTerminal.h"
 

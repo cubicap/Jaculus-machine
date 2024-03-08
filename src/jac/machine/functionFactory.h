@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "class.h"
 #include "funcUtil.h"
 #include "values.h"

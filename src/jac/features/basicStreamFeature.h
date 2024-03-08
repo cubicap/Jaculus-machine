@@ -1,10 +1,10 @@
 #pragma once
 
-#include <jac/machine/machine.h>
-#include <jac/machine/values.h>
 #include <jac/machine/class.h>
 #include <jac/machine/functionFactory.h>
-#include <vector>
+#include <jac/machine/machine.h>
+#include <jac/machine/values.h>
+
 #include <string>
 
 #include "types/streams.h"
@@ -27,8 +27,8 @@ struct ReadableProtoBuilder : public ProtoBuilder::Opaque<Readable>, public Prot
             Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
             auto [promise, resolve, reject] = Promise::create(ctx_);
 
-            bool res = self_.get([resolve, ctx_](char data) mutable {
-                resolve.call<void>(std::string{static_cast<char>(data)});
+            bool res = self_.get([resolve_ = resolve](char data) mutable {
+                resolve_.call<void>(std::string{static_cast<char>(data)});
             });
 
             if (!res) {
@@ -42,8 +42,8 @@ struct ReadableProtoBuilder : public ProtoBuilder::Opaque<Readable>, public Prot
             Readable& self_ = *ReadableProtoBuilder::getOpaque(ctx_, self);
             auto [promise, resolve, reject] = Promise::create(ctx_);
 
-            bool res = self_.read([resolve, ctx_](std::string data) mutable {
-                resolve.call<void>(data);
+            bool res = self_.read([resolve_ = resolve](std::string data) mutable {
+                resolve_.call<void>(data);
             });
 
             if (!res) {

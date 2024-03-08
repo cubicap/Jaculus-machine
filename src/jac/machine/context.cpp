@@ -6,7 +6,7 @@ namespace jac {
 
 Exception ContextRef::getException() {
     try {
-        return Exception(_ctx, JS_GetException(_ctx));
+        return { _ctx, JS_GetException(_ctx) };
     }
     catch (std::exception& e) {
         throw Exception::create(Exception::Type::InternalError, "No exception");
@@ -14,7 +14,7 @@ Exception ContextRef::getException() {
 }
 
 Object ContextRef::getGlobalObject() {
-    return Object(_ctx, JS_GetGlobalObject(_ctx));
+    return { _ctx, JS_GetGlobalObject(_ctx) };
 }
 
 

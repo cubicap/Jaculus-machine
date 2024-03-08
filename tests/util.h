@@ -1,9 +1,13 @@
 #pragma once
 
-#include <jac/machine/values.h>
-#include <jac/machine/machine.h>
+#include <catch2/catch_test_macros.hpp>
+
 #include <jac/machine/functionFactory.h>
+#include <jac/machine/machine.h>
+#include <jac/machine/values.h>
+
 #include <noal_func.h>
+
 #include <cmath>
 
 

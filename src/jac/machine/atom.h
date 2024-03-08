@@ -2,8 +2,13 @@
 
 #include <quickjs.h>
 
+#include <ostream>
+#include <string>
+
 #include "internal/declarations.h"
+
 #include "context.h"
+#include "stringView.h"
 
 
 namespace jac {
@@ -75,7 +80,7 @@ public:
      * @return StringView
      */
     StringView toString() const {
-        return StringView(_ctx, JS_AtomToCString(_ctx, _atom));
+        return { _ctx, JS_AtomToCString(_ctx, _atom) };
     }
 
     /**
@@ -109,7 +114,7 @@ public:
      * @return The newly constructed atom
      */
     static Atom create(ContextRef ctx, uint32_t value) {
-        return Atom(ctx, JS_NewAtomUInt32(ctx, value));
+        return { ctx, JS_NewAtomUInt32(ctx, value) };
     }
 
     /**
@@ -120,7 +125,7 @@ public:
      * @return The newly constructed atom
      */
     static Atom create(ContextRef ctx, const char* value) {
-        return Atom(ctx, JS_NewAtom(ctx, value));
+        return { ctx, JS_NewAtom(ctx, value) };
     }
 
     /**
@@ -135,7 +140,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, Atom& val) {
-        os << val.toString();
+        os << val.toString().c_str();
         return os;
     }
 };

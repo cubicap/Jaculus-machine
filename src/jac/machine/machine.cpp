@@ -1,5 +1,4 @@
 #include "machine.h"
-#include "functionFactory.h"
 
 
 namespace jac {
@@ -31,8 +30,8 @@ void MachineBase::initialize() {
     _context = JS_NewContext(_runtime);
 
     JS_SetContextOpaque(_context, this);
-    JS_SetInterruptHandler(_runtime, [](JSRuntime* rt, void* opaque) noexcept {
-        MachineBase& base = *reinterpret_cast<MachineBase*>(opaque);
+    JS_SetInterruptHandler(_runtime, [](JSRuntime*, void* opaque) noexcept {
+        MachineBase& base = *static_cast<MachineBase*>(opaque);
         if (base._interrupt) {
             base._interrupt = false;
             return 1;

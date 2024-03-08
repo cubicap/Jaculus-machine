@@ -1,13 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
-#include <string>
 #include <filesystem>
 #include <set>
+#include <string>
 
+#include <jac/features/filesystemFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
-#include <jac/features/filesystemFeature.h>
 
 #include "util.h"
 
@@ -15,7 +15,7 @@
 std::string readFile(auto f) {
     std::string buffer;
     std::string read = f.read();
-    while (read.size() > 0) {
+    while (!read.empty()) {
         buffer += read;
         read = f.read();
     }

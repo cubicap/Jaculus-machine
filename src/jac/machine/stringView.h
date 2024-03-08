@@ -1,6 +1,8 @@
 #pragma once
 
 #include <quickjs.h>
+#include <string>
+#include <string_view>
 
 #include "context.h"
 
@@ -14,11 +16,7 @@ namespace jac {
 class StringView : public std::basic_string_view<char> {
     using basic_string_view = std::basic_string_view<char>;
 
-    ContextRef _ctx;
-
-    StringView(const basic_string_view &other) = delete;
-    StringView(const StringView &other) = delete;
-    StringView &operator=(const StringView &other) = delete;
+    ContextRef _ctx = nullptr;
 public:
     StringView(StringView &&other) : basic_string_view(other), _ctx(other._ctx) {
         other._ctx = nullptr;
@@ -33,6 +31,10 @@ public:
         other._ctx = nullptr;
         return *this;
     }
+
+    StringView(const basic_string_view &other) = delete;
+    StringView(const StringView &other) = delete;
+    StringView &operator=(const StringView &other) = delete;
 
     /**
      * @brief Get the C string
