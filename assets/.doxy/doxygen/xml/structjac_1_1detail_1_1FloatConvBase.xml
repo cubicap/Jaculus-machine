@@ -1,0 +1,64 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
+  <compounddef id="structjac_1_1detail_1_1FloatConvBase" kind="struct" language="C++" prot="public">
+    <compoundname>jac::detail::FloatConvBase</compoundname>
+    <templateparamlist>
+      <param>
+        <type>typename T</type>
+      </param>
+    </templateparamlist>
+      <sectiondef kind="public-static-func">
+      <memberdef kind="function" id="structjac_1_1detail_1_1FloatConvBase_1a1e2b3bea3a62236dff5181846d8fb9a9" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>T</type>
+        <definition>static T jac::detail::FloatConvBase&lt; T &gt;::from</definition>
+        <argsstring>(ContextRef ctx, ValueWeak val)</argsstring>
+        <name>from</name>
+        <param>
+          <type><ref refid="classjac_1_1ContextRef" kindref="compound">ContextRef</ref></type>
+          <declname>ctx</declname>
+        </param>
+        <param>
+          <type><ref refid="classjac_1_1ValueWrapper" kindref="compound">ValueWeak</ref></type>
+          <declname>val</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/jac/machine/traits.h" line="54" column="18" bodyfile="src/jac/machine/traits.h" bodystart="54" bodyend="61"/>
+      </memberdef>
+      <memberdef kind="function" id="structjac_1_1detail_1_1FloatConvBase_1af1416e6aec13832673fb23ca8e7c8311" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type><ref refid="classjac_1_1ValueWrapper" kindref="compound">Value</ref></type>
+        <definition>static Value jac::detail::FloatConvBase&lt; T &gt;::to</definition>
+        <argsstring>(ContextRef ctx, T val)</argsstring>
+        <name>to</name>
+        <param>
+          <type><ref refid="classjac_1_1ContextRef" kindref="compound">ContextRef</ref></type>
+          <declname>ctx</declname>
+        </param>
+        <param>
+          <type>T</type>
+          <declname>val</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/jac/machine/traits.h" line="63" column="22" bodyfile="src/jac/machine/traits.h" bodystart="63" bodyend="65"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <location file="src/jac/machine/traits.h" line="53" column="5" bodyfile="src/jac/machine/traits.h" bodystart="53" bodyend="66"/>
+    <listofallmembers>
+      <member refid="structjac_1_1detail_1_1FloatConvBase_1a1e2b3bea3a62236dff5181846d8fb9a9" prot="public" virt="non-virtual"><scope>jac::detail::FloatConvBase</scope><name>from</name></member>
+      <member refid="structjac_1_1detail_1_1FloatConvBase_1af1416e6aec13832673fb23ca8e7c8311" prot="public" virt="non-virtual"><scope>jac::detail::FloatConvBase</scope><name>to</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>
