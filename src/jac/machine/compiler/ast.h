@@ -103,7 +103,7 @@ struct Identifier {
 
     static std::optional<Identifier> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (auto id = IdentifierName::parse(state); id) {
+        if (auto id = IdentifierName::parse(state)) {
             if (keywords.contains(id->name)) {
                 state.restorePosition(start);
                 state.error("Reserved word used as identifier");
@@ -122,7 +122,7 @@ struct IdentifierReference {
 
     static std::optional<IdentifierReference<Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (auto id = Identifier::parse(state); id) {
+        if (auto id = Identifier::parse(state)) {
             if (Yield && id->name.name == "yield") {
                 state.restorePosition(start);
                 state.error("Unexpected yield");
@@ -145,7 +145,7 @@ struct BindingIdentifier {
     Identifier identifier;
 
     static std::optional<BindingIdentifier<Yield, Await>> parse(ParserState& state) {
-        if (auto id = Identifier::parse(state); id) {
+        if (auto id = Identifier::parse(state)) {
             return BindingIdentifier<Yield, Await>{*id};
         }
 
@@ -159,7 +159,7 @@ struct LabelIdentifier {
 
     static std::optional<LabelIdentifier<Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (auto id = Identifier::parse(state); id) {
+        if (auto id = Identifier::parse(state)) {
             if (Yield && id->name.name == "yield") {
                 state.restorePosition(start);
                 state.error("Unexpected yield");
@@ -182,7 +182,7 @@ struct PrivateIdentifier {
 
     static std::optional<PrivateIdentifier> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (auto id = IdentifierName::parse(state); id) {
+        if (auto id = IdentifierName::parse(state)) {
             if (id->name.size() < 2 || id->name[0] != '#') {
                 state.restorePosition(start);
                 state.error("Private identifier must start with #");
@@ -461,16 +461,16 @@ struct Literal {
     std::variant<NullLiteral, BooleanLiteral, NumericLiteral, StringLiteral> value;
 
     static std::optional<Literal> parse(ParserState& state) {
-        if (auto null = NullLiteral::parse(state); null) {
+        if (auto null = NullLiteral::parse(state)) {
             return Literal{*null};
         }
-        if (auto boolean = BooleanLiteral::parse(state); boolean) {
+        if (auto boolean = BooleanLiteral::parse(state)) {
             return Literal{*boolean};
         }
-        if (auto numeric = NumericLiteral::parse(state); numeric) {
+        if (auto numeric = NumericLiteral::parse(state)) {
             return Literal{*numeric};
         }
-        if (auto string = StringLiteral::parse(state); string) {
+        if (auto string = StringLiteral::parse(state)) {
             return Literal{*string};
         }
 
@@ -524,7 +524,7 @@ struct UnaryExpression {
             std::string_view op = state.current().text;
             if (unaryOperator.contains(op) && (Await || op != "await")) {
                 state.advance();
-                if (auto expr = UnaryExpression::parse(state); expr) {
+                if (auto expr = UnaryExpression::parse(state)) {
                     auto ptr = std::make_unique<UnaryExpression<Yield, Await>>(std::move(*expr));
                     return UnaryExpression<Yield, Await>{std::move(ptr), op};
                 }
@@ -532,7 +532,7 @@ struct UnaryExpression {
             }
         }
 
-        if (auto update = UpdateExpression<Yield, Await>::parse(state); update) {
+        if (auto update = UpdateExpression<Yield, Await>::parse(state)) {
             return UnaryExpression{std::move(*update), ""};
         }
 
@@ -552,20 +552,20 @@ struct BinaryExpression {
     static std::optional<BinaryExpression> parse(ParserState& state, int minPrecedence = 0) {
         // TODO: handle ??, ** operators correctly
         if (minPrecedence > binaryPrecedenceMax) {
-            if (auto unary = UnaryExpression<Yield, Await>::parse(state); unary) {
+            if (auto unary = UnaryExpression<Yield, Await>::parse(state)) {
                 return BinaryExpression<In, Yield, Await>{std::move(*unary)};
             }
             return std::nullopt;
         }
 
-        if (auto lhs = BinaryExpression::parse(state, minPrecedence + 1); lhs) {
+        if (auto lhs = BinaryExpression::parse(state, minPrecedence + 1)) {
             auto start = state.getPosition();
             if (state.current().kind == Token::Punctuator) {
                 std::string_view op = state.current().text;
                 auto precedence = binaryPrecedence.find(op);
                 if (precedence != binaryPrecedence.end() && precedence->second >= minPrecedence) {
                     state.advance();
-                    if (auto rhs = BinaryExpression::parse(state, precedence->second); rhs) {
+                    if (auto rhs = BinaryExpression::parse(state, precedence->second)) {
                         auto lhsPtr = std::make_unique<BinaryExpression<In, Yield, Await>>(std::move(*lhs));
                         auto rhsPtr = std::make_unique<BinaryExpression<In, Yield, Await>>(std::move(*rhs));
                         return BinaryExpression<In, Yield, Await>{std::tuple{std::move(lhsPtr), std::move(rhsPtr), op}};
@@ -596,13 +596,13 @@ struct ConditionalExpression {
 
     static std::optional<ConditionalExpression<In, Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (auto shortCircuit = BinaryExpression<In, Yield, Await>::parse(state); shortCircuit) {
+        if (auto shortCircuit = BinaryExpression<In, Yield, Await>::parse(state)) {
             if (state.current().kind == Token::Punctuator && state.current().text == "?") {
                 state.advance();
-                if (auto consequent = AssignmentExpression<In, Yield, Await>::parse(state); consequent) {
+                if (auto consequent = AssignmentExpression<In, Yield, Await>::parse(state)) {
                     if (state.current().kind == Token::Punctuator && state.current().text == ":") {
                         state.advance();
-                        if (auto alternate = AssignmentExpression<In, Yield, Await>::parse(state); alternate) {
+                        if (auto alternate = AssignmentExpression<In, Yield, Await>::parse(state)) {
                             auto consPtr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*consequent));
                             auto altPtr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*alternate));
                             return ConditionalExpression<In, Yield, Await>{std::tuple{std::move(*shortCircuit), std::move(consPtr), std::move(altPtr)}};
@@ -677,7 +677,7 @@ struct BindingPattern {
         ArrayBindingPattern<Yield, Await>
     > value;
 
-    static std::optional<BindingPattern<Yield, Await>> parse(ParserState& state) {
+    static std::optional<BindingPattern<Yield, Await>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -696,10 +696,10 @@ struct BindingElement {
     > value;
 
     static std::optional<BindingElement<Yield, Await>> parse(ParserState& state) {
-        if (auto id = BindingIdentifier<Yield, Await>::parse(state); id) {
+        if (auto id = BindingIdentifier<Yield, Await>::parse(state)) {
             if (state.current().kind == Token::Punctuator && state.current().text == "=") {
                 state.advance();
-                if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state); initializer) {
+                if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
                     return BindingElement<Yield, Await>{std::pair{std::move(*id), std::move(ptr)}};
                 }
@@ -708,10 +708,10 @@ struct BindingElement {
             }
             return BindingElement<Yield, Await>{std::move(*id)};
         }
-        if (auto pattern = BindingPattern<Yield, Await>::parse(state); pattern) {
+        if (auto pattern = BindingPattern<Yield, Await>::parse(state)) {
             if (state.current().kind == Token::Punctuator && state.current().text == "=") {
                 state.advance();
-                if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state); initializer) {
+                if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
                     return BindingElement<Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}};
                 }
@@ -744,7 +744,7 @@ struct BindingRestElement {
         BindingPattern<Yield, Await>
     > value;
 
-    static std::optional<BindingRestElement<Yield, Await>> parse(ParserState& state) {
+    static std::optional<BindingRestElement<Yield, Await>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -760,7 +760,7 @@ struct FormalParameters {
 
         bool canContinue = true;
         while (true) {
-            if (auto param = FormalParameter<Yield, Await>::parse(state); param) {
+            if (auto param = FormalParameter<Yield, Await>::parse(state)) {
                 params.parameterList.push_back(std::move(*param));
                 if (state.current().kind == Token::Punctuator && state.current().text == ",") {
                     state.advance();
@@ -773,7 +773,7 @@ struct FormalParameters {
         }
 
         if (canContinue) {
-            if (auto rest = BindingRestElement<Yield, Await>::parse(state); rest) {
+            if (auto rest = BindingRestElement<Yield, Await>::parse(state)) {
                 params.restParameter.emplace(BindingRestElement<Yield, Await>{std::move(*rest)});
             }
         }
@@ -821,7 +821,7 @@ struct Expression {
         Expression<In, Yield, Await> expr;
         auto last = state.getPosition();
         while (true) {
-            if (auto assignment = AssignmentExpression<In, Yield, Await>::parse(state); assignment) {
+            if (auto assignment = AssignmentExpression<In, Yield, Await>::parse(state)) {
                 expr.items.push_back(std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*assignment)));
                 last = state.getPosition();
             }
@@ -852,7 +852,7 @@ struct Block {
 
         Block<Yield, Await, Return> block;
         auto start = state.getPosition();
-        if (auto list = StatementList<Yield, Await, Return>::parse(state); list) {
+        if (auto list = StatementList<Yield, Await, Return>::parse(state)) {
             block.statementList.emplace(std::move(*list));
         }
 
@@ -876,10 +876,10 @@ struct LexicalBinding {
     > value;
 
     static std::optional<LexicalBinding<In, Yield, Await>> parse(ParserState& state) {
-        if (auto id = BindingIdentifier<Yield, Await>::parse(state); id) {
+        if (auto id = BindingIdentifier<Yield, Await>::parse(state)) {
             if (state.current().kind == Token::Punctuator && state.current().text == "=") {
                 state.advance();
-                if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state); initializer) {
+                if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
                     return LexicalBinding<In, Yield, Await>{std::pair{std::move(*id), std::move(ptr)}};
                 }
@@ -890,10 +890,10 @@ struct LexicalBinding {
         }
 
         auto start = state.getPosition();
-        if (auto pattern = BindingPattern<Yield, Await>::parse(state); pattern) {
+        if (auto pattern = BindingPattern<Yield, Await>::parse(state)) {
             if (state.current().kind == Token::Punctuator && state.current().text == "=") {
                 state.advance();
-                if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state); initializer) {
+                if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
                     return LexicalBinding<In, Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}};
                 }
@@ -932,7 +932,7 @@ struct LexicalDeclaration {
         LexicalDeclaration<In, Yield, Await> declaration{ isConst, {} };
 
         while (true) {
-            if (auto binding = LexicalBinding<In, Yield, Await>::parse(state); binding) {
+            if (auto binding = LexicalBinding<In, Yield, Await>::parse(state)) {
                 declaration.bindings.push_back(std::move(*binding));
             }
             else {
@@ -987,7 +987,7 @@ struct ExpressionStatement {
 
     static std::optional<ExpressionStatement<Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (auto expr = Expression<false, Yield, Await>::parse(state); expr) {
+        if (auto expr = Expression<false, Yield, Await>::parse(state)) {
             if (state.current().kind != Token::Punctuator || state.current().text != ";") {
                 state.error("Expected ;");
                 state.restorePosition(start);
@@ -1096,7 +1096,7 @@ struct ReturnStatement {
         ReturnStatement<Yield, Await> statement;
 
         auto start = state.getPosition();
-        if (auto expr = Expression<true, Yield, Await>::parse(state); expr) {
+        if (auto expr = Expression<true, Yield, Await>::parse(state)) {
             statement.expression = std::move(*expr);
         }
 
@@ -1131,7 +1131,7 @@ struct FunctionDeclaration {
 
         std::optional<BindingIdentifier<Yield, Await>> name;
         if (!Default) {
-            if (auto id = BindingIdentifier<Yield, Await>::parse(state); id) {
+            if (auto id = BindingIdentifier<Yield, Await>::parse(state)) {
                 name = std::move(*id);
             }
             else {
@@ -1238,10 +1238,10 @@ struct Statement {
     > value;
 
     static std::optional<Statement<Yield, Await, Return>> parse(ParserState& state) {
-        if (auto block = BlockStatement<Yield, Await, Return>::parse(state); block) {
+        if (auto block = BlockStatement<Yield, Await, Return>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*block)};
         }
-        if (auto expression = ExpressionStatement<Yield, Await>::parse(state); expression) {
+        if (auto expression = ExpressionStatement<Yield, Await>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*expression)};
         }
         if (Return) {
@@ -1287,7 +1287,7 @@ struct HoistableDeclaration {
     > value;
 
     static std::optional<HoistableDeclaration<Yield, Await, Default>> parse(ParserState& state) {
-        if (auto function = FunctionDeclaration<Yield, Await, Default>::parse(state); function) {
+        if (auto function = FunctionDeclaration<Yield, Await, Default>::parse(state)) {
             return HoistableDeclaration<Yield, Await, Default>{std::move(*function)};
         }
 
@@ -1348,7 +1348,7 @@ struct ClassDeclaration {
     std::optional<ClassHeritage<Yield, Await>> heritage;
     ClassBody<Yield, Await> body;
 
-    static std::optional<ClassDeclaration<Yield, Await, Default>> parse(ParserState& state) {
+    static std::optional<ClassDeclaration<Yield, Await, Default>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -1363,13 +1363,13 @@ struct Declaration {
     > value;
 
     static std::optional<Declaration<Yield, Await, Return>> parse(ParserState& state) {
-        if (auto hoistable = HoistableDeclaration<Yield, Await, false>::parse(state); hoistable) {
+        if (auto hoistable = HoistableDeclaration<Yield, Await, false>::parse(state)) {
             return Declaration<Yield, Await, Return>{std::move(*hoistable)};
         }
-        if (auto klass = ClassDeclaration<Yield, Await, false>::parse(state); klass) {
+        if (auto klass = ClassDeclaration<Yield, Await, false>::parse(state)) {
             return Declaration<Yield, Await, Return>{std::move(*klass)};
         }
-        if (auto lexical = LexicalDeclaration<true, Yield, Await>::parse(state); lexical) {
+        if (auto lexical = LexicalDeclaration<true, Yield, Await>::parse(state)) {
             return Declaration<Yield, Await, Return>{std::move(*lexical)};
         }
         return std::nullopt;
@@ -1387,10 +1387,10 @@ struct StatementListItem {
     StatementListItem(Declaration<Yield, Await, Return> declaration): value(std::move(declaration)) {}
 
     static std::optional<StatementListItem<Yield, Await, Return>> parse(ParserState& state) {
-        if (auto statement = Statement<Yield, Await, Return>::parse(state); statement) {
+        if (auto statement = Statement<Yield, Await, Return>::parse(state)) {
             return StatementListItem<Yield, Await, Return>{std::move(*statement)};
         }
-        if (auto declaration = Declaration<Yield, Await, Return>::parse(state); declaration) {
+        if (auto declaration = Declaration<Yield, Await, Return>::parse(state)) {
             return StatementListItem<Yield, Await, Return>{std::move(*declaration)};
         }
 
@@ -1495,7 +1495,7 @@ struct CoverParenthesizedExpressionAndArrowParameterList {
         CoverParenthesizedExpressionAndArrowParameterList<Yield, Await> result;
         bool canContinue = true;
 
-        if (auto expr = Expression<true, Yield, Await>::parse(state); expr) {
+        if (auto expr = Expression<true, Yield, Await>::parse(state)) {
             result.expression = std::move(*expr);
             if (state.current().kind != Token::Punctuator || state.current().text != ",") {
                 canContinue = false;
@@ -1508,11 +1508,11 @@ struct CoverParenthesizedExpressionAndArrowParameterList {
         if (canContinue) {
             if (state.current().kind == Token::Punctuator && state.current().text == "...") {
                 state.advance();
-                if (auto binding = BindingIdentifier<Yield, Await>::parse(state); binding) {
+                if (auto binding = BindingIdentifier<Yield, Await>::parse(state)) {
                     canContinue = false;
                     result.parameters.template emplace<BindingIdentifier<Yield, Await>>(std::move(*binding));
                 }
-                else if (auto pattern = BindingPattern<Yield, Await>::parse(state); pattern) {
+                else if (auto pattern = BindingPattern<Yield, Await>::parse(state)) {
                     canContinue = false;
                     result.parameters.template emplace<BindingPattern<Yield, Await>>(std::move(*pattern));
                 }
@@ -1565,18 +1565,18 @@ struct PrimaryExpression {
     > value;
 
     static std::optional<PrimaryExpression<Yield, Await>> parse(ParserState& state) {
-        if (auto thisExpr = ThisExpr::parse(state); thisExpr) {
+        if (auto thisExpr = ThisExpr::parse(state)) {
             return PrimaryExpression<Yield, Await>{std::move(*thisExpr)};
         }
-        if (auto identifier = IdentifierReference<Yield, Await>::parse(state); identifier) {
+        if (auto identifier = IdentifierReference<Yield, Await>::parse(state)) {
             return PrimaryExpression<Yield, Await>{std::move(*identifier)};
         }
-        if (auto lit = Literal::parse(state); lit) {
+        if (auto lit = Literal::parse(state)) {
             return PrimaryExpression<Yield, Await>{std::move(*lit)};
         }
 
-        if (auto cover = CoverParenthesizedExpressionAndArrowParameterList<Yield, Await>::parse(state); cover) {
-            if (auto refined = cover->refineParExp(); refined) {
+        if (auto cover = CoverParenthesizedExpressionAndArrowParameterList<Yield, Await>::parse(state)) {
+            if (auto refined = cover->refineParExp()) {
                 return PrimaryExpression<Yield, Await>{std::move(*refined)};
             }
             state.error("Invalid parenthesized expression");
@@ -1595,7 +1595,7 @@ struct SuperProperty {
         Expression<true, Yield, Await>  // bracket
     > value;
 
-    static std::optional<SuperProperty<Yield, Await>> parse(ParserState& state) {
+    static std::optional<SuperProperty<Yield, Await>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -1609,7 +1609,7 @@ struct MetaProperty {
 
     Kind kind;
 
-    static std::optional<MetaProperty> parse(ParserState& state) {
+    static std::optional<MetaProperty> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -1619,7 +1619,7 @@ template<bool Yield, bool Await>
 struct Arguments {
     std::vector<std::pair<bool, AssignmentExpressionPtr<true, Yield, Await>>> arguments;  // bool: spread
 
-    static std::optional<Arguments<Yield, Await>> parse(ParserState& state) {
+    static std::optional<Arguments<Yield, Await>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -1645,8 +1645,8 @@ struct MemberExpression {
     static std::optional<MemberExpression<Yield, Await>> parse(ParserState& state) {
         if (state.current().kind == Token::Keyword && state.current().text == "new") {
             auto start = state.getPosition();
-            if (auto member = MemberExpression::parse(state); member) {
-                if (auto args = Arguments<Yield, Await>::parse(state); args) {
+            if (auto member = MemberExpression::parse(state)) {
+                if (auto args = Arguments<Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
                     return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*args)}};
                 }
@@ -1654,13 +1654,13 @@ struct MemberExpression {
             state.restorePosition(start);
         }
         std::optional<MemberExpression<Yield, Await>> member;
-        if (auto primary = PrimaryExpression<Yield, Await>::parse(state); primary) {
+        if (auto primary = PrimaryExpression<Yield, Await>::parse(state)) {
             member.emplace(MemberExpression{ std::move(*primary) });
         }
-        else if (auto super = SuperProperty<Yield, Await>::parse(state); super) {
+        else if (auto super = SuperProperty<Yield, Await>::parse(state)) {
             member.emplace(MemberExpression{ std::move(*super) });
         }
-        else if (auto meta = MetaProperty::parse(state); meta) {
+        else if (auto meta = MetaProperty::parse(state)) {
             member.emplace(MemberExpression{ std::move(*meta) });
         }
         else {
@@ -1670,7 +1670,7 @@ struct MemberExpression {
         if (state.current().kind == Token::Punctuator && state.current().text == ".") {
             state.advance();
             // TODO: handle private identifiers
-            if (auto identifier = IdentifierName::parse(state); identifier) {
+            if (auto identifier = IdentifierName::parse(state)) {
                 auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
                 return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*identifier)}};
             }
@@ -1678,7 +1678,7 @@ struct MemberExpression {
         }
         else if (state.current().kind == Token::Punctuator && state.current().text == "[") {
             auto start = state.getPosition();
-            if (auto expr = Expression<true, Yield, Await>::parse(state); expr) {
+            if (auto expr = Expression<true, Yield, Await>::parse(state)) {
                 if (state.current().kind == Token::Punctuator && state.current().text == "]") {
                     state.advance();
                     auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
@@ -1687,7 +1687,7 @@ struct MemberExpression {
             }
             state.restorePosition(start);
         }
-        else if (auto tplate = TemplateLiteral<Yield, Await, true>::parse(state); tplate) {
+        else if (auto tplate = TemplateLiteral<Yield, Await, true>::parse(state)) {
             auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
             return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*tplate)}};
         }
@@ -1708,13 +1708,13 @@ struct NewExpression {
     static std::optional<NewExpression<Yield, Await>> parse(ParserState& state) {
         if (state.current().kind != Token::Keyword && state.current().text == "new") {
             state.advance();
-            if (auto expr = NewExpression::parse(state); expr) {
+            if (auto expr = NewExpression::parse(state)) {
                 auto ptr = std::make_unique<NewExpression<Yield, Await>>(std::move(*expr));
                 return NewExpression<Yield, Await>{std::move(ptr)};
             }
             state.backtrack();
         }
-        if (auto member = MemberExpression<Yield, Await>::parse(state); member) {
+        if (auto member = MemberExpression<Yield, Await>::parse(state)) {
             return NewExpression<Yield, Await>{std::move(*member)};
         }
 
@@ -1791,7 +1791,7 @@ struct LeftHandSideExpression {
     > value;
 
     static std::optional<LeftHandSideExpression> parse(ParserState& state) {
-        if (auto newExpr = NewExpression<Yield, Await>::parse(state); newExpr) {
+        if (auto newExpr = NewExpression<Yield, Await>::parse(state)) {
             return LeftHandSideExpression{std::move(*newExpr)};
         }
         // TODO: rest
@@ -1805,7 +1805,7 @@ struct YieldExpression {
     bool star;
     std::optional<AssignmentExpressionPtr<In, Yield, Await>> expression;
 
-    static std::optional<YieldExpression<In, Yield, Await>> parse(ParserState& state) {
+    static std::optional<YieldExpression<In, Yield, Await>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -1832,7 +1832,7 @@ struct ArrowFunction {
     ArrowParameters<Yield, Await> parameters;
     ConciseBody<In> body;
 
-    static std::optional<ArrowFunction<In, Yield, Await>> parse(ParserState& state) {
+    static std::optional<ArrowFunction<In, Yield, Await>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -1854,7 +1854,7 @@ struct AsyncArrowFunction {
     > parameters;
     AsyncConciseBody<In> body;
 
-    static std::optional<AsyncArrowFunction<In, Yield, Await>> parse(ParserState& state) {
+    static std::optional<AsyncArrowFunction<In, Yield, Await>> parse(ParserState&) {
         // TODO
         return std::nullopt;
     }
@@ -1906,16 +1906,16 @@ struct AssignmentExpression {
         if (auto yield = YieldExpression<In, Yield, Await>::parse(state)) {
             return AssignmentExpression<In, Yield, Await>{std::move(*yield)};
         }
-        if (auto arrow = ArrowFunction<In, Yield, Await>::parse(state); arrow) {
+        if (auto arrow = ArrowFunction<In, Yield, Await>::parse(state)) {
             return AssignmentExpression<In, Yield, Await>{std::move(*arrow)};
         }
-        if (auto asyncArrow = AsyncArrowFunction<In, Yield, Await>::parse(state); asyncArrow) {
+        if (auto asyncArrow = AsyncArrowFunction<In, Yield, Await>::parse(state)) {
             return AssignmentExpression<In, Yield, Await>{std::move(*asyncArrow)};
         }
-        if (auto assignment = Assignment<In, Yield, Await>::parse(state); assignment) {
+        if (auto assignment = Assignment<In, Yield, Await>::parse(state)) {
             return AssignmentExpression<In, Yield, Await>{std::move(*assignment)};
         }
-        if (auto cond = ConditionalExpression<In, Yield, Await>::parse(state); cond) {
+        if (auto cond = ConditionalExpression<In, Yield, Await>::parse(state)) {
             return AssignmentExpression<In, Yield, Await>{std::move(*cond)};
         }
         return std::nullopt;
@@ -1931,7 +1931,7 @@ struct Script {
             return Script{};
         }
 
-        if (auto statementList = StatementList<false, false, false>::parse(state); statementList) {
+        if (auto statementList = StatementList<false, false, false>::parse(state)) {
             return Script{std::move(*statementList)};
         }
 
@@ -1967,7 +1967,7 @@ template<bool Yield, bool Await, bool Return>
 std::optional<StatementList<Yield, Await, Return>> StatementList<Yield, Await, Return>::parse(ParserState& state) {
     StatementList<Yield, Await, Return> list;
     while (true) {
-        if (auto item = StatementListItem<Yield, Await, Return>::parse(state); item) {
+        if (auto item = StatementListItem<Yield, Await, Return>::parse(state)) {
             list.items.push_back(std::move(*item));
         }
         else {
@@ -1989,7 +1989,7 @@ std::optional<UpdateExpression<Yield, Await>> UpdateExpression<Yield, Await>::pa
         std::string_view op = state.current().text;
         if (op == "++" || op == "--") {
             state.advance();
-            if (auto expr = UnaryExpression<Yield, Await>::parse(state); expr) {
+            if (auto expr = UnaryExpression<Yield, Await>::parse(state)) {
                 auto ptr = std::make_unique<UnaryExpression<Yield, Await>>(std::move(*expr));
                 return UpdateExpression{std::move(ptr), (op == "++" ? "++x" : "--x")};
             }
@@ -1998,7 +1998,7 @@ std::optional<UpdateExpression<Yield, Await>> UpdateExpression<Yield, Await>::pa
     }
 
 
-    if (auto expr = LeftHandSideExpression<Yield, Await>::parse(state); expr) {
+    if (auto expr = LeftHandSideExpression<Yield, Await>::parse(state)) {
         auto ptr = std::make_unique<LeftHandSideExpression<Yield, Await>>(std::move(*expr));
         if (state.current().kind == Token::Punctuator) {
             std::string_view op = state.current().text;
