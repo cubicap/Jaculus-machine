@@ -29,6 +29,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(QuickJS)
 
+FetchContent_Declare(
+    QBE
+    URL               https://c9x.me/compile/release/qbe-1.2.tar.xz
+    PATCH_COMMAND     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/qbe.CMakeLists.txt <SOURCE_DIR>/CMakeLists.txt
+    CMAKE_ARGS        -DESP_PLATFORM=${ESP_PLATFORM}
+)
+FetchContent_MakeAvailable(QBE)
+
 
 if(ESP_PLATFORM)
     target_link_libraries(${COMPONENT_LIB} PUBLIC quickjs)
@@ -37,6 +45,6 @@ else()
     add_library(jac-machine STATIC ${JAC_MACHINE_SRC})
     target_include_directories(jac-machine PUBLIC .)
     set_target_properties(jac-machine PROPERTIES LINKER_LANGUAGE CXX)
-    target_link_libraries(jac-machine PUBLIC quickjs)
+    target_link_libraries(jac-machine PUBLIC quickjs qbe)
 
 endif()
