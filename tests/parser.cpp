@@ -8,8 +8,8 @@
 
 
 template<>
-struct Catch::StringMaker<jac::Token> {
-    static std::string convert(jac::Token const& value) {
+struct Catch::StringMaker<jac::lex::Token> {
+    static std::string convert(jac::lex::Token const& value) {
         return std::string("Token(") + std::to_string(value.line) + ", " + std::to_string(value.column) + ", " + std::string(value.text) + ", " + std::to_string(value.kind) + ")";
     }
 };
@@ -91,14 +91,14 @@ auto lhsExpIdentifier(jac::ast::LeftHandSideExpression<Yield, Await>& expr) {
 }
 
 
-using TokenVector = std::vector<jac::Token>;
+using TokenVector = std::vector<jac::lex::Token>;
 
 
 TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("123") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "123", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "123", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -114,7 +114,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("123.456") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "123.456", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "123.456", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -130,7 +130,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("123.456e-7") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "123.456e-7", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "123.456e-7", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -146,7 +146,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("123.456e+7") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "123.456e+7", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "123.456e+7", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -162,7 +162,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("12_3.45_6e+7") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "12_3.45_6e+7", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "12_3.45_6e+7", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -178,7 +178,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("0x0123") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0x0123", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0x0123", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -194,7 +194,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("0o0123") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0o0123", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0o0123", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -210,7 +210,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("0b1010") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0b1010", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0b1010", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -226,7 +226,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("0123456789") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0123456789", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0123456789", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -242,7 +242,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("0x0123456789abcdef") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0x0123456789abcdef", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0x0123456789abcdef", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -258,7 +258,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("0x0123456789ABCDEF") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0x0123456789ABCDEF", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0x0123456789ABCDEF", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -276,7 +276,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("0") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -292,7 +292,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("invalid") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "123.456e", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "123.456e", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -305,7 +305,7 @@ TEST_CASE("NumericLiteral", "[parser]") {
 
     SECTION("invalid 2") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "0x", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "0x", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -322,7 +322,7 @@ TEST_CASE("BooleanLiteral", "[parser]") {
 
     SECTION("true") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "true", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "true", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -337,7 +337,7 @@ TEST_CASE("BooleanLiteral", "[parser]") {
 
     SECTION("false") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "false", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "false", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -352,7 +352,7 @@ TEST_CASE("BooleanLiteral", "[parser]") {
 
     SECTION("tru") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "tru", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "tru", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -369,7 +369,7 @@ TEST_CASE("Identifier", "[parser]") {
 
     SECTION("label") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "label", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "label", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -384,7 +384,7 @@ TEST_CASE("Identifier", "[parser]") {
 
     SECTION("var") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "var", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "var", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -401,7 +401,7 @@ TEST_CASE("IdentifierReference", "[parser]") {
 
     SECTION("label") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "label", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "label", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -415,7 +415,7 @@ TEST_CASE("IdentifierReference", "[parser]") {
 
     SECTION("yield fail") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "yield", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -428,7 +428,7 @@ TEST_CASE("IdentifierReference", "[parser]") {
 
     SECTION("yield fail2") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "yield", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -445,7 +445,7 @@ TEST_CASE("BindingIdentifier", "[parser]") {
 
     SECTION("label") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "label", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "label", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -460,7 +460,7 @@ TEST_CASE("BindingIdentifier", "[parser]") {
 
     SECTION("yield fail") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "yield", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -473,7 +473,7 @@ TEST_CASE("BindingIdentifier", "[parser]") {
 
     SECTION("yield fail2") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "yield", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -490,7 +490,7 @@ TEST_CASE("LabelIdentifier", "[parser]") {
 
     SECTION("label") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "label", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "label", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -504,7 +504,7 @@ TEST_CASE("LabelIdentifier", "[parser]") {
 
     SECTION("yield fail") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "yield", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -517,7 +517,7 @@ TEST_CASE("LabelIdentifier", "[parser]") {
 
     SECTION("yield fail2") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "yield", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -534,7 +534,7 @@ TEST_CASE("PrivateIdentifier", "[parser]") {
 
     SECTION("label") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "label", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "label", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -547,7 +547,7 @@ TEST_CASE("PrivateIdentifier", "[parser]") {
 
     SECTION("#label") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "#label", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "#label", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -566,7 +566,7 @@ TEST_CASE("NullLiteral", "[parser]") {
 
     SECTION("null") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "null", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "null", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -580,7 +580,7 @@ TEST_CASE("NullLiteral", "[parser]") {
 
     SECTION("nul") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "nul", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "nul", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -597,7 +597,7 @@ TEST_CASE("ThisExpr", "[parser]") {
 
     SECTION("this") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "this", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "this", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -615,7 +615,7 @@ TEST_CASE("StringLiteral", "[parser]") {
 
     SECTION("\"hello\"") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "\"hello\"", jac::Token::StringLiteral)
+            jac::lex::Token(1, 1, "\"hello\"", jac::lex::Token::StringLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -630,7 +630,7 @@ TEST_CASE("StringLiteral", "[parser]") {
 
     SECTION("\"hello\\nworld\"") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "\"hello\\nworld\"", jac::Token::StringLiteral)
+            jac::lex::Token(1, 1, "\"hello\\nworld\"", jac::lex::Token::StringLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -648,7 +648,7 @@ TEST_CASE("StringLiteral", "[parser]") {
 TEST_CASE("Literal", "[parser]") {
     SECTION("NumericLiteral") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "123", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "123", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -666,7 +666,7 @@ TEST_CASE("Literal", "[parser]") {
 
     SECTION("BooleanLiteral") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "true", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "true", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -682,7 +682,7 @@ TEST_CASE("Literal", "[parser]") {
 
     SECTION("NullLiteral") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "null", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "null", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -697,7 +697,7 @@ TEST_CASE("Literal", "[parser]") {
 
     SECTION("StringLiteral") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "\"hello\"", jac::Token::StringLiteral)
+            jac::lex::Token(1, 1, "\"hello\"", jac::lex::Token::StringLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -713,7 +713,7 @@ TEST_CASE("Literal", "[parser]") {
 
     SECTION("invalid") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "123.456e", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "123.456e", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -730,9 +730,9 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
 
     SECTION("let x;") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "let", jac::Token::Keyword),
-            jac::Token(1, 5, "x", jac::Token::IdentifierName),
-            jac::Token(1, 7, ";", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "let", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 5, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 7, ";", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -752,11 +752,11 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
 
     SECTION("const x = 123;") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "const", jac::Token::Keyword),
-            jac::Token(1, 7, "x", jac::Token::IdentifierName),
-            jac::Token(1, 9, "=", jac::Token::Punctuator),
-            jac::Token(1, 11, "123", jac::Token::NumericLiteral),
-            jac::Token(1, 14, ";", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "const", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 7, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 9, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "123", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 14, ";", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -800,13 +800,13 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
 
     SECTION("const x = abc + def;") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "const", jac::Token::Keyword),
-            jac::Token(1, 7, "x", jac::Token::IdentifierName),
-            jac::Token(1, 9, "=", jac::Token::Punctuator),
-            jac::Token(1, 11, "abc", jac::Token::IdentifierName),
-            jac::Token(1, 15, "+", jac::Token::Punctuator),
-            jac::Token(1, 17, "def", jac::Token::IdentifierName),
-            jac::Token(1, 20, ";", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "const", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 7, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 9, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "abc", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 15, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 17, "def", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 20, ";", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -872,9 +872,9 @@ TEST_CASE("UnaryExpression", "[parser]") {
 
     SECTION("+ - 123") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "+", jac::Token::Punctuator),
-            jac::Token(1, 3, "-", jac::Token::Punctuator),
-            jac::Token(1, 5, "123", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 3, "-", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "123", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -897,9 +897,9 @@ TEST_CASE("UnaryExpression", "[parser]") {
 
     SECTION("- a++") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "-", jac::Token::Punctuator),
-            jac::Token(1, 3, "a", jac::Token::IdentifierName),
-            jac::Token(1, 4, "++", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "-", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 3, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 4, "++", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -924,9 +924,9 @@ TEST_CASE("BinaryExpression", "[parser]") {
 
     SECTION("1 + 2") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "1", jac::Token::NumericLiteral),
-            jac::Token(1, 3, "+", jac::Token::Punctuator),
-            jac::Token(1, 5, "2", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "2", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -947,11 +947,11 @@ TEST_CASE("BinaryExpression", "[parser]") {
 
     SECTION("1 + 2 * 3") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "1", jac::Token::NumericLiteral),
-            jac::Token(1, 3, "+", jac::Token::Punctuator),
-            jac::Token(1, 5, "2", jac::Token::NumericLiteral),
-            jac::Token(1, 7, "*", jac::Token::Punctuator),
-            jac::Token(1, 9, "3", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 7, "*", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 9, "3", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -975,15 +975,15 @@ TEST_CASE("BinaryExpression", "[parser]") {
 
     SECTION("1 + 2 * 3 * 4 - 5") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "1", jac::Token::NumericLiteral),
-            jac::Token(1, 3, "+", jac::Token::Punctuator),
-            jac::Token(1, 5, "2", jac::Token::NumericLiteral),
-            jac::Token(1, 7, "*", jac::Token::Punctuator),
-            jac::Token(1, 9, "3", jac::Token::NumericLiteral),
-            jac::Token(1, 11, "*", jac::Token::Punctuator),
-            jac::Token(1, 13, "4", jac::Token::NumericLiteral),
-            jac::Token(1, 15, "-", jac::Token::Punctuator),
-            jac::Token(1, 17, "5", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 7, "*", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 9, "3", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 11, "*", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 13, "4", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 15, "-", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 17, "5", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1020,13 +1020,13 @@ TEST_CASE("BinaryExpression", "[parser]") {
 
     SECTION("1 + (2 * 3)") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "1", jac::Token::NumericLiteral),
-            jac::Token(1, 3, "+", jac::Token::Punctuator),
-            jac::Token(1, 5, "(", jac::Token::Punctuator),
-            jac::Token(1, 6, "2", jac::Token::NumericLiteral),
-            jac::Token(1, 8, "*", jac::Token::Punctuator),
-            jac::Token(1, 10, "3", jac::Token::NumericLiteral),
-            jac::Token(1, 12, ")", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 6, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 8, "*", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 10, "3", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 12, ")", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1060,15 +1060,15 @@ TEST_CASE("ConditionalExpression", "[parser]") {
 
     SECTION("a && b ? c : d + e") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "a", jac::Token::IdentifierName),
-            jac::Token(1, 3, "&&", jac::Token::Punctuator),
-            jac::Token(1, 6, "b", jac::Token::IdentifierName),
-            jac::Token(1, 8, "?", jac::Token::Punctuator),
-            jac::Token(1, 10, "c", jac::Token::IdentifierName),
-            jac::Token(1, 12, ":", jac::Token::Punctuator),
-            jac::Token(1, 14, "d", jac::Token::IdentifierName),
-            jac::Token(1, 16, "+", jac::Token::Punctuator),
-            jac::Token(1, 18, "e", jac::Token::IdentifierName)
+            jac::lex::Token(1, 1, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 3, "&&", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 6, "b", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 8, "?", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 10, "c", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 12, ":", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 14, "d", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 16, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 18, "e", jac::lex::Token::IdentifierName)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1107,12 +1107,12 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
 
     SECTION("function f() {}") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "function", jac::Token::Keyword),
-            jac::Token(1, 10, "f", jac::Token::IdentifierName),
-            jac::Token(1, 11, "(", jac::Token::Punctuator),
-            jac::Token(1, 12, ")", jac::Token::Punctuator),
-            jac::Token(1, 14, "{", jac::Token::Punctuator),
-            jac::Token(1, 15, "}", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "function", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 10, "f", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 11, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 12, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 14, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 15, "}", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1130,30 +1130,30 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
 
     SECTION("function fun(a, b) { const x = 3; let y = 4; return x + y; }") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "function", jac::Token::Keyword),
-            jac::Token(1, 10, "fun", jac::Token::IdentifierName),
-            jac::Token(1, 13, "(", jac::Token::Punctuator),
-            jac::Token(1, 14, "a", jac::Token::IdentifierName),
-            jac::Token(1, 15, ",", jac::Token::Punctuator),
-            jac::Token(1, 17, "b", jac::Token::IdentifierName),
-            jac::Token(1, 18, ")", jac::Token::Punctuator),
-            jac::Token(1, 20, "{", jac::Token::Punctuator),
-            jac::Token(1, 22, "const", jac::Token::Keyword),
-            jac::Token(1, 28, "x", jac::Token::IdentifierName),
-            jac::Token(1, 30, "=", jac::Token::Punctuator),
-            jac::Token(1, 32, "3", jac::Token::NumericLiteral),
-            jac::Token(1, 33, ";", jac::Token::Punctuator),
-            jac::Token(1, 35, "let", jac::Token::Keyword),
-            jac::Token(1, 39, "y", jac::Token::IdentifierName),
-            jac::Token(1, 41, "=", jac::Token::Punctuator),
-            jac::Token(1, 43, "4", jac::Token::NumericLiteral),
-            jac::Token(1, 44, ";", jac::Token::Punctuator),
-            jac::Token(1, 46, "return", jac::Token::Keyword),
-            jac::Token(1, 53, "x", jac::Token::IdentifierName),
-            jac::Token(1, 55, "+", jac::Token::Punctuator),
-            jac::Token(1, 57, "y", jac::Token::IdentifierName),
-            jac::Token(1, 58, ";", jac::Token::Punctuator),
-            jac::Token(1, 60, "}", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "function", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 10, "fun", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 13, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 14, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 15, ",", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 17, "b", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 18, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 20, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 22, "const", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 28, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 30, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 32, "3", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 33, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 35, "let", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 39, "y", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 41, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 43, "4", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 44, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 46, "return", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 53, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 55, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 57, "y", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 58, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 60, "}", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1205,17 +1205,17 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
 
     SECTION("function fun(a, b=3) {}") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "function", jac::Token::Keyword),
-            jac::Token(1, 10, "fun", jac::Token::IdentifierName),
-            jac::Token(1, 13, "(", jac::Token::Punctuator),
-            jac::Token(1, 14, "a", jac::Token::IdentifierName),
-            jac::Token(1, 15, ",", jac::Token::Punctuator),
-            jac::Token(1, 17, "b", jac::Token::IdentifierName),
-            jac::Token(1, 18, "=", jac::Token::Punctuator),
-            jac::Token(1, 19, "3", jac::Token::NumericLiteral),
-            jac::Token(1, 20, ")", jac::Token::Punctuator),
-            jac::Token(1, 22, "{", jac::Token::Punctuator),
-            jac::Token(1, 23, "}", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "function", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 10, "fun", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 13, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 14, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 15, ",", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 17, "b", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 18, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 19, "3", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 20, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 22, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 23, "}", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1244,9 +1244,9 @@ TEST_CASE("Assignment", "[parser]") {
 
     SECTION("x = 4") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "x", jac::Token::IdentifierName),
-            jac::Token(1, 3, "=", jac::Token::Punctuator),
-            jac::Token(1, 5, "4", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 3, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "4", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1264,11 +1264,11 @@ TEST_CASE("Assignment", "[parser]") {
 
     SECTION("x = x / 4") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "x", jac::Token::IdentifierName),
-            jac::Token(1, 3, "=", jac::Token::Punctuator),
-            jac::Token(1, 5, "x", jac::Token::IdentifierName),
-            jac::Token(1, 7, "/", jac::Token::Punctuator),
-            jac::Token(1, 9, "4", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 3, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 7, "/", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 9, "4", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1291,11 +1291,11 @@ TEST_CASE("Assignment", "[parser]") {
 
     SECTION("x += y -= 4") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "x", jac::Token::IdentifierName),
-            jac::Token(1, 3, "+=", jac::Token::Punctuator),
-            jac::Token(1, 6, "y", jac::Token::IdentifierName),
-            jac::Token(1, 8, "-=", jac::Token::Punctuator),
-            jac::Token(1, 11, "4", jac::Token::NumericLiteral)
+            jac::lex::Token(1, 1, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 3, "+=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 6, "y", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 8, "-=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "4", jac::lex::Token::NumericLiteral)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1321,8 +1321,8 @@ TEST_CASE("BlockStatement", "[parser]") {
 
     SECTION("{}") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "{", jac::Token::Punctuator),
-            jac::Token(1, 2, "}", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 2, "}", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);
@@ -1338,19 +1338,19 @@ TEST_CASE("BlockStatement", "[parser]") {
 
     SECTION("{ let x = 3; x <<= x % 4; }") {
         auto tokens = TokenVector{
-            jac::Token(1, 1, "{", jac::Token::Punctuator),
-            jac::Token(1, 3, "let", jac::Token::Keyword),
-            jac::Token(1, 7, "x", jac::Token::IdentifierName),
-            jac::Token(1, 9, "=", jac::Token::Punctuator),
-            jac::Token(1, 11, "3", jac::Token::NumericLiteral),
-            jac::Token(1, 12, ";", jac::Token::Punctuator),
-            jac::Token(1, 14, "x", jac::Token::IdentifierName),
-            jac::Token(1, 16, "<<=", jac::Token::Punctuator),
-            jac::Token(1, 19, "x", jac::Token::IdentifierName),
-            jac::Token(1, 21, "%", jac::Token::Punctuator),
-            jac::Token(1, 23, "4", jac::Token::NumericLiteral),
-            jac::Token(1, 24, ";", jac::Token::Punctuator),
-            jac::Token(1, 26, "}", jac::Token::Punctuator)
+            jac::lex::Token(1, 1, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 3, "let", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 7, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 9, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "3", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 12, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 14, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 16, "<<=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 19, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 21, "%", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 23, "4", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 24, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 26, "}", jac::lex::Token::Punctuator)
         };
 
         jac::ast::ParserState state(tokens);

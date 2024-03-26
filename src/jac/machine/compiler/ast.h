@@ -16,14 +16,14 @@ namespace jac::ast {
 
 
 class ParserState {
-    std::span<Token> _tokens;
-    std::span<Token>::iterator _pos;
+    std::span<lex::Token> _tokens;
+    std::span<lex::Token>::iterator _pos;
 
-    Token _errorToken = Token(0, 0, "", Token::NoToken);
+    lex::Token _errorToken = lex::Token(0, 0, "", lex::Token::NoToken);
     std::string_view _errorMessage;
 
 public:
-    ParserState(std::span<Token> tokens):
+    ParserState(std::span<lex::Token> tokens):
         _tokens(tokens),
         _pos(_tokens.begin())
     {}
@@ -36,7 +36,7 @@ public:
         _errorMessage = message;
     }
 
-    Token& current() {
+    lex::Token& current() {
         if (_pos == _tokens.end()) {
             return _tokens.back();
         }
@@ -72,7 +72,7 @@ public:
         return _errorMessage;
     }
 
-    Token getErrorToken() const {
+    lex::Token getErrorToken() const {
         return _errorToken;
     }
 };
@@ -87,7 +87,7 @@ struct IdentifierName {
             return std::nullopt;
         }
 
-        if (state.current().kind == Token::IdentifierName) {
+        if (state.current().kind == lex::Token::IdentifierName) {
             IdentifierName id;
             id.name = state.current().text;
             state.advance();
@@ -198,7 +198,7 @@ struct PrivateIdentifier {
 
 struct ThisExpr {
     static std::optional<ThisExpr> parse(ParserState& state) {
-        if (state.current().kind == Token::IdentifierName && state.current().text == "this") {
+        if (state.current().kind == lex::Token::IdentifierName && state.current().text == "this") {
             state.advance();
             return ThisExpr{};
         }
@@ -209,7 +209,7 @@ struct ThisExpr {
 
 struct NullLiteral {
     static std::optional<NullLiteral> parse(ParserState& state) {
-        if (state.current().kind == Token::IdentifierName && state.current().text == "null") {
+        if (state.current().kind == lex::Token::IdentifierName && state.current().text == "null") {
             state.advance();
             return NullLiteral{};
         }
@@ -222,7 +222,7 @@ struct BooleanLiteral {
     bool value;
 
     static std::optional<BooleanLiteral> parse(ParserState& state) {
-        if (state.current().kind == Token::IdentifierName) {
+        if (state.current().kind == lex::Token::IdentifierName) {
             if (state.current().text == "true") {
                 state.advance();
                 return BooleanLiteral{true};
@@ -241,7 +241,7 @@ struct NumericLiteral {
     std::variant<std::int32_t, double> value;  // TODO: bigint
 
     static std::optional<NumericLiteral> parse(ParserState& state) {
-        if (state.current().kind != Token::NumericLiteral) {
+        if (state.current().kind != lex::Token::NumericLiteral) {
             return std::nullopt;
         }
         std::string_view text = state.current().text;
@@ -391,7 +391,7 @@ struct StringLiteral {
     std::string value;
 
     static std::optional<StringLiteral> parse(ParserState& state) {
-        if (state.current().kind != Token::StringLiteral) {
+        if (state.current().kind != lex::Token::StringLiteral) {
             return std::nullopt;
         }
         std::string_view text = state.current().text;
@@ -520,7 +520,7 @@ struct UnaryExpression {
     std::string_view op;
 
     static std::optional<UnaryExpression> parse(ParserState& state) {
-        if (state.current().kind == Token::Punctuator || state.current().kind == Token::Keyword) { // parse prefix unary
+        if (state.current().kind == lex::Token::Punctuator || state.current().kind == lex::Token::Keyword) { // parse prefix unary
             std::string_view op = state.current().text;
             if (unaryOperator.contains(op) && (Await || op != "await")) {
                 state.advance();
@@ -560,7 +560,7 @@ struct BinaryExpression {
 
         if (auto lhs = BinaryExpression::parse(state, minPrecedence + 1)) {
             auto start = state.getPosition();
-            if (state.current().kind == Token::Punctuator) {
+            if (state.current().kind == lex::Token::Punctuator) {
                 std::string_view op = state.current().text;
                 auto precedence = binaryPrecedence.find(op);
                 if (precedence != binaryPrecedence.end() && precedence->second >= minPrecedence) {
@@ -597,10 +597,10 @@ struct ConditionalExpression {
     static std::optional<ConditionalExpression<In, Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
         if (auto shortCircuit = BinaryExpression<In, Yield, Await>::parse(state)) {
-            if (state.current().kind == Token::Punctuator && state.current().text == "?") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "?") {
                 state.advance();
                 if (auto consequent = AssignmentExpression<In, Yield, Await>::parse(state)) {
-                    if (state.current().kind == Token::Punctuator && state.current().text == ":") {
+                    if (state.current().kind == lex::Token::Punctuator && state.current().text == ":") {
                         state.advance();
                         if (auto alternate = AssignmentExpression<In, Yield, Await>::parse(state)) {
                             auto consPtr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*consequent));
@@ -697,7 +697,7 @@ struct BindingElement {
 
     static std::optional<BindingElement<Yield, Await>> parse(ParserState& state) {
         if (auto id = BindingIdentifier<Yield, Await>::parse(state)) {
-            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
@@ -709,7 +709,7 @@ struct BindingElement {
             return BindingElement<Yield, Await>{std::move(*id)};
         }
         if (auto pattern = BindingPattern<Yield, Await>::parse(state)) {
-            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
@@ -762,7 +762,7 @@ struct FormalParameters {
         while (true) {
             if (auto param = FormalParameter<Yield, Await>::parse(state)) {
                 params.parameterList.push_back(std::move(*param));
-                if (state.current().kind == Token::Punctuator && state.current().text == ",") {
+                if (state.current().kind == lex::Token::Punctuator && state.current().text == ",") {
                     state.advance();
                     continue;
                 }
@@ -829,7 +829,7 @@ struct Expression {
                 break;
             }
 
-            if (state.current().kind != Token::Punctuator || state.current().text != ",") {
+            if (state.current().kind != lex::Token::Punctuator || state.current().text != ",") {
                 break;
             }
             state.advance();
@@ -844,7 +844,7 @@ struct Block {
     std::optional<StatementList<Yield, Await, Return>> statementList;
 
     static std::optional<Block<Yield, Await, Return>> parse(ParserState& state) {
-        if (state.current().kind != Token::Punctuator || state.current().text != "{") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "{") {
             state.error("Expected {");
             return std::nullopt;
         }
@@ -856,7 +856,7 @@ struct Block {
             block.statementList.emplace(std::move(*list));
         }
 
-        if (state.current().kind != Token::Punctuator || state.current().text != "}") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "}") {
             state.restorePosition(start);
             state.error("Expected }");
             return std::nullopt;
@@ -877,7 +877,7 @@ struct LexicalBinding {
 
     static std::optional<LexicalBinding<In, Yield, Await>> parse(ParserState& state) {
         if (auto id = BindingIdentifier<Yield, Await>::parse(state)) {
-            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
@@ -891,7 +891,7 @@ struct LexicalBinding {
 
         auto start = state.getPosition();
         if (auto pattern = BindingPattern<Yield, Await>::parse(state)) {
-            if (state.current().kind == Token::Punctuator && state.current().text == "=") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
@@ -912,7 +912,7 @@ struct LexicalDeclaration {
 
     static std::optional<LexicalDeclaration<In, Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (state.current().kind != Token::Keyword) {
+        if (state.current().kind != lex::Token::Keyword) {
             state.error("Expected let or const");
             return std::nullopt;
         }
@@ -942,11 +942,11 @@ struct LexicalDeclaration {
             }
 
 
-            if (state.current().kind == Token::Punctuator && state.current().text == ",") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == ",") {
                 state.advance();
                 continue;
             }
-            if (state.current().kind == Token::Punctuator && state.current().text == ";") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == ";") {
                 state.advance();
                 break;
             }
@@ -988,7 +988,7 @@ struct ExpressionStatement {
     static std::optional<ExpressionStatement<Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
         if (auto expr = Expression<false, Yield, Await>::parse(state)) {
-            if (state.current().kind != Token::Punctuator || state.current().text != ";") {
+            if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
                 state.error("Expected ;");
                 state.restorePosition(start);
                 return std::nullopt;
@@ -1088,7 +1088,7 @@ struct ReturnStatement {
     std::optional<Expression<true, Yield, Await>> expression;
 
     static std::optional<ReturnStatement<Yield, Await>> parse(ParserState& state) {
-        if (state.current().kind != Token::Keyword || state.current().text != "return") {
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "return") {
             return std::nullopt;
         }
         state.advance();
@@ -1100,7 +1100,7 @@ struct ReturnStatement {
             statement.expression = std::move(*expr);
         }
 
-        if (state.current().kind != Token::Punctuator || state.current().text != ";") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
             state.error("Expected ;");
             state.restorePosition(start);
             return std::nullopt;
@@ -1124,7 +1124,7 @@ struct FunctionDeclaration {
 
     static std::optional<FunctionDeclaration<Yield, Await, Default>> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (state.current().kind != Token::Keyword || state.current().text != "function") {
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "function") {
             return std::nullopt;
         }
         state.advance();
@@ -1141,7 +1141,7 @@ struct FunctionDeclaration {
             }
         }
 
-        if (state.current().kind != Token::Punctuator || state.current().text != "(") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
             state.error("Expected (");
             state.restorePosition(start);
             return std::nullopt;
@@ -1154,14 +1154,14 @@ struct FunctionDeclaration {
             return std::nullopt;
         }
 
-        if (state.current().kind != Token::Punctuator || state.current().text != ")") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ")") {
             state.error("Expected )");
             state.restorePosition(start);
             return std::nullopt;
         }
         state.advance();
 
-        if (state.current().kind != Token::Punctuator || state.current().text != "{") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "{") {
             state.error("Expected {");
             state.restorePosition(start);
             return std::nullopt;
@@ -1170,7 +1170,7 @@ struct FunctionDeclaration {
 
         auto body = FunctionBody<false, false>::parse(state);
 
-        if (state.current().kind != Token::Punctuator || state.current().text != "}") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "}") {
             state.error("Expected }");
             state.restorePosition(start);
             return std::nullopt;
@@ -1487,7 +1487,7 @@ struct CoverParenthesizedExpressionAndArrowParameterList {
 
     static std::optional<CoverParenthesizedExpressionAndArrowParameterList<Yield, Await>> parse(ParserState& state) {
         auto start = state.getPosition();
-        if (state.current().kind != Token::Punctuator || state.current().text != "(") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
             return std::nullopt;
         }
         state.advance();
@@ -1497,7 +1497,7 @@ struct CoverParenthesizedExpressionAndArrowParameterList {
 
         if (auto expr = Expression<true, Yield, Await>::parse(state)) {
             result.expression = std::move(*expr);
-            if (state.current().kind != Token::Punctuator || state.current().text != ",") {
+            if (state.current().kind != lex::Token::Punctuator || state.current().text != ",") {
                 canContinue = false;
             }
             else {
@@ -1506,7 +1506,7 @@ struct CoverParenthesizedExpressionAndArrowParameterList {
         }
 
         if (canContinue) {
-            if (state.current().kind == Token::Punctuator && state.current().text == "...") {
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "...") {
                 state.advance();
                 if (auto binding = BindingIdentifier<Yield, Await>::parse(state)) {
                     canContinue = false;
@@ -1524,7 +1524,7 @@ struct CoverParenthesizedExpressionAndArrowParameterList {
             }
         }
 
-        if (state.current().kind != Token::Punctuator || state.current().text != ")") {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ")") {
             state.error("Expected )");
             state.restorePosition(start);
             return std::nullopt;
@@ -1643,7 +1643,7 @@ struct MemberExpression {
     > value;
 
     static std::optional<MemberExpression<Yield, Await>> parse(ParserState& state) {
-        if (state.current().kind == Token::Keyword && state.current().text == "new") {
+        if (state.current().kind == lex::Token::Keyword && state.current().text == "new") {
             auto start = state.getPosition();
             if (auto member = MemberExpression::parse(state)) {
                 if (auto args = Arguments<Yield, Await>::parse(state)) {
@@ -1667,7 +1667,7 @@ struct MemberExpression {
             return std::nullopt;
         }
 
-        if (state.current().kind == Token::Punctuator && state.current().text == ".") {
+        if (state.current().kind == lex::Token::Punctuator && state.current().text == ".") {
             state.advance();
             // TODO: handle private identifiers
             if (auto identifier = IdentifierName::parse(state)) {
@@ -1676,10 +1676,10 @@ struct MemberExpression {
             }
             state.backtrack();
         }
-        else if (state.current().kind == Token::Punctuator && state.current().text == "[") {
+        else if (state.current().kind == lex::Token::Punctuator && state.current().text == "[") {
             auto start = state.getPosition();
             if (auto expr = Expression<true, Yield, Await>::parse(state)) {
-                if (state.current().kind == Token::Punctuator && state.current().text == "]") {
+                if (state.current().kind == lex::Token::Punctuator && state.current().text == "]") {
                     state.advance();
                     auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
                     return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*expr)}};
@@ -1706,7 +1706,7 @@ struct NewExpression {
     > value;
 
     static std::optional<NewExpression<Yield, Await>> parse(ParserState& state) {
-        if (state.current().kind != Token::Keyword && state.current().text == "new") {
+        if (state.current().kind != lex::Token::Keyword && state.current().text == "new") {
             state.advance();
             if (auto expr = NewExpression::parse(state)) {
                 auto ptr = std::make_unique<NewExpression<Yield, Await>>(std::move(*expr));
@@ -1873,7 +1873,7 @@ struct Assignment {
             return std::nullopt;
         }
 
-        if (state.current().kind != Token::Punctuator || !assignmentOperator.contains(state.current().text)) {
+        if (state.current().kind != lex::Token::Punctuator || !assignmentOperator.contains(state.current().text)) {
             state.restorePosition(start);
             state.error("Expected assignment operator");
             return std::nullopt;
@@ -1985,7 +1985,7 @@ template<bool Yield, bool Await>
 std::optional<UpdateExpression<Yield, Await>> UpdateExpression<Yield, Await>::parse(ParserState& state) {
     // TODO: handle situations like multiple ++ or -- operators
     // TODO: check that "AssignmentTargetType" is simple
-    if (state.current().kind == Token::Punctuator) {
+    if (state.current().kind == lex::Token::Punctuator) {
         std::string_view op = state.current().text;
         if (op == "++" || op == "--") {
             state.advance();
@@ -2000,7 +2000,7 @@ std::optional<UpdateExpression<Yield, Await>> UpdateExpression<Yield, Await>::pa
 
     if (auto expr = LeftHandSideExpression<Yield, Await>::parse(state)) {
         auto ptr = std::make_unique<LeftHandSideExpression<Yield, Await>>(std::move(*expr));
-        if (state.current().kind == Token::Punctuator) {
+        if (state.current().kind == lex::Token::Punctuator) {
             std::string_view op = state.current().text;
             if (op == "++" || op == "--") {
                 state.advance();

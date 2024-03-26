@@ -6,7 +6,7 @@
 #include "language.h"
 
 
-namespace jac {
+namespace jac::lex {
 
 
 struct Token {
@@ -436,4 +436,4 @@ public:
 };
 
 
-} // namespace jac
+} // namespace jac::lex
