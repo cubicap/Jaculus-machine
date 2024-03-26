@@ -12,7 +12,7 @@
 #include "scanner.h"
 
 
-namespace jac {
+namespace jac::ast {
 
 
 class ParserState {
@@ -2029,4 +2029,4 @@ template<bool Yield, bool Await>
 BindingPattern<Yield, Await>::BindingPattern(BindingPattern&&) = default;
 
 
-}  // namespace jac
+}  // namespace jac::ast

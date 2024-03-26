@@ -1,12 +1,12 @@
 #pragma once
 
-#include "grammar.h"
+#include "ast.h"
 #include "tacTree.h"
 #include <unordered_map>
 #include <variant>
 
 
-namespace jac::emit {
+namespace jac::tac {
 
 
 inline tac::Identifier id(std::string name) {
@@ -59,16 +59,16 @@ const std::unordered_map<std::string_view, tac::Operation> unaryOps = {
 
 
 template<bool Yield, bool Await>
-const PrimaryExpression<Yield, Await>& lhsGetPrimary(const LeftHandSideExpression<Yield, Await>& lhs) {
-    const auto newExp = std::get_if<NewExpression<Yield, Await>>(&(lhs.value));
+const ast::PrimaryExpression<Yield, Await>& lhsGetPrimary(const ast::LeftHandSideExpression<Yield, Await>& lhs) {
+    const auto newExp = std::get_if<ast::NewExpression<Yield, Await>>(&(lhs.value));
     if (!newExp) {
         throw std::runtime_error("Only new expressions are supported");
     }
-    const auto member = std::get_if<MemberExpression<Yield, Await>>(&(newExp->value));
+    const auto member = std::get_if<ast::MemberExpression<Yield, Await>>(&(newExp->value));
     if (!member) {
         throw std::runtime_error("Only member expressions are supported");
     }
-    const auto primary = std::get_if<PrimaryExpression<Yield, Await>>(&(member->value));
+    const auto primary = std::get_if<ast::PrimaryExpression<Yield, Await>>(&(member->value));
     if (!primary) {
         throw std::runtime_error("Only primary expressions are supported");
     }
@@ -77,7 +77,7 @@ const PrimaryExpression<Yield, Await>& lhsGetPrimary(const LeftHandSideExpressio
 }
 
 
-inline tac::Arg emit(NumericLiteral lit) {
+inline tac::Arg emit(ast::NumericLiteral lit) {
     struct visitor {
         tac::Arg operator()(int32_t lit) {
             return lit;
@@ -91,18 +91,18 @@ inline tac::Arg emit(NumericLiteral lit) {
 }
 
 
-inline tac::Arg emit(const Literal& lit) {
+inline tac::Arg emit(const ast::Literal& lit) {
     struct visitor {
-        tac::Arg operator()(const NullLiteral&) {
+        tac::Arg operator()(const ast::NullLiteral&) {
             throw std::runtime_error("Null literals are not supported");
         }
-        tac::Arg operator()(const BooleanLiteral& lit) {
+        tac::Arg operator()(const ast::BooleanLiteral& lit) {
             return tac::Arg(lit.value);
         }
-        tac::Arg operator()(const NumericLiteral& lit) {
+        tac::Arg operator()(const ast::NumericLiteral& lit) {
             return emit(lit);
         }
-        tac::Arg operator()(const StringLiteral&) {
+        tac::Arg operator()(const ast::StringLiteral&) {
             throw std::runtime_error("String literals are not supported");
         }
     };
@@ -112,46 +112,46 @@ inline tac::Arg emit(const Literal& lit) {
 
 
 template<bool Yield, bool Await>
-tac::Arg emit(const PrimaryExpression<Yield, Await>& primary, tac::Block& block) {
+tac::Arg emit(const ast::PrimaryExpression<Yield, Await>& primary, tac::Block& block) {
     struct visitor {
         tac::Block& block;
-        tac::Arg operator()(const ThisExpr&) {
+        tac::Arg operator()(const ast::ThisExpr&) {
             throw std::runtime_error("This expressions are not supported");
         }
-        tac::Arg operator()(const IdentifierReference<Yield, Await>& identifier) {
+        tac::Arg operator()(const ast::IdentifierReference<Yield, Await>& identifier) {
             return tac::Arg(id(identifier.identifier.name.name));
         }
-        tac::Arg operator()(const Literal& literal) {
+        tac::Arg operator()(const ast::Literal& literal) {
             return emit(literal);
         }
-        tac::Arg operator()(const ArrayLiteral<Yield, Await>&) {
+        tac::Arg operator()(const ast::ArrayLiteral<Yield, Await>&) {
             throw std::runtime_error("Array literals are not supported");
         }
-        tac::Arg operator()(const ObjectLiteral<Yield, Await>&) {
+        tac::Arg operator()(const ast::ObjectLiteral<Yield, Await>&) {
             throw std::runtime_error("Object literals are not supported");
         }
-        tac::Arg operator()(const FunctionExpression&) {
+        tac::Arg operator()(const ast::FunctionExpression&) {
             throw std::runtime_error("Function expressions are not supported");
         }
-        tac::Arg operator()(const ClassExpression<Yield, Await>&) {
+        tac::Arg operator()(const ast::ClassExpression<Yield, Await>&) {
             throw std::runtime_error("Class expressions are not supported");
         }
-        tac::Arg operator()(const GeneratorExpression&) {
+        tac::Arg operator()(const ast::GeneratorExpression&) {
             throw std::runtime_error("Generator expressions are not supported");
         }
-        tac::Arg operator()(const AsyncFunctionExpression&) {
+        tac::Arg operator()(const ast::AsyncFunctionExpression&) {
             throw std::runtime_error("Async function expressions are not supported");
         }
-        tac::Arg operator()(const AsyncGeneratorExpression&) {
+        tac::Arg operator()(const ast::AsyncGeneratorExpression&) {
             throw std::runtime_error("Async generator expressions are not supported");
         }
-        tac::Arg operator()(const RegularExpressionLiteral&) {
+        tac::Arg operator()(const ast::RegularExpressionLiteral&) {
             throw std::runtime_error("Regular expression literals are not supported");
         }
-        tac::Arg operator()(const TemplateLiteral<Yield, Await, false>&) {
+        tac::Arg operator()(const ast::TemplateLiteral<Yield, Await, false>&) {
             throw std::runtime_error("Template literals are not supported");
         }
-        tac::Arg operator()(const ParenthesizedExpression<Yield, Await>&) {
+        tac::Arg operator()(const ast::ParenthesizedExpression<Yield, Await>&) {
             throw std::runtime_error("Parenthesized expressions are not supported");
         }
     };
@@ -161,14 +161,14 @@ tac::Arg emit(const PrimaryExpression<Yield, Await>& primary, tac::Block& block)
 
 
 template<bool Yield, bool Await>
-tac::Arg emit(const UpdateExpression<Yield, Await>& expr, tac::Block& block) {
+tac::Arg emit(const ast::UpdateExpression<Yield, Await>& expr, tac::Block& block) {
     struct visitor {
         tac::Block& block;
-        tac::Arg operator()(const UnaryExpressionPtr<Yield, Await>&) {
+        tac::Arg operator()(const ast::UnaryExpressionPtr<Yield, Await>&) {
             throw std::runtime_error("Unary expressions are not supported");
         }
 
-        tac::Arg operator()(const LeftHandSideExpressionPtr<Yield, Await>& lhs) {
+        tac::Arg operator()(const ast::LeftHandSideExpressionPtr<Yield, Await>& lhs) {
             return emit(lhsGetPrimary(*lhs), block);
         }
     };
@@ -178,10 +178,10 @@ tac::Arg emit(const UpdateExpression<Yield, Await>& expr, tac::Block& block) {
 
 
 template<bool Yield, bool Await>
-tac::Arg emit(const UnaryExpression<Yield, Await>& expr, tac::Block& block) {
+tac::Arg emit(const ast::UnaryExpression<Yield, Await>& expr, tac::Block& block) {
     struct visitor {
         tac::Block& block;
-        tac::Arg operator()(const UnaryExpressionPtr<Yield, Await>& unary) {
+        tac::Arg operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
             tac::Arg arg = emit(*unary, block);
 
             auto it = unaryOps.find(unary->op);
@@ -202,7 +202,7 @@ tac::Arg emit(const UnaryExpression<Yield, Await>& expr, tac::Block& block) {
             return res;
         }
 
-        tac::Arg operator()(const UpdateExpression<Yield, Await>& update) {
+        tac::Arg operator()(const ast::UpdateExpression<Yield, Await>& update) {
             return emit(update, block);
         }
     };
@@ -212,12 +212,12 @@ tac::Arg emit(const UnaryExpression<Yield, Await>& expr, tac::Block& block) {
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const BinaryExpression<In, Yield, Await>& expr, tac::Block& block) {
+tac::Arg emit(const ast::BinaryExpression<In, Yield, Await>& expr, tac::Block& block) {
     struct visitor {
         tac::Block& block;
         tac::Arg operator()(const std::tuple<
-                                BinaryExpressionPtr<In, Yield, Await>,
-                                BinaryExpressionPtr<In, Yield, Await>,
+                                ast::BinaryExpressionPtr<In, Yield, Await>,
+                                ast::BinaryExpressionPtr<In, Yield, Await>,
                                 std::string_view
                             >& binExpr) {
             tac::Arg lhs = emit(*std::get<0>(binExpr), block);
@@ -241,7 +241,7 @@ tac::Arg emit(const BinaryExpression<In, Yield, Await>& expr, tac::Block& block)
 
             return res;
         }
-        tac::Arg operator()(const UnaryExpression<Yield, Await>& unary) {
+        tac::Arg operator()(const ast::UnaryExpression<Yield, Await>& unary) {
             return emit(unary, block);
         }
     };
@@ -251,16 +251,16 @@ tac::Arg emit(const BinaryExpression<In, Yield, Await>& expr, tac::Block& block)
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const ConditionalExpression<In, Yield, Await>& expr, tac::Block& block) {
+tac::Arg emit(const ast::ConditionalExpression<In, Yield, Await>& expr, tac::Block& block) {
     struct visitor {
         tac::Block& block;
-        tac::Arg operator()(const BinaryExpression<In, Yield, Await>& xpr) {
+        tac::Arg operator()(const ast::BinaryExpression<In, Yield, Await>& xpr) {
             return emit(xpr, block);
         }
         tac::Arg operator()(const std::tuple<  // ternary conditional operator
-                                BinaryExpression<In, Yield, Await>,
-                                AssignmentExpressionPtr<In, Yield, Await>,
-                                AssignmentExpressionPtr<In, Yield, Await>
+                                ast::BinaryExpression<In, Yield, Await>,
+                                ast::AssignmentExpressionPtr<In, Yield, Await>,
+                                ast::AssignmentExpressionPtr<In, Yield, Await>
                             >&) {
             throw std::runtime_error("Ternary conditional operator is not supported");
         }
@@ -271,26 +271,26 @@ tac::Arg emit(const ConditionalExpression<In, Yield, Await>& expr, tac::Block& b
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const Assignment<In, Yield, Await>& assign, tac::Block& block);
+tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Block& block);
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const AssignmentExpression<In, Yield, Await>& expr, tac::Block& block) {
+tac::Arg emit(const ast::AssignmentExpression<In, Yield, Await>& expr, tac::Block& block) {
     struct visitor {
         tac::Block& block;
-        tac::Arg operator()(const ConditionalExpression<In, Yield, Await>& cond) {
+        tac::Arg operator()(const ast::ConditionalExpression<In, Yield, Await>& cond) {
             return emit(cond, block);
         }
-        tac::Arg operator()(const YieldExpression<In, Yield, Await>&) {
+        tac::Arg operator()(const ast::YieldExpression<In, Yield, Await>&) {
             throw std::runtime_error("Yield expressions are not supported");
         }
-        tac::Arg operator()(const ArrowFunction<In, Yield, Await>&) {
+        tac::Arg operator()(const ast::ArrowFunction<In, Yield, Await>&) {
             throw std::runtime_error("Arrow functions are not supported");
         }
-        tac::Arg operator()(const AsyncArrowFunction<In, Yield, Await>&) {
+        tac::Arg operator()(const ast::AsyncArrowFunction<In, Yield, Await>&) {
             throw std::runtime_error("Async arrow functions are not supported");
         }
-        tac::Arg operator()(const Assignment<In, Yield, Await>& assign) {
+        tac::Arg operator()(const ast::Assignment<In, Yield, Await>& assign) {
             return emit(assign, block);
         }
     };
@@ -300,12 +300,12 @@ tac::Arg emit(const AssignmentExpression<In, Yield, Await>& expr, tac::Block& bl
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const Assignment<In, Yield, Await>& assign, tac::Block& block) {
+tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Block& block) {
     const auto& lhsPrimary = lhsGetPrimary(assign.lhs);
-    if (!std::holds_alternative<IdentifierReference<Yield, Await>>(lhsPrimary.value)) {
+    if (!std::holds_alternative<ast::IdentifierReference<Yield, Await>>(lhsPrimary.value)) {
         throw std::runtime_error("Only identifier references are supported as assignment targets");
     }
-    tac::Identifier target = id(std::get<IdentifierReference<Yield, Await>>(lhsPrimary.value).identifier.name.name);
+    tac::Identifier target = id(std::get<ast::IdentifierReference<Yield, Await>>(lhsPrimary.value).identifier.name.name);
 
     tac::Arg rhs = emit(*assign.rhs, block);
 
@@ -325,17 +325,17 @@ tac::Arg emit(const Assignment<In, Yield, Await>& assign, tac::Block& block) {
 
 
 template<bool Yield, bool Await, bool Return>
-void emit(const Declaration<Yield, Await, Return>& declaration, tac::Block& block) {
-    if (!std::holds_alternative<LexicalDeclaration<true, Yield, Await>>(declaration.value)) {
+void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Block& block) {
+    if (!std::holds_alternative<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value)) {
         throw std::runtime_error("Only lexical declarations are supported");
     }
 
     struct visitor {
         tac::Block& block;
-        void operator()(const BindingIdentifier<Yield, Await>& decl) {
+        void operator()(const ast::BindingIdentifier<Yield, Await>& decl) {
             // do nothing
         }
-        void operator()(const std::pair<BindingIdentifier<Yield, Await>, InitializerPtr<true, Yield, Await>>& assign) {
+        void operator()(const std::pair<ast::BindingIdentifier<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>& assign) {
             const auto& [binding, initializer] = assign;
 
             tac::Arg tmp = emit(*initializer, block);
@@ -346,20 +346,20 @@ void emit(const Declaration<Yield, Await, Return>& declaration, tac::Block& bloc
                 .result = id(binding.identifier.name.name)
             });
         }
-        void operator()(const std::pair<BindingPattern<Yield, Await>, InitializerPtr<true, Yield, Await>>&) {
+        void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>&) {
             throw std::runtime_error("Binding patterns are not supported");
         }
     };
 
-    const auto& lexical = std::get<LexicalDeclaration<true, Yield, Await>>(declaration.value);
-    for (const LexicalBinding<true, Yield, Await>& binding : lexical.bindings) {
+    const auto& lexical = std::get<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value);
+    for (const ast::LexicalBinding<true, Yield, Await>& binding : lexical.bindings) {
         std::visit(visitor{block}, binding.value);
     }
 }
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const Expression<In, Yield, Await>& expr, tac::Block& block) {
+tac::Arg emit(const ast::Expression<In, Yield, Await>& expr, tac::Block& block) {
     for (size_t i = 0; i + 1 < expr.items.size(); i++) {
         emit(*expr.items[i], block);
     }
@@ -371,7 +371,7 @@ tac::Arg emit(const Expression<In, Yield, Await>& expr, tac::Block& block) {
 
 
 template<bool Yield, bool Await>
-void emit(const ReturnStatement<Yield, Await>& stmt, tac::Block& block) {
+void emit(const ast::ReturnStatement<Yield, Await>& stmt, tac::Block& block) {
     if (!stmt.expression) {
         block.jump = tac::Jump::retVal(tac::Arg(0));
         return;
@@ -383,49 +383,49 @@ void emit(const ReturnStatement<Yield, Await>& stmt, tac::Block& block) {
 
 
 template<bool Yield, bool Await, bool Return>
-void emit(const Statement<Yield, Await, Return>& statement, tac::Block& block) {
+void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Block& block) {
     struct visitor {
         tac::Block& block;
-        void operator()(const BlockStatement<Yield, Await, Return>&) {
+        void operator()(const ast::BlockStatement<Yield, Await, Return>&) {
             throw std::runtime_error("Block statements are not supported");
         }
-        void operator()(const VariableStatement<Yield, Await>&) {
+        void operator()(const ast::VariableStatement<Yield, Await>&) {
             throw std::runtime_error("Variable statements are not supported");
         }
-        void operator()(const EmptyStatement&) {
+        void operator()(const ast::EmptyStatement&) {
             throw std::runtime_error("Empty statements are not supported");
         }
-        void operator()(const ExpressionStatement<Yield, Await>& statement) {
+        void operator()(const ast::ExpressionStatement<Yield, Await>& statement) {
             emit(statement.expression, block);
         }
-        void operator()(const IfStatement<Yield, Await, Return>&) {
+        void operator()(const ast::IfStatement<Yield, Await, Return>&) {
             throw std::runtime_error("If statements are not supported");
         }
-        void operator()(const BreakableStatement<Yield, Await, Return>&) {
+        void operator()(const ast::BreakableStatement<Yield, Await, Return>&) {
             throw std::runtime_error("Breakable statements are not supported");
         }
-        void operator()(const ContinueStatement<Yield, Await>&) {
+        void operator()(const ast::ContinueStatement<Yield, Await>&) {
             throw std::runtime_error("Continue statements are not supported");
         }
-        void operator()(const BreakStatement<Yield, Await>&) {
+        void operator()(const ast::BreakStatement<Yield, Await>&) {
             throw std::runtime_error("Break statements are not supported");
         }
-        void operator()(const ReturnStatement<Yield, Await>& stmt) {
+        void operator()(const ast::ReturnStatement<Yield, Await>& stmt) {
             emit(stmt, block);
         }
-        void operator()(const WithStatement<Yield, Await, Return>&) {
+        void operator()(const ast::WithStatement<Yield, Await, Return>&) {
             throw std::runtime_error("With statements are not supported");
         }
-        void operator()(const LabeledStatement<Yield, Await, Return>&) {
+        void operator()(const ast::LabeledStatement<Yield, Await, Return>&) {
             throw std::runtime_error("Labeled statements are not supported");
         }
-        void operator()(const ThrowStatement<Yield, Await>&) {
+        void operator()(const ast::ThrowStatement<Yield, Await>&) {
             throw std::runtime_error("Throw statements are not supported");
         }
-        void operator()(const TryStatement<Yield, Await, Return>&) {
+        void operator()(const ast::TryStatement<Yield, Await, Return>&) {
             throw std::runtime_error("Try statements are not supported");
         }
-        void operator()(const DebuggerStatement&) {
+        void operator()(const ast::DebuggerStatement&) {
             throw std::runtime_error("Debugger statements are not supported");
         }
     };
@@ -435,19 +435,19 @@ void emit(const Statement<Yield, Await, Return>& statement, tac::Block& block) {
 
 
 template<bool Yield, bool Await, bool Return>
-tac::Block emit(const StatementList<Yield, Await, Return>& list) {
+tac::Block emit(const ast::StatementList<Yield, Await, Return>& list) {
     struct visitor {
         tac::Block& block;
-        void operator()(const Statement<Yield, Await, Return>& statement) {
+        void operator()(const ast::Statement<Yield, Await, Return>& statement) {
             emit(statement, block);
         }
-        void operator()(const Declaration<Yield, Await, Return>& declaration) {
+        void operator()(const ast::Declaration<Yield, Await, Return>& declaration) {
             emit(declaration, block);
         }
     };
 
     tac::Block block;
-    for (const StatementListItem<Yield, Await, Return>& statement : list.items) {
+    for (const ast::StatementListItem<Yield, Await, Return>& statement : list.items) {
         std::visit(visitor{block}, statement.value);
     }
     return block;
@@ -455,7 +455,7 @@ tac::Block emit(const StatementList<Yield, Await, Return>& list) {
 
 
 template<bool Yield, bool Await, bool Default>
-tac::Function emit(const FunctionDeclaration<Yield, Await, Default>& decl) {
+tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) {
     tac::Function out;
     if (!decl.name) {
         throw std::runtime_error("Function declarations must have a name");
@@ -463,11 +463,11 @@ tac::Function emit(const FunctionDeclaration<Yield, Await, Default>& decl) {
     out.name = id(decl.name->identifier.name.name);
 
     out.returnType = tac::ValueType::Word;
-    for (const FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
-        if (!std::holds_alternative<BindingIdentifier<Yield, Await>>(arg.value)) {
+    for (const ast::FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
+        if (!std::holds_alternative<ast::BindingIdentifier<Yield, Await>>(arg.value)) {
             throw std::runtime_error("Only binding identifiers are supported as function parameters");
         }
-        const auto& binding = std::get<BindingIdentifier<Yield, Await>>(arg.value);
+        const auto& binding = std::get<ast::BindingIdentifier<Yield, Await>>(arg.value);
         out.args.emplace_back(id(binding.identifier.name.name), tac::ValueType::Word);
     }
 
@@ -491,4 +491,4 @@ tac::Function emit(const FunctionDeclaration<Yield, Await, Default>& decl) {
 }
 
 
-}  // namespace jac::emit
+}  // namespace jac::tac
