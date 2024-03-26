@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <jac/machine/parser/scanner.h>
+#include <jac/machine/compiler/scanner.h>
 
 
 template<>

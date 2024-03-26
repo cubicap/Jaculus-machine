@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include <jac/machine/parser/grammar.h>
+#include <jac/machine/compiler/grammar.h>
 
 
 template<>

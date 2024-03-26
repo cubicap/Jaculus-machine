@@ -809,9 +809,9 @@ struct StatementList {
 
 template<bool Yield, bool Await>
 using FunctionBody = StatementList<Yield, Await, true>;
-using GeneratorBody = FunctionBody<false, false>;
-using AsyncFunctionBody = FunctionBody<false, false>;
-using AsyncGeneratorBody = FunctionBody<false, false>;
+using GeneratorBody = FunctionBody<true, false>;
+using AsyncFunctionBody = FunctionBody<false, true>;
+using AsyncGeneratorBody = FunctionBody<true, true>;
 
 template<bool In, bool Yield, bool Await>
 struct Expression {
