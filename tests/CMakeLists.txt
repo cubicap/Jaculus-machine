@@ -35,4 +35,6 @@ add_test_executable(regression)
 add_test_executable(scanner)
 add_test_executable(parser)
 
+add_test_executable(asScanner)
+
 file(COPY test_files DESTINATION "./")
