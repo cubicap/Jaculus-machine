@@ -151,8 +151,8 @@ tac::Arg emit(const ast::PrimaryExpression<Yield, Await>& primary, tac::Block& b
         tac::Arg operator()(const ast::TemplateLiteral<Yield, Await, false>&) {
             throw std::runtime_error("Template literals are not supported");
         }
-        tac::Arg operator()(const ast::ParenthesizedExpression<Yield, Await>&) {
-            throw std::runtime_error("Parenthesized expressions are not supported");
+        tac::Arg operator()(const ast::ParenthesizedExpression<Yield, Await>& expr) {
+            return emit(expr.expression, block);
         }
     };
 
