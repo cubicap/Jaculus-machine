@@ -519,6 +519,70 @@ void emitAddIR(std::span<Token> toks, InstructionStream& is) {
 }
 
 template<RegSize size>
+void emitImulRR(std::span<Token> toks, InstructionStream& is) {
+    auto regA = toks[0];
+    auto regB = toks[1];
+
+    auto [sizeA, codeA] = registers.at(regA.text);
+    auto [sizeB, codeB] = registers.at(regB.text);
+    if (sizeA != size || sizeB != size) {
+        throw std::runtime_error("Register sizes do not match");
+    }
+
+    if constexpr (size == RegSize::R8) {
+        throw std::runtime_error("'imul' does not support 8-bit registers");
+    }
+    else if constexpr (size == RegSize::R16) {
+        is.emit(0x66);
+        is.emit(0x0F);
+        is.emit(0xAF);
+    }
+    else if constexpr (size == RegSize::R32) {
+        is.emit(0x0F);
+        is.emit(0xAF);
+    }
+    else if constexpr (size == RegSize::R64) {
+        is.emit(0x48);
+        is.emit(0x0F);
+        is.emit(0xAF);
+    }
+
+    is.emit(0xC0 + codeB * 8 + codeA);
+};
+
+template<RegSize size>
+void emitImulIRR(std::span<Token> toks, InstructionStream& is) {
+    auto imm = toks[0];
+    auto regA = toks[1];
+    auto regB = toks[2];
+
+    auto [sizeA, codeA] = registers.at(regA.text);
+    auto [sizeB, codeB] = registers.at(regB.text);
+    if (sizeB != size || sizeA != size) {
+        throw std::runtime_error("Register sizes do not match");
+    }
+
+    if constexpr (size == RegSize::R8) {
+        throw std::runtime_error("'imul' does not support 8-bit registers");
+    }
+    else if constexpr (size == RegSize::R16) {
+        is.emit(0x66);
+        is.emit(0x69);
+    }
+    else if constexpr (size == RegSize::R32) {
+        is.emit(0x69);
+    }
+    else if constexpr (size == RegSize::R64) {
+        is.emit(0x48);
+        is.emit(0x69);
+    }
+
+    is.emit(0xC0 + codeB * 8 + codeA);
+
+    emitImmediate<size, RegSize::R32>(is, imm.toInt());
+};
+
+template<RegSize size>
 void emitLeave(std::span<Token>, InstructionStream& is) {
     is.emit(0xC9);
 }
@@ -580,6 +644,12 @@ const std::unordered_multimap<std::string_view, Instruction> instructions{
     { "addl",  { Args<Imm, Reg>::matcher(), emitAddIR<RegSize::R32> } },
     { "addw",  { Args<Imm, Reg>::matcher(), emitAddIR<RegSize::R16> } },
     { "addb",  { Args<Imm, Reg>::matcher(), emitAddIR<RegSize::R8> } },
+    { "imulq", { Args<Imm, Reg, Reg>::matcher(), emitImulIRR<RegSize::R64> } },
+    { "imull", { Args<Imm, Reg, Reg>::matcher(), emitImulIRR<RegSize::R32> } },
+    { "imulw", { Args<Imm, Reg, Reg>::matcher(), emitImulIRR<RegSize::R16> } },
+    { "imulq", { Args<Reg, Reg>::matcher(), emitImulRR<RegSize::R64> } },
+    { "imull", { Args<Reg, Reg>::matcher(), emitImulRR<RegSize::R32> } },
+    { "imulw", { Args<Reg, Reg>::matcher(), emitImulRR<RegSize::R16> } },
     { "leave", { Args<>::matcher(), emitLeave<RegSize::R64> } },
     { "ret",   { Args<>::matcher(), emitRet<RegSize::R64> } }
 };
