@@ -109,8 +109,6 @@ inline std::optional<std::string> compile(std::string path, std::span<char> code
         qbec::T.emitfin(outf);
     }
 
-    fputc('\0', outf);
-
     fclose(f);
     fclose(outf);
 
