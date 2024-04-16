@@ -686,6 +686,23 @@ struct BindingPattern {
     ~BindingPattern();
 };
 
+
+// XXX: EXTENSION, incompatible with standard
+struct TypeAnnotation {
+    Identifier type;
+
+    static std::optional<TypeAnnotation> parse(ParserState& state) {
+        if (state.current().kind == lex::Token::Punctuator && state.current().text == ":") {
+            state.advance();
+            if (auto id = Identifier::parse(state)) {
+                return TypeAnnotation{*id};
+            }
+        }
+
+        return std::nullopt;
+    }
+};
+
 template<bool Yield, bool Await>
 struct BindingElement {
     std::variant<
@@ -694,9 +711,12 @@ struct BindingElement {
         BindingPattern<Yield, Await>,
         std::pair<BindingPattern<Yield, Await>, InitializerPtr<true, Yield, Await>>
     > value;
+    std::optional<TypeAnnotation> type;
 
     static std::optional<BindingElement<Yield, Await>> parse(ParserState& state) {
         if (auto id = BindingIdentifier<Yield, Await>::parse(state)) {
+            auto annotation = TypeAnnotation::parse(state);
+
             if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
@@ -706,9 +726,11 @@ struct BindingElement {
                 state.backtrack();
                 return std::nullopt;
             }
-            return BindingElement<Yield, Await>{std::move(*id)};
+            return BindingElement<Yield, Await>{std::move(*id), std::move(annotation)};
         }
         if (auto pattern = BindingPattern<Yield, Await>::parse(state)) {
+            auto annotation = TypeAnnotation::parse(state);
+
             if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
@@ -718,7 +740,7 @@ struct BindingElement {
                 state.backtrack();
                 return std::nullopt;
             }
-            return BindingElement<Yield, Await>{std::move(*pattern)};
+            return BindingElement<Yield, Await>{std::move(*pattern), std::move(annotation)};
         }
 
         return std::nullopt;
@@ -1121,6 +1143,7 @@ struct FunctionDeclaration {
     std::optional<BindingIdentifier<Yield, Await>> name;  // optional only when [+Default]
     FormalParameters<false, false> parameters;
     std::optional<FunctionBody<false, false>> body;
+    std::optional<TypeAnnotation> returnType;
 
     static std::optional<FunctionDeclaration<Yield, Await, Default>> parse(ParserState& state) {
         auto start = state.getPosition();
@@ -1161,6 +1184,8 @@ struct FunctionDeclaration {
         }
         state.advance();
 
+        auto returnType = TypeAnnotation::parse(state);
+
         if (state.current().kind != lex::Token::Punctuator || state.current().text != "{") {
             state.error("Expected {");
             state.restorePosition(start);
@@ -1177,7 +1202,12 @@ struct FunctionDeclaration {
         }
         state.advance();
 
-        return FunctionDeclaration<Yield, Await, Default>{std::move(name), std::move(*params), std::move(body)};
+        return FunctionDeclaration<Yield, Await, Default>{
+            std::move(name),
+            std::move(*params),
+            std::move(body),
+            std::move(returnType)
+        };
     }
 };
 

@@ -30,12 +30,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(QuickJS)
 
 FetchContent_Declare(
-    QBE
-    URL               https://c9x.me/compile/release/qbe-1.2.tar.xz
-    PATCH_COMMAND     ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/qbe.CMakeLists.txt <SOURCE_DIR>/CMakeLists.txt
-    CMAKE_ARGS        -DESP_PLATFORM=${ESP_PLATFORM}
+    MIR
+    URL               https://github.com/vnmakarov/mir/archive/refs/tags/v0.1.2.tar.gz
+    CMAKE_ARGS        -D
 )
-FetchContent_MakeAvailable(QBE)
+FetchContent_MakeAvailable(MIR)
+set(MIR_INCLUDE_DIR ${mir_SOURCE_DIR}/include)
 
 
 if(ESP_PLATFORM)
@@ -43,8 +43,8 @@ if(ESP_PLATFORM)
 else()
 
     add_library(jac-machine STATIC ${JAC_MACHINE_SRC})
-    target_include_directories(jac-machine PUBLIC .)
+    target_include_directories(jac-machine PUBLIC . ${mir_SOURCE_DIR})
     set_target_properties(jac-machine PROPERTIES LINKER_LANGUAGE CXX)
-    target_link_libraries(jac-machine PUBLIC quickjs qbe)
+    target_link_libraries(jac-machine PUBLIC quickjs mir)
 
 endif()
