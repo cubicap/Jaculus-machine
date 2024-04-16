@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <jac/features/evalFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/plugins.h>
 
@@ -32,6 +33,7 @@ public:
 TEST_CASE("ReportPlugin") {
     using Machine = jac::ComposeMachine<
         jac::MachineBase,
+        jac::EvalFeature,
         jac::PluginHolderFeature
     >;
 
@@ -75,6 +77,7 @@ public:
 TEST_CASE("MathPlugin") {
     using Machine = jac::ComposeMachine<
         jac::MachineBase,
+        jac::EvalFeature,
         jac::PluginHolderFeature
     >;
 

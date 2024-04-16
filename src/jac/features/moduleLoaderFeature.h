@@ -24,9 +24,13 @@ private:
 
         // compile and return module
         self.resetWatchdog();
-        JSValue val = JS_Eval(ctx, buffer.c_str(), buffer.size(), module_name,
-                              JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
-        if (JS_IsException(val)) {
+
+        JSValue val;
+        try {
+            Value code = self.eval(std::move(buffer), std::move(filename), EvalFlags::Module | EvalFlags::CompileOnly);
+            val = code.loot().second;
+        }
+        catch (...) {
             return nullptr;
         }
 

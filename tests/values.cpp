@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 
+#include <jac/features/evalFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
@@ -15,9 +16,10 @@
 
 
 TEST_CASE("To JS value", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -94,9 +96,10 @@ TEST_CASE("To JS value", "[base]") {
 
 
 TEST_CASE("toString", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -133,9 +136,10 @@ TEST_CASE("toString", "[base]") {
 
 
 TEST_CASE("From JS value", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -179,9 +183,10 @@ TEST_CASE("From JS value", "[base]") {
 
 
 TEST_CASE("Object get", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -211,9 +216,10 @@ TEST_CASE("Object get", "[base]") {
 
 
 TEST_CASE("Object set", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -252,9 +258,10 @@ TEST_CASE("Object set", "[base]") {
 
 
 TEST_CASE("Object create", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -273,9 +280,10 @@ TEST_CASE("Object create", "[base]") {
 
 
 TEST_CASE("Object hasProperty", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -290,9 +298,9 @@ TEST_CASE("Object hasProperty", "[base]") {
 
 
 TEST_CASE("Object defineProperty", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -320,9 +328,10 @@ TEST_CASE("Object defineProperty", "[base]") {
 
 
 TEST_CASE("Object deleteProperty", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -338,9 +347,10 @@ TEST_CASE("Object deleteProperty", "[base]") {
 
 
 TEST_CASE("Function") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -495,9 +505,10 @@ TEST_CASE("Function") {
 
 
 TEST_CASE("Promise", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -553,9 +564,10 @@ TEST_CASE("Promise", "[base]") {
 
 
 TEST_CASE("is type", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -586,9 +598,9 @@ TEST_CASE("is type", "[base]") {
 
 
 TEST_CASE("json", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -641,9 +653,10 @@ TEST_CASE("json", "[base]") {
 
 
 TEST_CASE("ArrayBuffer", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;

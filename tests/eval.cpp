@@ -5,6 +5,7 @@
 
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
+#include <jac/features/evalFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
 
@@ -12,9 +13,10 @@
 
 
 TEST_CASE("TestReportFeature", "[reportFeature]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -58,9 +60,10 @@ TEST_CASE("TestReportFeature", "[reportFeature]") {
 
 
 TEST_CASE("Eval", "[eval]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;

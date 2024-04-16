@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <jac/features/evalFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
@@ -12,12 +13,13 @@
 
 
 TEST_CASE("Eval file", "[moduleLoader]") {
-    using Machine =
-        jac::ModuleLoaderFeature<
-        jac::FilesystemFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>>;
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature,
+        jac::FilesystemFeature,
+        jac::ModuleLoaderFeature
+    >;
     Machine machine;
 
     using sgn = typename std::tuple<std::string, std::string, std::vector<std::string>>;
@@ -45,12 +47,13 @@ TEST_CASE("Eval file", "[moduleLoader]") {
 
 
 TEST_CASE("Import file", "[moduleLoader]") {
-    using Machine =
-        jac::ModuleLoaderFeature<
-        jac::FilesystemFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>>;
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature,
+        jac::FilesystemFeature,
+        jac::ModuleLoaderFeature
+    >;
     Machine machine;
 
     using sgn = typename std::tuple<std::string, std::string, std::vector<std::string>>;

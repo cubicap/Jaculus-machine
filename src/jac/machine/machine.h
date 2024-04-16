@@ -165,16 +165,6 @@ public:
     }
 
     /**
-     * @brief Evaluate a string containing javascript code
-     *
-     * @param code the code to evaluate
-     * @param filename filename to use for the code. Used for error reporting
-     * @param flags flags to evaluate the code with
-     * @return Result of the evaluation
-     */
-    Value eval(std::string code, std::string filename, EvalFlags flags = EvalFlags::Global);
-
-    /**
      * @brief Create a new module in the machine
      *
      * @param name name of the module

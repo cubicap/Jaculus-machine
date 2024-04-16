@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <jac/features/evalFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
@@ -12,9 +13,10 @@
 
 
 TEST_CASE("Register global", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -31,9 +33,10 @@ TEST_CASE("Register global", "[base]") {
 
 
 TEST_CASE("Cpp Module", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -76,9 +79,10 @@ TEST_CASE("Cpp Module", "[base]") {
 }
 
 TEST_CASE("watchdog", "[base]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;

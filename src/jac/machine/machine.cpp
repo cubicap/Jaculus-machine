@@ -49,17 +49,6 @@ void MachineBase::initialize() {
     }, this);
 }
 
-Value MachineBase::eval(std::string code, std::string filename, EvalFlags flags /*= EvalFlags::Global*/) {
-    resetWatchdog();
-    Value bytecode(_context, JS_Eval(_context, code.c_str(), code.size(), filename.c_str(), static_cast<int>(flags | EvalFlags::CompileOnly)));
-    if (static_cast<int>(flags & EvalFlags::CompileOnly) != 0) {
-        return bytecode;
-    }
-    code = "";
-    resetWatchdog();
-    return Value(_context, JS_EvalFunction(_context, bytecode.loot().second));
-}
-
 Module& MachineBase::newModule(std::string name) {
     Module mdl(_context, name);
     JSModuleDef* def = mdl.get();

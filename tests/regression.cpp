@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <jac/features/evalFeature.h>
 #include <jac/features/eventLoopFeature.h>
 #include <jac/features/eventQueueFeature.h>
 #include <jac/features/filesystemFeature.h>
@@ -15,16 +16,17 @@
 
 
 TEST_CASE("Imported promise", "[moduleLoader]") {
-    using Machine =
-        jac::EventLoopTerminal<
-        jac::TimersFeature<
-        jac::ModuleLoaderFeature<
-        jac::FilesystemFeature<
-        jac::EventLoopFeature<
-        jac::EventQueueFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>>>>>>;
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature,
+        jac::EventQueueFeature,
+        jac::EventLoopFeature,
+        jac::FilesystemFeature,
+        jac::ModuleLoaderFeature,
+        jac::TimersFeature,
+        jac::EventLoopTerminal
+    >;
 
     Machine machine;
 
@@ -39,14 +41,15 @@ TEST_CASE("Imported promise", "[moduleLoader]") {
 
 
 TEST_CASE("Timer leak", "[timers]") {
-    using Machine =
-        jac::EventLoopTerminal<
-        jac::TimersFeature<
-        jac::EventLoopFeature<
-        jac::EventQueueFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>>>>;
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature,
+        jac::EventQueueFeature,
+        jac::EventLoopFeature,
+        jac::TimersFeature,
+        jac::EventLoopTerminal
+    >;
 
     Machine machine;
 

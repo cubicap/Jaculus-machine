@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <jac/features/evalFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
@@ -12,9 +13,10 @@
 
 
 TEST_CASE("New function", "[functionFactory]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -71,9 +73,10 @@ TEST_CASE("New function", "[functionFactory]") {
 
 
 TEST_CASE("New function variadic", "[functionFactory]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -105,9 +108,10 @@ TEST_CASE("New function variadic", "[functionFactory]") {
 
 
 TEST_CASE("New function this", "[functionFactory]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;
@@ -164,9 +168,10 @@ TEST_CASE("New function this", "[functionFactory]") {
 
 
 TEST_CASE("New function this variadic", "[functionFactory]") {
-    using Machine =
-        TestReportFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        TestReportFeature
     >;
 
     Machine machine;

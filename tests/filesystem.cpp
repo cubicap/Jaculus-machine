@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 
+#include <jac/features/evalFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
@@ -24,9 +25,10 @@ std::string readFile(auto f) {
 
 
 TEST_CASE("Filesystem", "[filesystem]") {
-    using Machine =
-        jac::FilesystemFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        jac::FilesystemFeature
     >;
     Machine machine;
 
@@ -169,9 +171,10 @@ TEST_CASE("Filesystem", "[filesystem]") {
 
 
 TEST_CASE("Path", "[filesystem]") {
-    using Machine =
-        jac::FilesystemFeature<
-        jac::MachineBase
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        jac::FilesystemFeature
     >;
     Machine machine;
 
@@ -209,11 +212,12 @@ TEST_CASE("Path", "[filesystem]") {
 
 
 TEST_CASE("File class js", "[filesystem]") {
-    using Machine =
-        jac::FilesystemFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>;
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::EvalFeature,
+        jac::FilesystemFeature,
+        TestReportFeature
+    >;
 
     Machine machine;
     machine.setCodeDir("test_files/fs/");
