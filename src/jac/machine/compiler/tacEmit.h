@@ -493,6 +493,9 @@ tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) 
         throw std::runtime_error("Function declarations must have a return type");
     }
     auto typeIt = types.find(decl.returnType->type.name.name);
+    if (typeIt == types.end()) {
+        throw std::runtime_error("Unsupported return type");
+    }
     out.returnType = typeIt->second;
 
     for (const ast::FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
@@ -517,7 +520,9 @@ tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) 
     auto block = emit(*decl.body, out.locals);
     block.name = "body";
 
-    if (!block.statements.statements.empty()) {
+    if (!block.statements.statements.empty()
+      || block.jump.type == tac::Jump::Type::Return
+      || block.jump.type == tac::Jump::Type::ReturnValue) {
         out.body.blocks.push_back(block);
     }
 

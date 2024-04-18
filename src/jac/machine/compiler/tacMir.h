@@ -146,9 +146,6 @@ inline std::ostream& generate(std::ostream& os, const FunctionBody& fb) {
 
 
 inline std::ostream& generate(std::ostream& os, const Function& f) {
-    os << "m_" << f.name << ": module\n";
-    printIndent(os);
-
     os << f.name << ": " << "func ";
     if (f.returnType != ValueType::Void) {
         generate(os, f.returnType);
@@ -188,10 +185,32 @@ inline std::ostream& generate(std::ostream& os, const Function& f) {
     generate(os, f.body);
 
     os << "endfunc\n";
-    os << "endmodule\n";
 
     return os;
 }
 
+
+inline std::ostream& generateProto(std::ostream& os, const Function& f) {
+    os << "p_" + f.name << ": proto ";
+    if (f.returnType != ValueType::Void) {
+        generate(os, f.returnType);
+    }
+    if (!f.args.empty()) {
+        bool first = f.returnType == ValueType::Void;
+        for (const auto& [arg, type] : f.args) {
+            if (!first) {
+                os << ", ";
+            }
+            else {
+                first = false;
+            }
+            generate(os, type);
+            os << ":" << arg;
+        }
+    }
+    os << '\n';
+
+    return os;
+}
 
 } // namespace jac::tac::mir

@@ -1145,6 +1145,8 @@ struct FunctionDeclaration {
     std::optional<FunctionBody<false, false>> body;
     std::optional<TypeAnnotation> returnType;
 
+    std::string_view code;
+
     static std::optional<FunctionDeclaration<Yield, Await, Default>> parse(ParserState& state) {
         auto start = state.getPosition();
         if (state.current().kind != lex::Token::Keyword || state.current().text != "function") {
@@ -1200,13 +1202,17 @@ struct FunctionDeclaration {
             state.restorePosition(start);
             return std::nullopt;
         }
+
+        std::string_view code(start->text.begin(), state.current().text.end());
+
         state.advance();
 
         return FunctionDeclaration<Yield, Await, Default>{
             std::move(name),
             std::move(*params),
             std::move(body),
-            std::move(returnType)
+            std::move(returnType),
+            code
         };
     }
 };
