@@ -13,46 +13,46 @@ inline tac::Identifier id(std::string name) {
     return "i_" + name;
 }
 
-inline tac::Identifier newTmp(tac::Locals& locals) {
+inline tac::Identifier newTmp(tac::Function& func) {
     static unsigned counter = 0;
     std::string name = "t_" + std::to_string(counter++);
-    locals.add(name, tac::ValueType::I64);
+    func.currentLocals().add(name, tac::ValueType::I64);
     return name;
 }
 
 
-const std::unordered_map<std::string_view, tac::Operation> binaryOps = {
-    { "||", tac::Operation::BoolOr },
-    { "&&", tac::Operation::BoolAnd },
-    { "|", tac::Operation::BitOr },
-    { "^", tac::Operation::BitXor },
-    { "&", tac::Operation::BitAnd },
-    { "==", tac::Operation::Eq },
-    { "!=", tac::Operation::Neq },
+const std::unordered_map<std::string_view, tac::Opcode> binaryOps = {
+    { "||", tac::Opcode::BoolOr },
+    { "&&", tac::Opcode::BoolAnd },
+    { "|", tac::Opcode::BitOr },
+    { "^", tac::Opcode::BitXor },
+    { "&", tac::Opcode::BitAnd },
+    { "==", tac::Opcode::Eq },
+    { "!=", tac::Opcode::Neq },
     // { "===", ... },
     // { "!==", ... },
-    { "<", tac::Operation::SignedLt },
-    { "<=", tac::Operation::SignedLte },
-    { ">", tac::Operation::SignedGt },
-    { ">=", tac::Operation::SignedGte },
+    { "<", tac::Opcode::SignedLt },
+    { "<=", tac::Opcode::SignedLte },
+    { ">", tac::Opcode::SignedGt },
+    { ">=", tac::Opcode::SignedGte },
     // { "in", ... },
     // { "instanceof", ... },
-    { "<<", tac::Operation::LShift },
-    { ">>", tac::Operation::RShift },
-    { ">>>", tac::Operation::URShift },
-    { "+", tac::Operation::Add },
-    { "-", tac::Operation::Sub },
-    { "*", tac::Operation::Mul },
-    { "/", tac::Operation::Div },
-    { "%", tac::Operation::Mod },
-    { "**", tac::Operation::Pow }
+    { "<<", tac::Opcode::LShift },
+    { ">>", tac::Opcode::RShift },
+    { ">>>", tac::Opcode::URShift },
+    { "+", tac::Opcode::Add },
+    { "-", tac::Opcode::Sub },
+    { "*", tac::Opcode::Mul },
+    { "/", tac::Opcode::Div },
+    { "%", tac::Opcode::Mod },
+    { "**", tac::Opcode::Pow }
 };
 
-const std::unordered_map<std::string_view, tac::Operation> unaryOps = {
-    { "!", tac::Operation::BoolNot },
-    { "~", tac::Operation::BitNot },
-    { "+", tac::Operation::UnPlus },
-    { "-", tac::Operation::UnMinus },
+const std::unordered_map<std::string_view, tac::Opcode> unaryOps = {
+    { "!", tac::Opcode::BoolNot },
+    { "~", tac::Opcode::BitNot },
+    { "+", tac::Opcode::UnPlus },
+    { "-", tac::Opcode::UnMinus },
     // "typeof",
     // "void",
     // "delete",
@@ -128,10 +128,9 @@ inline tac::Arg emit(const ast::Literal& lit) {
 
 
 template<bool Yield, bool Await>
-tac::Arg emit(const ast::PrimaryExpression<Yield, Await>& primary, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::PrimaryExpression<Yield, Await>& primary, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         tac::Arg operator()(const ast::ThisExpr&) {
             throw std::runtime_error("This expressions are not supported");
@@ -170,51 +169,49 @@ tac::Arg emit(const ast::PrimaryExpression<Yield, Await>& primary, tac::Block& b
             throw std::runtime_error("Template literals are not supported");
         }
         tac::Arg operator()(const ast::ParenthesizedExpression<Yield, Await>& expr) {
-            return emit(expr.expression, block, locals);
+            return emit(expr.expression, func);
         }
     };
 
-    return std::visit(visitor{block, locals}, primary.value);
+    return std::visit(visitor{func}, primary.value);
 }
 
 
 template<bool Yield, bool Await>
-tac::Arg emit(const ast::UpdateExpression<Yield, Await>& expr, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::UpdateExpression<Yield, Await>& expr, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         tac::Arg operator()(const ast::UnaryExpressionPtr<Yield, Await>&) {
             throw std::runtime_error("Unary expressions are not supported");
         }
 
         tac::Arg operator()(const ast::LeftHandSideExpressionPtr<Yield, Await>& lhs) {
-            return emit(lhsGetPrimary(*lhs), block, locals);
+            return emit(lhsGetPrimary(*lhs), func);
         }
     };
 
-    return std::visit(visitor{block, locals}, expr.value);
+    return std::visit(visitor{func}, expr.value);
 }
 
 
 template<bool Yield, bool Await>
-tac::Arg emit(const ast::UnaryExpression<Yield, Await>& expr, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::UnaryExpression<Yield, Await>& expr, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         tac::Arg operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
-            tac::Arg arg = emit(*unary, block, locals);
+            tac::Arg arg = emit(*unary, func);
 
             auto it = unaryOps.find(unary->op);
             if (it == unaryOps.end()) {
                 throw std::runtime_error("Unsupported unary operator");
             }
-            tac::Operation op = it->second;
+            tac::Opcode op = it->second;
 
-            tac::Identifier res = newTmp(locals);
+            tac::Identifier res = newTmp(func);
 
-            block.statements.statements.push_back(tac::Statement{
+            func.currentBlock().statements.statements.emplace_back(tac::Operation{
                 .op = op,
                 .args = { arg, arg }
             });
@@ -223,37 +220,36 @@ tac::Arg emit(const ast::UnaryExpression<Yield, Await>& expr, tac::Block& block,
         }
 
         tac::Arg operator()(const ast::UpdateExpression<Yield, Await>& update) {
-            return emit(update, block, locals);
+            return emit(update, func);
         }
     };
 
-    return std::visit(visitor{block, locals}, expr.value);
+    return std::visit(visitor{func}, expr.value);
 }
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const ast::BinaryExpression<In, Yield, Await>& expr, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::BinaryExpression<In, Yield, Await>& expr, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         tac::Arg operator()(const std::tuple<
                                 ast::BinaryExpressionPtr<In, Yield, Await>,
                                 ast::BinaryExpressionPtr<In, Yield, Await>,
                                 std::string_view
                             >& binExpr) {
-            tac::Arg lop = emit(*std::get<0>(binExpr), block, locals);
-            tac::Arg rop = emit(*std::get<1>(binExpr), block, locals);
+            tac::Arg lop = emit(*std::get<0>(binExpr), func);
+            tac::Arg rop = emit(*std::get<1>(binExpr), func);
 
             auto it = binaryOps.find(std::get<2>(binExpr));
             if (it == binaryOps.end()) {
                 throw std::runtime_error("Unsupported binary operator");
             }
-            tac::Operation op = it->second;
+            tac::Opcode op = it->second;
 
-            tac::Identifier res = newTmp(locals);
+            tac::Identifier res = newTmp(func);
 
-            block.statements.statements.push_back(tac::Statement{
+            func.currentBlock().statements.statements.emplace_back(tac::Operation{
                 .op = op,
                 .args = { res, lop, rop }
             });
@@ -261,22 +257,21 @@ tac::Arg emit(const ast::BinaryExpression<In, Yield, Await>& expr, tac::Block& b
             return res;
         }
         tac::Arg operator()(const ast::UnaryExpression<Yield, Await>& unary) {
-            return emit(unary, block, locals);
+            return emit(unary, func);
         }
     };
 
-    return std::visit(visitor{block, locals}, expr.value);
+    return std::visit(visitor{func}, expr.value);
 }
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const ast::ConditionalExpression<In, Yield, Await>& expr, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::ConditionalExpression<In, Yield, Await>& expr, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         tac::Arg operator()(const ast::BinaryExpression<In, Yield, Await>& xpr) {
-            return emit(xpr, block, locals);
+            return emit(xpr, func);
         }
         tac::Arg operator()(const std::tuple<  // ternary conditional operator
                                 ast::BinaryExpression<In, Yield, Await>,
@@ -287,22 +282,21 @@ tac::Arg emit(const ast::ConditionalExpression<In, Yield, Await>& expr, tac::Blo
         }
     };
 
-    return std::visit(visitor{block, locals}, expr.value);
+    return std::visit(visitor{func}, expr.value);
 }
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Block& block, tac::Locals& locals);
+tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Function& func);
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const ast::AssignmentExpression<In, Yield, Await>& expr, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::AssignmentExpression<In, Yield, Await>& expr, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         tac::Arg operator()(const ast::ConditionalExpression<In, Yield, Await>& cond) {
-            return emit(cond, block, locals);
+            return emit(cond, func);
         }
         tac::Arg operator()(const ast::YieldExpression<In, Yield, Await>&) {
             throw std::runtime_error("Yield expressions are not supported");
@@ -314,30 +308,30 @@ tac::Arg emit(const ast::AssignmentExpression<In, Yield, Await>& expr, tac::Bloc
             throw std::runtime_error("Async arrow functions are not supported");
         }
         tac::Arg operator()(const ast::Assignment<In, Yield, Await>& assign) {
-            return emit(assign, block, locals);
+            return emit(assign, func);
         }
     };
 
-    return std::visit(visitor{block, locals}, expr.value);
+    return std::visit(visitor{func}, expr.value);
 }
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Function& func) {
     const auto& lhsPrimary = lhsGetPrimary(assign.lhs);
     if (!std::holds_alternative<ast::IdentifierReference<Yield, Await>>(lhsPrimary.value)) {
         throw std::runtime_error("Only identifier references are supported as assignment targets");
     }
     tac::Identifier target = id(std::get<ast::IdentifierReference<Yield, Await>>(lhsPrimary.value).identifier.name.name);
 
-    tac::Arg rhs = emit(*assign.rhs, block, locals);
+    tac::Arg rhs = emit(*assign.rhs, func);
 
     if (assign.op != "=") {
         throw std::runtime_error("Only simple assignments are supported");
     }
 
-    block.statements.statements.push_back(tac::Statement{
-        .op = tac::Operation::Copy,
+    func.currentBlock().statements.statements.emplace_back(tac::Operation{
+        .op = tac::Opcode::Copy,
         .args = { target, rhs }
     });
 
@@ -346,27 +340,26 @@ tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Block& block
 
 
 template<bool Yield, bool Await, bool Return>
-void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Block& block, tac::Locals& locals) {
+void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Function& func) {
     if (!std::holds_alternative<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value)) {
         throw std::runtime_error("Only lexical declarations are supported");
     }
 
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         void operator()(const ast::BindingIdentifier<Yield, Await>& decl) {
-            locals.add(id(decl.identifier.name.name), tac::ValueType::I64);
+            func.currentLocals().add(id(decl.identifier.name.name), tac::ValueType::I64);
             // do nothing
         }
         void operator()(const std::pair<ast::BindingIdentifier<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>& assign) {
-            locals.add(id(assign.first.identifier.name.name), tac::ValueType::I64);
+            func.currentLocals().add(id(assign.first.identifier.name.name), tac::ValueType::I64);
 
             const auto& [binding, initializer] = assign;
 
-            tac::Arg tmp = emit(*initializer, block, locals);
-            block.statements.statements.push_back(tac::Statement{
-                .op = tac::Operation::Copy,
+            tac::Arg tmp = emit(*initializer, func);
+            func.currentBlock().statements.statements.emplace_back(tac::Operation{
+                .op = tac::Opcode::Copy,
                 .args = { id(binding.identifier.name.name), tmp }
             });
         }
@@ -377,40 +370,39 @@ void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Block&
 
     const auto& lexical = std::get<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value);
     for (const ast::LexicalBinding<true, Yield, Await>& binding : lexical.bindings) {
-        std::visit(visitor{block, locals}, binding.value);
+        std::visit(visitor{func}, binding.value);
     }
 }
 
 
 template<bool In, bool Yield, bool Await>
-tac::Arg emit(const ast::Expression<In, Yield, Await>& expr, tac::Block& block, tac::Locals& locals) {
+tac::Arg emit(const ast::Expression<In, Yield, Await>& expr, tac::Function& func) {
     for (size_t i = 0; i + 1 < expr.items.size(); i++) {
-        emit(*expr.items[i], block, locals);
+        emit(*expr.items[i], func);
     }
     if (expr.items.size() != 0) {
-        return emit(*expr.items.back(), block, locals);
+        return emit(*expr.items.back(), func);
     }
     return tac::Arg(0);
 }
 
 
 template<bool Yield, bool Await>
-void emit(const ast::ReturnStatement<Yield, Await>& stmt, tac::Block& block, tac::Locals& locals) {
+void emit(const ast::ReturnStatement<Yield, Await>& stmt, tac::Function& func) {
     if (!stmt.expression) {
-        block.jump = tac::Jump::retVal(tac::Arg(0));
+        func.currentBlock().jump = tac::Jump::retVal(tac::Arg(0));
         return;
     }
 
-    tac::Arg arg = emit(*stmt.expression, block, locals);
-    block.jump = tac::Jump::retVal(arg);
+    tac::Arg arg = emit(*stmt.expression, func);
+    func.currentBlock().jump = tac::Jump::retVal(arg);
 }
 
 
 template<bool Yield, bool Await, bool Return>
-void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Block& block, tac::Locals& locals) {
+void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
 
         void operator()(const ast::BlockStatement<Yield, Await, Return>&) {
             throw std::runtime_error("Block statements are not supported");
@@ -422,7 +414,7 @@ void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Block& blo
             throw std::runtime_error("Empty statements are not supported");
         }
         void operator()(const ast::ExpressionStatement<Yield, Await>& statement) {
-            emit(statement.expression, block, locals);
+            emit(statement.expression, func);
         }
         void operator()(const ast::IfStatement<Yield, Await, Return>&) {
             throw std::runtime_error("If statements are not supported");
@@ -437,7 +429,7 @@ void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Block& blo
             throw std::runtime_error("Break statements are not supported");
         }
         void operator()(const ast::ReturnStatement<Yield, Await>& stmt) {
-            emit(stmt, block, locals);
+            emit(stmt, func);
         }
         void operator()(const ast::WithStatement<Yield, Await, Return>&) {
             throw std::runtime_error("With statements are not supported");
@@ -456,28 +448,25 @@ void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Block& blo
         }
     };
 
-    std::visit(visitor{block, locals}, statement.value);
+    std::visit(visitor{func}, statement.value);
 }
 
 
 template<bool Yield, bool Await, bool Return>
-tac::Block emit(const ast::StatementList<Yield, Await, Return>& list, tac::Locals& locals) {
+void emit(const ast::StatementList<Yield, Await, Return>& list, tac::Function& func) {
     struct visitor {
-        tac::Block& block;
-        tac::Locals& locals;
+        tac::Function& func;
         void operator()(const ast::Statement<Yield, Await, Return>& statement) {
-            emit(statement, block, locals);
+            emit(statement, func);
         }
         void operator()(const ast::Declaration<Yield, Await, Return>& declaration) {
-            emit(declaration, block, locals);
+            emit(declaration, func);
         }
     };
 
-    tac::Block block;
     for (const ast::StatementListItem<Yield, Await, Return>& statement : list.items) {
-        std::visit(visitor{block, locals}, statement.value);
+        std::visit(visitor{func}, statement.value);
     }
-    return block;
 }
 
 
@@ -517,15 +506,20 @@ tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) 
     }
 
     // TODO
-    auto block = emit(*decl.body, out.locals);
-    block.name = "body";
+    out.body.blocks.push_back(tac::Block{
+        .name = "body",
+        .statements = {},
+        .jump = tac::Jump::next()
+    });
 
-    if (!block.statements.statements.empty()
-      || block.jump.type == tac::Jump::Type::Return
-      || block.jump.type == tac::Jump::Type::ReturnValue) {
-        out.body.blocks.push_back(block);
+    emit(*decl.body, out);
+
+    if (out.body.blocks.front().statements.statements.empty()
+     && out.body.blocks.front().jump.type == tac::Jump::Type::Next) {
+        out.body.blocks.pop_back();
     }
 
+    // TODO: throw exception
     out.body.blocks.push_back(tac::Block{
         .name = "end",
         .statements = {},

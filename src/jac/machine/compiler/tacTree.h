@@ -28,7 +28,7 @@ enum class ValueType {
 using Identifier = std::string;
 using Arg = std::variant<Identifier, int, long, float, double>;
 
-enum class Operation {
+enum class Opcode {
     // Binary
     Add,
     Sub,
@@ -62,13 +62,24 @@ enum class Operation {
     UnPlus,
     UnMinus
 };
-constexpr Operation MIN_UNARY_OP = Operation::Copy;
+constexpr Opcode MIN_UNARY_OP = Opcode::Copy;
+
+
+struct Operation {
+    Opcode op;
+
+    std::vector<Arg> args;
+};
+
+
+struct Call {
+    Identifier name;
+    std::vector<Arg> args;
+};
 
 
 struct Statement {
-    Operation op;
-
-    std::vector<Arg> args;
+    std::variant<Operation, Call> op;
 };
 
 
@@ -140,6 +151,17 @@ struct Function {
     Locals locals;
     ValueType returnType;
     FunctionBody body;
+
+    std::vector<Identifier> requiredFunctions;
+
+    Block& currentBlock() {
+        // TODO: block+locals tree
+        return body.blocks.back();
+    }
+
+    Locals& currentLocals() {
+        return locals;
+    }
 };
 
 

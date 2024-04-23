@@ -44,30 +44,30 @@ inline std::ostream& generate(std::ostream& os, const Arg& arg_) {
 }
 
 
-inline std::ostream& generate(std::ostream& os, Operation op) {
+inline std::ostream& generate(std::ostream& os, Opcode op) {
     // XXX: does not support other than word comparisons
     switch (op) {
-        case Operation::Add: os << "add"; break;
-        case Operation::Sub: os << "sub"; break;
-        case Operation::Mul: os << "mul"; break;
-        case Operation::Div: os << "div"; break;
-        case Operation::Mod: os << "rem"; break;
-        case Operation::Pow: throw std::runtime_error("Pow not implemented");
-        case Operation::LShift: os << "lsh"; break;
-        case Operation::RShift: os << "rsh"; break;
-        case Operation::URShift: os << "ursh"; break;
-        case Operation::BoolAnd: os << "and"; break;
-        case Operation::BoolOr: os << "or"; break;
-        case Operation::BitAnd: os << "and"; break;
-        case Operation::BitOr: os << "or"; break;
-        case Operation::BitXor: os << "xor"; break;
-        case Operation::Eq: os << "eq"; break;
-        case Operation::Neq: os << "ne"; break;
-        case Operation::SignedGt: os << "gt"; break;
-        case Operation::SignedGte: os << "ge"; break;
-        case Operation::SignedLt: os << "lt"; break;
-        case Operation::SignedLte: os << "le"; break;
-        case Operation::Copy: os << "mov"; break;
+        case Opcode::Add: os << "add"; break;
+        case Opcode::Sub: os << "sub"; break;
+        case Opcode::Mul: os << "mul"; break;
+        case Opcode::Div: os << "div"; break;
+        case Opcode::Mod: os << "rem"; break;
+        case Opcode::Pow: throw std::runtime_error("Pow not implemented");
+        case Opcode::LShift: os << "lsh"; break;
+        case Opcode::RShift: os << "rsh"; break;
+        case Opcode::URShift: os << "ursh"; break;
+        case Opcode::BoolAnd: os << "and"; break;
+        case Opcode::BoolOr: os << "or"; break;
+        case Opcode::BitAnd: os << "and"; break;
+        case Opcode::BitOr: os << "or"; break;
+        case Opcode::BitXor: os << "xor"; break;
+        case Opcode::Eq: os << "eq"; break;
+        case Opcode::Neq: os << "ne"; break;
+        case Opcode::SignedGt: os << "gt"; break;
+        case Opcode::SignedGte: os << "ge"; break;
+        case Opcode::SignedLt: os << "lt"; break;
+        case Opcode::SignedLte: os << "le"; break;
+        case Opcode::Copy: os << "mov"; break;
         default:
             throw std::runtime_error("Unknown operation");
     }
@@ -75,11 +75,11 @@ inline std::ostream& generate(std::ostream& os, Operation op) {
 }
 
 
-inline std::ostream& generate(std::ostream& os, const Statement& s) {
+inline std::ostream& generate(std::ostream& os, const Operation& op) {
     printIndent(os);
-    generate(os, s.op);
+    generate(os, op.op);
     bool first = true;
-    for (const auto& arg : s.args) {
+    for (const auto& arg : op.args) {
         if (!first) {
             os << ", ";
         }
@@ -90,6 +90,19 @@ inline std::ostream& generate(std::ostream& os, const Statement& s) {
         generate(os, arg);
     }
     return os;
+}
+
+
+inline std::ostream& generate(std::ostream& os, const Call& c) {
+    // TODO
+    throw std::runtime_error("Call not implemented");
+}
+
+
+inline std::ostream& generate(std::ostream& os, const Statement& s) {
+    return std::visit([&os](const auto& s_) -> std::ostream& {
+        return generate(os, s_);
+    }, s.op);
 }
 
 
