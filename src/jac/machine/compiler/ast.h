@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <variant>
 
 #include "language.h"
@@ -29,6 +30,15 @@ public:
     {}
 
     void error(std::string_view message) {
+        if (_tokens.empty()) {
+            _errorMessage = message;
+            return;
+        }
+        if (_pos == _tokens.end()) { // TODO: fix token position
+            _errorToken = _tokens.back();
+            _errorMessage = message;
+            return;
+        }
         if (_errorToken.text.begin() > _pos->text.begin()) {
             return;
         }
@@ -36,9 +46,13 @@ public:
         _errorMessage = message;
     }
 
-    lex::Token& current() {
+    lex::Token current() {
+        if (_tokens.empty()) {
+            return lex::Token(0, 0, "", lex::Token::NoToken);
+        }
         if (_pos == _tokens.end()) {
-            return _tokens.back();
+            auto pos = _tokens.back().text.end();
+            return lex::Token(_tokens.back().line + 1, 0, std::string_view(pos, pos), lex::Token::NoToken);
         }
         return *_pos;
     }
@@ -1655,9 +1669,51 @@ template<bool Yield, bool Await>
 struct Arguments {
     std::vector<std::pair<bool, AssignmentExpressionPtr<true, Yield, Await>>> arguments;  // bool: spread
 
-    static std::optional<Arguments<Yield, Await>> parse(ParserState&) {
-        // TODO
-        return std::nullopt;
+    static std::optional<Arguments<Yield, Await>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        Arguments<Yield, Await> args;
+        if (state.current().kind == lex::Token::Punctuator && state.current().text == ")") {
+            state.advance();
+            return args;
+        }
+
+        while (true) {
+            bool isSpread = false;
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "...") {
+                isSpread = true;
+                state.advance();
+            }
+
+            if (auto expr = AssignmentExpression<true, Yield, Await>::parse(state)) {
+                args.arguments.push_back(std::pair{isSpread, std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*expr))});
+            }
+            else {
+                state.restorePosition(start);
+                state.error("Invalid arguments");
+                return std::nullopt;
+            }
+
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == ",") {
+                state.advance();
+                continue;
+            }
+
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == ")") {
+                state.advance();
+                break;
+            }
+
+            state.restorePosition(start);
+            state.error("Expected , or )");
+            return std::nullopt;
+        }
+
+        return args;
     }
 };
 
@@ -1681,6 +1737,7 @@ struct MemberExpression {
     static std::optional<MemberExpression<Yield, Await>> parse(ParserState& state) {
         if (state.current().kind == lex::Token::Keyword && state.current().text == "new") {
             auto start = state.getPosition();
+            state.advance();
             if (auto member = MemberExpression::parse(state)) {
                 if (auto args = Arguments<Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
@@ -1720,6 +1777,7 @@ struct MemberExpression {
                     auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
                     return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*expr)}};
                 }
+                state.error("Expected ]");
             }
             state.restorePosition(start);
         }
@@ -1761,35 +1819,122 @@ struct NewExpression {
 template<bool Yield, bool Await>
 struct SuperCall {
     Arguments<Yield, Await> arguments;
+
+    static std::optional<SuperCall<Yield, Await>> parse(ParserState&) {
+        // TODO
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct ImportCall {
     Expression<true, Yield, Await> expression;
+
+    static std::optional<ImportCall<Yield, Await>> parse(ParserState&) {
+        // TODO
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct CoverCallExpressionAndAsyncArrowHead {
-    std::variant<
-        MemberExpression<Yield, Await>,
-        Arguments<Yield, Await>
-    > value;
+    MemberExpression<Yield, Await> memberExpression;
+    Arguments<Yield, Await> arguments;
+
+    static std::optional<CoverCallExpressionAndAsyncArrowHead<Yield, Await>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (auto member = MemberExpression<Yield, Await>::parse(state)) {
+            if (auto args = Arguments<Yield, Await>::parse(state)) {
+                return CoverCallExpressionAndAsyncArrowHead<Yield, Await>{std::move(*member), std::move(*args)};
+            }
+        }
+
+        state.restorePosition(start);
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct CallExpression {
     using CallExpressionPtr = std::unique_ptr<CallExpression<Yield, Await>>;
 
+    // grammar: CoverCallExpressionAndAsyncArrowHead
     std::variant<
-        CoverCallExpressionAndAsyncArrowHead<Yield, Await>,
         SuperCall<Yield, Await>,
         ImportCall<Yield, Await>,
+        std::pair<MemberExpression<Yield, Await>, Arguments<Yield, Await>>,
         std::pair<CallExpressionPtr, Arguments<Yield, Await>>,
         std::pair<CallExpressionPtr, Expression<true, Yield, Await>>,  // bracket
         std::pair<CallExpressionPtr, IdentifierName>,  // dot
         std::pair<CallExpressionPtr, PrivateIdentifier>,  // dot
         std::pair<CallExpressionPtr, TemplateLiteral<Yield, Await, true>>  // tag
     > value;
+
+    static std::optional<CallExpression<Yield, Await>> parse(ParserState& state) {
+        std::optional<CallExpression<Yield, Await>> call;
+
+        if (auto super = SuperCall<Yield, Await>::parse(state)) {
+            call.emplace(CallExpression<Yield, Await>{std::move(*super)});
+        }
+        if (auto import = ImportCall<Yield, Await>::parse(state)) {
+            call.emplace(CallExpression<Yield, Await>{std::move(*import)});
+        }
+
+        if (auto cover = CoverCallExpressionAndAsyncArrowHead<Yield, Await>::parse(state)) {
+            call.emplace(CallExpression<Yield, Await>{std::pair{std::move(cover->memberExpression), std::move(cover->arguments)}});
+        }
+
+        if (!call) {
+            return std::nullopt;
+        }
+
+        do {
+            auto start = state.getPosition();
+            if (auto args = Arguments<Yield, Await>::parse(state)) {
+                auto ptr = std::make_unique<CallExpression<Yield, Await>>(std::move(*call));
+                call.emplace(CallExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*args)}});
+                continue;
+            }
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "[") {
+                auto post = state.getPosition();
+                state.advance();
+                if (auto expr = Expression<true, Yield, Await>::parse(state)) {
+                    if (state.current().kind == lex::Token::Punctuator && state.current().text == "]") {
+                        state.advance();
+                        auto ptr = std::make_unique<CallExpression<Yield, Await>>(std::move(*call));
+                        call.emplace(CallExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*expr)}});
+                        continue;
+                    }
+                    state.error("Expected ]");
+                }
+
+                state.restorePosition(post);
+            }
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == ".") {
+                state.advance();
+                if (auto identifier = IdentifierName::parse(state)) {
+                    auto ptr = std::make_unique<CallExpression<Yield, Await>>(std::move(*call));
+                    call.emplace(CallExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*identifier)}});
+                    continue;
+                }
+                if (auto identifier = PrivateIdentifier::parse(state)) {
+                    auto ptr = std::make_unique<CallExpression<Yield, Await>>(std::move(*call));
+                    call.emplace(CallExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*identifier)}});
+                    continue;
+                }
+                state.backtrack();
+            }
+            if (auto tplate = TemplateLiteral<Yield, Await, true>::parse(state)) {
+                auto ptr = std::make_unique<CallExpression<Yield, Await>>(std::move(*call));
+                call.emplace(CallExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*tplate)}});
+                continue;
+            }
+
+            state.restorePosition(start);
+        } while (false);
+
+        return call;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -1821,12 +1966,15 @@ struct OptionalExpression {
 template<bool Yield, bool Await>
 struct LeftHandSideExpression {
     std::variant<
+        CallExpression<Yield, Await>,
         NewExpression<Yield, Await>
-        // CallExpression<Yield, Await>,
         // OptionalExpression<Yield, Await>
     > value;
 
     static std::optional<LeftHandSideExpression> parse(ParserState& state) {
+        if (auto call = CallExpression<Yield, Await>::parse(state)) {
+            return LeftHandSideExpression{std::move(*call)};
+        }
         if (auto newExpr = NewExpression<Yield, Await>::parse(state)) {
             return LeftHandSideExpression{std::move(*newExpr)};
         }

@@ -183,7 +183,7 @@ class AotEvalFeature : public EvalFeature<Next> {
         jac::ast::ParserState state(tokens);
 
         auto script = jac::ast::Script::parse(state);
-        if (!script) {
+        if (!script || !state.isEnd()) {
             throw std::runtime_error("Parse error");
         }
 

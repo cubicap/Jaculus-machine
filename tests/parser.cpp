@@ -1386,3 +1386,85 @@ TEST_CASE("BlockStatement", "[parser]") {
         REQUIRE((unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(modExpTup)->value)) == 4));
     }
 }
+
+
+TEST_CASE("Script", "[parser]") {
+    SECTION("x;") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 2, ";", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::Script::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        auto& list = result->statementList;
+        REQUIRE(list->items.size() == 1);
+
+        jac::ast::StatementListItem<false, false, false>& expStat = list->items[0];
+        auto& statement = std::get<jac::ast::Statement<false, false, false>>(expStat.value);
+        auto& expr = std::get<jac::ast::ExpressionStatement<false, false>>(statement.value).expression;
+        REQUIRE(expr.items.size() == 1);
+        REQUIRE(std::string(unaryExpIdentifier(assignExpUnary(*expr.items[0]))) == "x");
+    }
+}
+
+
+TEST_CASE("Call expression", "[parser]") {
+
+    SECTION("f()") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "f", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 2, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 3, ")", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::CallExpression<false, false>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression<false, false>, jac::ast::Arguments<false, false>>>(result->value);
+        auto& primary = std::get<jac::ast::PrimaryExpression<false, false>>(mem.value);
+        auto& ident = std::get<jac::ast::IdentifierReference<false, false>>(primary.value);
+        REQUIRE((ident.identifier.name.name == "f"));
+
+        REQUIRE(args.arguments.empty());
+    }
+
+    SECTION("function(1, 'abc', variable)") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "func", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 9, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 10, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 11, ",", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 13, "'abc'", jac::lex::Token::StringLiteral),
+            jac::lex::Token(1, 18, ",", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 20, "variable", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 28, ")", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::CallExpression<false, false>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression<false, false>, jac::ast::Arguments<false, false>>>(result->value);
+        auto& primary = std::get<jac::ast::PrimaryExpression<false, false>>(mem.value);
+        auto& ident = std::get<jac::ast::IdentifierReference<false, false>>(primary.value);
+        REQUIRE((ident.identifier.name.name == "func"));
+
+        REQUIRE(args.arguments.size() == 3);
+    }
+}
