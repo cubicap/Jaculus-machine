@@ -94,8 +94,13 @@ inline std::ostream& generate(std::ostream& os, const Operation& op) {
 
 
 inline std::ostream& generate(std::ostream& os, const Call& c) {
-    // TODO
-    throw std::runtime_error("Call not implemented");
+    printIndent(os);
+    os << "call p_" << c.name << ", " << c.name;
+    for (const auto& arg : c.args) {
+        os << ", ";
+        generate(os, arg);
+    }
+    return os;
 }
 
 

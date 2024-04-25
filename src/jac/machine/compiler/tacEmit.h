@@ -75,12 +75,8 @@ const std::unordered_map<std::string_view, tac::ValueType> types = {
 
 
 template<bool Yield, bool Await>
-const ast::PrimaryExpression<Yield, Await>& lhsGetPrimary(const ast::LeftHandSideExpression<Yield, Await>& lhs) {
-    const auto newExp = std::get_if<ast::NewExpression<Yield, Await>>(&(lhs.value));
-    if (!newExp) {
-        throw std::runtime_error("Only new expressions are supported");
-    }
-    const auto member = std::get_if<ast::MemberExpression<Yield, Await>>(&(newExp->value));
+const ast::PrimaryExpression<Yield, Await>& newExpGetPrimary(const ast::NewExpression<Yield, Await>& newExp) {
+    const auto member = std::get_if<ast::MemberExpression<Yield, Await>>(&(newExp.value));
     if (!member) {
         throw std::runtime_error("Only member expressions are supported");
     }
@@ -90,6 +86,17 @@ const ast::PrimaryExpression<Yield, Await>& lhsGetPrimary(const ast::LeftHandSid
     }
 
     return *primary;
+}
+
+
+template<bool Yield, bool Await>
+const ast::PrimaryExpression<Yield, Await>& lhsGetPrimary(const ast::LeftHandSideExpression<Yield, Await>& lhs) {
+    const auto newExp = std::get_if<ast::NewExpression<Yield, Await>>(&(lhs.value));
+    if (newExp) {
+        return newExpGetPrimary(*newExp);
+    }
+
+    throw std::runtime_error("Only new expressions are supported");
 }
 
 
@@ -178,6 +185,85 @@ tac::Arg emit(const ast::PrimaryExpression<Yield, Await>& primary, tac::Function
 
 
 template<bool Yield, bool Await>
+tac::Arg emit(const ast::CallExpression<Yield, Await>& call, tac::Function& func) {
+    struct visitor {
+        tac::Function& func;
+
+        tac::Arg operator()(const ast::SuperCall<Yield, Await>&) {
+            throw std::runtime_error("Super calls are not supported");
+        }
+        tac::Arg operator()(const ast::ImportCall<Yield, Await>&) {
+            throw std::runtime_error("Import calls are not supported");
+        }
+        tac::Arg operator()(const std::pair<ast::MemberExpression<Yield, Await>, ast::Arguments<Yield, Await>>& call) {
+            auto primary = std::get_if<ast::PrimaryExpression<Yield, Await>>(&(call.first.value));
+            if (!primary) {
+                throw std::runtime_error("Only primary expressions are supported");
+            }
+            auto identifier = std::get_if<ast::IdentifierReference<Yield, Await>>(&(primary->value));
+            if (!identifier) {
+                throw std::runtime_error("Only identifier references are supported");
+            }
+            std::string fun = identifier->identifier.name.name;
+
+            tac::Identifier res = newTmp(func);
+
+            std::vector<Arg> args{res};
+            for (const auto& [ spread, expr ] : call.second.arguments) {
+                if (spread) {
+                    throw std::runtime_error("Spread arguments are not supported");
+                }
+                args.push_back(emit(*expr, func));
+            }
+
+
+            func.currentBlock().statements.statements.emplace_back(tac::Call{
+                .name = id(fun),
+                .args = args
+            });
+            func.addRequiredFunction(fun);
+
+            return res;
+        }
+        tac::Arg operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::Arguments<Yield, Await>>&) {
+            throw std::runtime_error("Call -> args are not supported");
+        }
+        tac::Arg operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::Expression<true, Yield, Await>>&) {
+            throw std::runtime_error("Call -> brackets are not supported");
+        }
+        tac::Arg operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::IdentifierName>&) {
+            throw std::runtime_error("Call -> dots are not supported");
+        }
+        tac::Arg operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::PrivateIdentifier>&) {
+            throw std::runtime_error("Call -> .private are not supported");
+        }
+        tac::Arg operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::TemplateLiteral<Yield, Await, true>>&) {
+            throw std::runtime_error("Call -> template literals are not supported");
+        }
+    };
+
+    return std::visit(visitor{func}, call.value);
+}
+
+
+template<bool Yield, bool Await>
+tac::Arg emit(const ast::LeftHandSideExpression<Yield, Await>& lhs, tac::Function& func) {
+    struct visitor {
+        tac::Function& func;
+
+        tac::Arg operator()(const ast::CallExpression<Yield, Await>& call) {
+            return emit(call, func);
+        }
+        tac::Arg operator()(const ast::NewExpression<Yield, Await>& newExp) {
+            return emit(newExpGetPrimary(newExp), func);
+        }
+    };
+
+    return std::visit(visitor{func}, lhs.value);
+}
+
+
+template<bool Yield, bool Await>
 tac::Arg emit(const ast::UpdateExpression<Yield, Await>& expr, tac::Function& func) {
     struct visitor {
         tac::Function& func;
@@ -187,7 +273,7 @@ tac::Arg emit(const ast::UpdateExpression<Yield, Await>& expr, tac::Function& fu
         }
 
         tac::Arg operator()(const ast::LeftHandSideExpressionPtr<Yield, Await>& lhs) {
-            return emit(lhsGetPrimary(*lhs), func);
+            return emit(*lhs, func);
         }
     };
 

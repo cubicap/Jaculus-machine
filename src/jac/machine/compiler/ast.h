@@ -1735,6 +1735,7 @@ struct MemberExpression {
     > value;
 
     static std::optional<MemberExpression<Yield, Await>> parse(ParserState& state) {
+        // FIXME: not recursive enough
         if (state.current().kind == lex::Token::Keyword && state.current().text == "new") {
             auto start = state.getPosition();
             state.advance();
@@ -1936,6 +1937,9 @@ struct CallExpression {
         return call;
     }
 };
+
+template<bool Yield, bool Await>
+using CallExpressionPtr = std::unique_ptr<CallExpression<Yield, Await>>;
 
 template<bool Yield, bool Await>
 struct OptionalChain {

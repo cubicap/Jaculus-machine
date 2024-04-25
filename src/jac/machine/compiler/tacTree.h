@@ -1,5 +1,6 @@
 #pragma once
 
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -152,7 +153,7 @@ struct Function {
     ValueType returnType;
     FunctionBody body;
 
-    std::vector<Identifier> requiredFunctions;
+    std::set<std::string> requiredFunctions;
 
     Block& currentBlock() {
         // TODO: block+locals tree
@@ -161,6 +162,10 @@ struct Function {
 
     Locals& currentLocals() {
         return locals;
+    }
+
+    void addRequiredFunction(std::string name_) {
+        requiredFunctions.insert(name_);
     }
 };
 

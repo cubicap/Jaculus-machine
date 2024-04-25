@@ -74,4 +74,42 @@ TEST_CASE("Eval", "[eval]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"-16"});
     }
+
+    SECTION("Two") {
+        machine.initialize();
+        std::string code(R"(
+            function id(a: Int32): Int32 {
+                return a;
+            }
+
+            function fun(a: Int32, b: Int32): Int32 {
+                return a + b;
+            }
+
+            report(id(7));
+            report(fun(1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"7", "3"});
+    }
+
+    SECTION("Call") {
+        machine.initialize();
+        std::string code(R"(
+            function id(a: Int32): Int32 {
+                return a;
+            }
+
+            function fun(a: Int32, b: Int32): Int32 {
+                return id(a) + id(b);
+            }
+
+            report(id(7));
+            report(fun(1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"7", "3"});
+    }
 }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "jac/machine/internal/declarations.h"
 #include <jac/features/evalFeature.h>
 #include <jac/machine/functionFactory.h>
 #include <jac/machine/machine.h>
@@ -17,7 +16,7 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <iostream>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -53,25 +52,56 @@ inline MIR_item_t MIR_get_global_item(MIR_context_t ctx, std::string_view name) 
 
 template<class Next>
 class AotEvalFeature : public EvalFeature<Next> {
-    MIR_context_t mirCtx;
+    struct FunctionInfo {
+        Function fn;
+        void* ptr;
+        std::string prototype;
+    };
 
-    std::vector<std::pair<std::string, Function>> compiledHolder;
+    std::vector<MIR_context_t> mirContexts;
+
+    std::map<std::string, FunctionInfo> compiledHolder;
+
+    std::string alias(void* ptr) {
+        return "__jac_aot_func_" + std::to_string(reinterpret_cast<uint64_t>(ptr));  // NOLINT
+    }
 
     template<bool Yield, bool Await, bool Default>
-    std::pair<Function, void*> compileFunction(const jac::ast::FunctionDeclaration<Yield, Await, Default>& astFunc) {
+    FunctionInfo compileFunction(const jac::ast::FunctionDeclaration<Yield, Await, Default>& astFunc) {
+        MIR_context_t mirCtx = MIR_init();
+        mirContexts.push_back(mirCtx);
+
         jac::tac::Function tacFunc = jac::tac::emit(astFunc);
 
         std::stringstream ss;
         ss << "mod: module\n";
 
+        // --- required functions prototypes ---
+        for (const auto& name : tacFunc.requiredFunctions) {
+            auto it = compiledHolder.find(name);
+            if (it == compiledHolder.end()) {
+                throw std::runtime_error("Required function not found: " + name);
+            }
+
+            ss << it->second.prototype;
+            ss << "    import i_" << name << '\n';
+        }
+
         // --- function ---
         jac::tac::mir::generate(ss, tacFunc);
 
         // prototype
-        tac::mir::generateProto(ss, tacFunc);
+        std::string prototype;
+        {
+            std::stringstream proto;
+            tac::mir::generateProto(proto, tacFunc);
+            prototype = proto.str();
+        }
+        ss << prototype;
 
         // --- caller ---
-        ss << "caller: func i64, i64:argc, p:argv\n";
+        std::string callerName(std::string("caller_") + tacFunc.name);
+        ss << callerName << ": func i64, i64:argc, p:argv\n";
 
 
         ss << "    local i64:pos, i64:res";
@@ -131,8 +161,16 @@ class AotEvalFeature : public EvalFeature<Next> {
 
         MIR_scan_string(mirCtx, code.c_str());
 
-        MIR_module_t mod = DLIST_HEAD(MIR_module_t, *MIR_get_module_list (mirCtx));
+        MIR_module_t mod = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(mirCtx));
         MIR_load_module(mirCtx, mod);
+
+        for (const auto& name : tacFunc.requiredFunctions) {
+            const auto& fn = compiledHolder.at(name);
+            std::string i_name = "i_" + name;
+
+            MIR_load_external(mirCtx, i_name.c_str(), fn.ptr);
+        }
+
         MIR_link(mirCtx, MIR_set_interp_interface, nullptr);
 
         std::string name = jac::tac::id(astFunc.name->identifier.name.name);
@@ -141,7 +179,7 @@ class AotEvalFeature : public EvalFeature<Next> {
             throw std::runtime_error("Function not found");
         }
 
-        MIR_item_t caller = detail::MIR_get_global_item(mirCtx, "caller");
+        MIR_item_t caller = detail::MIR_get_global_item(mirCtx, callerName);
         if (!caller) {
             throw std::runtime_error("Caller not found");
         }
@@ -165,7 +203,7 @@ class AotEvalFeature : public EvalFeature<Next> {
         });
 
 
-        return { jsFn, ptr };
+        return { jsFn, ptr, prototype };
     }
 
     std::string tryAot(std::string_view js, std::string_view filename, EvalFlags flags) {
@@ -192,18 +230,21 @@ class AotEvalFeature : public EvalFeature<Next> {
         jac::ast::traverse::funcs(*script, functions);
 
         struct CompFn {
-            Function fn;
+            FunctionInfo* fn;
             std::string_view name;
             std::string_view code;
-            void* ptr;
         };
 
         std::vector<CompFn> compiledFunctions;
 
         for (auto func : functions.functions) {
             try {
-                auto [ fn, ptr ] = compileFunction(*func);
-                compiledFunctions.push_back({ fn, func->name->identifier.name.name, func->code, ptr });
+                auto fn = compileFunction(*func);
+
+                const std::string& name = func->name->identifier.name.name;
+                auto [it, succ] = compiledHolder.emplace(name, std::move(fn));
+
+                compiledFunctions.push_back({ &(it->second), name, func->code });
             }
             catch (std::runtime_error& e) {
                 throw std::runtime_error("Failed to compile function: " + std::string(e.what()));
@@ -217,21 +258,18 @@ class AotEvalFeature : public EvalFeature<Next> {
         std::string newCode;
         auto begin = js.begin();
         for (auto& compFn : compiledFunctions) {
-            std::string alias = "__jac_aot_func_" + std::to_string(reinterpret_cast<uint64_t>(compFn.ptr));  // NOLINT
 
             newCode.append(begin, compFn.code.begin());
 
             newCode.append("var ");
             newCode.append(compFn.name);
             newCode.append(" = ");
-            newCode.append(alias);
+            newCode.append(alias(compFn.fn->ptr));
             newCode.append("; /* compiled from: ");
             newCode.append(compFn.code);
             newCode.append(" */");
 
             begin = compFn.code.end();
-
-            compiledHolder.push_back({ alias, compFn.fn });
         }
 
         newCode.append(begin, js.end());
@@ -239,11 +277,11 @@ class AotEvalFeature : public EvalFeature<Next> {
         return newCode;
     }
 public:
-    AotEvalFeature() : mirCtx(MIR_init()) {
-    }
 
     ~AotEvalFeature() {
-        MIR_finish(mirCtx);
+        for (auto& ctx : mirContexts) {
+            MIR_finish(ctx);
+        }
     }
 
     /**
@@ -262,8 +300,8 @@ public:
             // define the compiled functions in global scope
             jac::Object global = this->context().getGlobalObject();
 
-            for (auto& [ name, fn ] : compiledHolder) {
-                global.defineProperty(name, fn);
+            for (auto& [ _, fn ] : compiledHolder) {
+                global.defineProperty(alias(fn.ptr), fn.fn);
             }
 
             return EvalFeature<Next>::eval(std::move(newCode), filename, flags);
