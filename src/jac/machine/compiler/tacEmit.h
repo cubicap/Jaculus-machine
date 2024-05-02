@@ -283,34 +283,24 @@ tac::Arg emit(const ast::UpdateExpression<Yield, Await>& expr, tac::Function& fu
 
 template<bool Yield, bool Await>
 tac::Arg emit(const ast::UnaryExpression<Yield, Await>& expr, tac::Function& func) {
-    struct visitor {
-        tac::Function& func;
+    if (std::holds_alternative<ast::UpdateExpression<Yield, Await>>(expr.value)) {
+        return emit(std::get<ast::UpdateExpression<Yield, Await>>(expr.value), func);
+    }
 
-        tac::Arg operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
-            tac::Arg arg = emit(*unary, func);
+        tac::Arg arg = emit(*std::get<ast::UnaryExpressionPtr<Yield, Await>>(expr.value), func);
 
-            auto it = unaryOps.find(unary->op);
+            auto it = unaryOps.find(expr.op);
             if (it == unaryOps.end()) {
-                throw std::runtime_error("Unsupported unary operator");
+                throw std::runtime_error("Unsupported unary operator '" + std::string(expr.op) + "'");
             }
             tac::Opcode op = it->second;
-
-            tac::Identifier res = newTmp(func);
 
             func.currentBlock().statements.statements.emplace_back(tac::Operation{
                 .op = op,
                 .args = { arg, arg }
             });
 
-            return res;
-        }
-
-        tac::Arg operator()(const ast::UpdateExpression<Yield, Await>& update) {
-            return emit(update, func);
-        }
-    };
-
-    return std::visit(visitor{func}, expr.value);
+            return arg;
 }
 
 

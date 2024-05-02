@@ -68,6 +68,8 @@ inline std::ostream& generate(std::ostream& os, Opcode op) {
         case Opcode::SignedLt: os << "lt"; break;
         case Opcode::SignedLte: os << "le"; break;
         case Opcode::Copy: os << "mov"; break;
+        case Opcode::UnMinus: os << "neg"; break;
+        case Opcode::UnPlus: os << "mov"; break;
         default:
             throw std::runtime_error("Unknown operation");
     }

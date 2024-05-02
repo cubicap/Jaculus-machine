@@ -12,7 +12,7 @@
 #include "util.h"
 
 
-TEST_CASE("Eval", "[eval]") {
+TEST_CASE("Eval", "[aot]") {
     using Machine = jac::ComposeMachine<
         jac::MachineBase,
         jac::AotEvalFeature,
@@ -41,6 +41,7 @@ TEST_CASE("Eval", "[eval]") {
             function fun(a: Int32, b: Int32): Int32 {
                 let c = a + b + 3;
                 c = c * 2;
+                c = +(-c);
                 return c;
             }
 
@@ -48,7 +49,7 @@ TEST_CASE("Eval", "[eval]") {
         )");
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
-        REQUIRE(machine.getReports() == std::vector<std::string>{"12"});
+        REQUIRE(machine.getReports() == std::vector<std::string>{"-12"});
     }
 
     SECTION("Many args") {
