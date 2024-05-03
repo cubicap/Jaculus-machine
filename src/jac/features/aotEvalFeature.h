@@ -119,23 +119,8 @@ class AotEvalFeature : public EvalFeature<Next> {
             const auto& [arg, type] = tacFunc.args[i];
             ss << "    mov pos, " << i * 2 << "\n";
             switch (type) {
-                case tac::ValueType::I8:
-                    ss << "    mov arg" << i << ", i8:(argv, pos, 8)\n";
-                    break;
-                case tac::ValueType::U8:
-                    ss << "    mov arg" << i << ", u8:(argv, pos, 8)\n";
-                    break;
-                case tac::ValueType::I16:
-                    ss << "    mov arg" << i << ", i16:(argv, pos, 8)\n";
-                    break;
-                case tac::ValueType::U16:
-                    ss << "    mov arg" << i << ", u16:(argv, pos, 8)\n";
-                    break;
                 case tac::ValueType::I32:
                     ss << "    mov arg" << i << ", i32:(argv, pos, 8)\n";
-                    break;
-                case tac::ValueType::U32:
-                    ss << "    mov arg" << i << ", u32:(argv, pos, 8)\n";
                     break;
                 default:
                     throw std::runtime_error("Unsupported argument type" + std::to_string(static_cast<int>(type)));
@@ -191,7 +176,7 @@ class AotEvalFeature : public EvalFeature<Next> {
         MIR_gen_finish(mirCtx);
 
         FunctionFactory ff(this->context());
-        auto jsFn = ff.newFunctionVariadic([callerPtr](std::vector<ValueWeak> args) {
+        Function jsFn = ff.newFunctionVariadic([callerPtr](std::vector<ValueWeak> args) {
             std::vector<JSValue> jsArgs;
             for (ValueWeak& arg : args) {
                 jsArgs.push_back(arg.getVal());

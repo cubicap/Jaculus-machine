@@ -39,7 +39,7 @@ TEST_CASE("Eval", "[aot]") {
         machine.initialize();
         std::string code(R"(
             function fun(a: Int32, b: Int32): Int32 {
-                let c = a + b + 3;
+                let c: Int32 = a + b + 3;
                 c = c * 2;
                 c = +(-c);
                 return c;
@@ -56,10 +56,10 @@ TEST_CASE("Eval", "[aot]") {
         machine.initialize();
         std::string code(R"(
 
-            function haha(a: Int8, b: Int8, c: Int8, d: Int8, e: Int8, f: Int8, g: Int8, h: Int8,
-                          i: Int8, j: Int8, k: Int8, l: Int8, m: Int8, n: Int8, o: Int8, p: Int8,
-                          q: Int8, r: Int8, s: Int8, t: Int8, u: Int8, v: Int8, w: Int8, x: Int8,
-                          y: Int8, z: Int8, aa: Int8, ab: Int8, ac: Int8, ad: Int8, ae: Int8, af: Int8): Int32 {
+            function haha(a: Int32, b: Int32, c: Int32, d: Int32, e: Int32, f: Int32, g: Int32, h: Int32,
+                          i: Int32, j: Int32, k: Int32, l: Int32, m: Int32, n: Int32, o: Int32, p: Int32,
+                          q: Int32, r: Int32, s: Int32, t: Int32, u: Int32, v: Int32, w: Int32, x: Int32,
+                          y: Int32, z: Int32, aa: Int32, ab: Int32, ac: Int32, ad: Int32, ae: Int32, af: Int32): Int32 {
                 return a + b + c + d + e + f + g + h
                      + i + j + k + l + m + n + o + p
                      + q + r + s + t + u + v + w + x

@@ -527,11 +527,9 @@ struct UpdateExpression {
 template<bool Yield, bool Await>
 struct UnaryExpression {
     std::variant<
-        UnaryExpressionPtr<Yield, Await>,
+        std::pair<UnaryExpressionPtr<Yield, Await>, std::string_view>,
         UpdateExpression<Yield, Await>
     > value;
-
-    std::string_view op;
 
     static std::optional<UnaryExpression> parse(ParserState& state) {
         if (state.current().kind == lex::Token::Punctuator || state.current().kind == lex::Token::Keyword) { // parse prefix unary
@@ -540,14 +538,14 @@ struct UnaryExpression {
                 state.advance();
                 if (auto expr = UnaryExpression::parse(state)) {
                     auto ptr = std::make_unique<UnaryExpression<Yield, Await>>(std::move(*expr));
-                    return UnaryExpression<Yield, Await>{std::move(ptr), op};
+                    return UnaryExpression<Yield, Await>{std::pair{std::move(ptr), op}};
                 }
                 state.backtrack();
             }
         }
 
         if (auto update = UpdateExpression<Yield, Await>::parse(state)) {
-            return UnaryExpression{std::move(*update), ""};
+            return UnaryExpression{std::move(*update)};
         }
 
         return std::nullopt;
@@ -735,7 +733,7 @@ struct BindingElement {
                 state.advance();
                 if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
-                    return BindingElement<Yield, Await>{std::pair{std::move(*id), std::move(ptr)}};
+                    return BindingElement<Yield, Await>{std::pair{std::move(*id), std::move(ptr)}, std::move(annotation)};
                 }
                 state.backtrack();
                 return std::nullopt;
@@ -749,7 +747,7 @@ struct BindingElement {
                 state.advance();
                 if (auto initializer = AssignmentExpression<true, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<true, Yield, Await>>(std::move(*initializer));
-                    return BindingElement<Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}};
+                    return BindingElement<Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}, std::move(annotation)};
                 }
                 state.backtrack();
                 return std::nullopt;
@@ -910,28 +908,33 @@ struct LexicalBinding {
         std::pair<BindingIdentifier<Yield, Await>, InitializerPtr<In, Yield, Await>>,
         std::pair<BindingPattern<Yield, Await>, InitializerPtr<In, Yield, Await>>
     > value;
+    std::optional<TypeAnnotation> type;  // TODO: maybe move to BindingIdentifier?
 
     static std::optional<LexicalBinding<In, Yield, Await>> parse(ParserState& state) {
         if (auto id = BindingIdentifier<Yield, Await>::parse(state)) {
+            auto annotation = TypeAnnotation::parse(state);
+
             if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
-                    return LexicalBinding<In, Yield, Await>{std::pair{std::move(*id), std::move(ptr)}};
+                    return LexicalBinding<In, Yield, Await>{std::pair{std::move(*id), std::move(ptr)}, std::move(annotation)};
                 }
                 state.backtrack();
                 return std::nullopt;
             }
-            return LexicalBinding<In, Yield, Await>{std::move(*id)};
+            return LexicalBinding<In, Yield, Await>{std::move(*id), std::move(annotation)};
         }
 
         auto start = state.getPosition();
         if (auto pattern = BindingPattern<Yield, Await>::parse(state)) {
+            auto annotation = TypeAnnotation::parse(state);
+
             if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
                 state.advance();
                 if (auto initializer = AssignmentExpression<In, Yield, Await>::parse(state)) {
                     auto ptr = std::make_unique<AssignmentExpression<In, Yield, Await>>(std::move(*initializer));
-                    return LexicalBinding<In, Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}};
+                    return LexicalBinding<In, Yield, Await>{std::pair{std::move(*pattern), std::move(ptr)}, std::move(annotation)};
                 }
             }
         }

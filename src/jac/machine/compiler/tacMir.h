@@ -19,27 +19,33 @@ inline std::ostream& printIndent(std::ostream& os) {
 
 inline std::ostream& generate(std::ostream& os, ValueType type) {
     switch (type) {
-        case ValueType::I8: os << "i8"; break;
-        case ValueType::U8: os << "u8"; break;
-        case ValueType::I16: os << "i16"; break;
-        case ValueType::U16: os << "u16"; break;
         case ValueType::I32: os << "i32"; break;
-        case ValueType::U32: os << "u32"; break;
-        case ValueType::I64: os << "i64"; break;
-        case ValueType::U64: os << "u64"; break;
-        case ValueType::Float: os << "f"; break;
         case ValueType::Double: os << "d"; break;
         case ValueType::Ptr: os << "p"; break;
         case ValueType::Void: os << "v"; break;
+        case ValueType::Bool: os << "i32"; break;
     }
     return os;
 }
 
+namespace detail {
+
+    struct ArgVisitor {
+        std::ostream& os;
+
+        void operator()(const Variable& v) {
+            os << v.first;
+        }
+
+        void operator()(auto i) {
+            os << i;
+        }
+    };
+
+} // namespace detail
 
 inline std::ostream& generate(std::ostream& os, const Arg& arg_) {
-    std::visit([&os](const auto& arg) {
-        os << arg;
-    }, arg_);
+    std::visit(detail::ArgVisitor{os}, arg_.value);
     return os;
 }
 
@@ -185,19 +191,19 @@ inline std::ostream& generate(std::ostream& os, const Function& f) {
     }
     os << '\n';
 
-    if (!f.locals.locals.empty()) {
+    if (!f.getInnerVars().empty()) {
         printIndent(os);
         os << "local ";
         bool first = true;
-        for (const auto& [local, type] : f.locals.locals) {
+        for (const auto& [id, type] : f.getInnerVars()) {
             if (!first) {
                 os << ", ";
             }
             else {
                 first = false;
             }
-            generate(os, type);
-            os << ":" << local;
+
+            os << "i64:" << id;
         }
         os << '\n';
     }

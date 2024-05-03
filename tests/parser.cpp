@@ -885,14 +885,14 @@ TEST_CASE("UnaryExpression", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
 
-        REQUIRE((result->op == "+"));
 
-        auto& inner = *std::get<jac::ast::UnaryExpressionPtr<true, true>>(result->value);
-        REQUIRE((inner.op == "-"));
+        auto& un1 = std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(result->value);
+        REQUIRE((un1.second == "+"));
 
-        auto& numExpr = std::get<jac::ast::UnaryExpressionPtr<true, true>>(inner.value);
+        auto& inner = std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(un1.first->value);
+        REQUIRE((inner.second == "-"));
 
-        REQUIRE(literalI32(unaryExpLiteral(*numExpr)) == 123);
+        REQUIRE(literalI32(unaryExpLiteral(*inner.first)) == 123);
     }
 
     SECTION("- a++") {
@@ -910,12 +910,12 @@ TEST_CASE("UnaryExpression", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
 
-        REQUIRE((result->op == "-"));
+        auto& un = std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(result->value);
+        REQUIRE((un.second == "-"));
 
-        auto& inner = *std::get<jac::ast::UnaryExpressionPtr<true, true>>(result->value);
-        REQUIRE((std::get<jac::ast::UpdateExpression<true, true>>(inner.value).op == "x++"));
+        REQUIRE((std::get<jac::ast::UpdateExpression<true, true>>(un.first->value).op == "x++"));
 
-        REQUIRE((unaryExpIdentifier(inner) == "a"));
+        REQUIRE((unaryExpIdentifier(*un.first) == "a"));
     }
 }
 

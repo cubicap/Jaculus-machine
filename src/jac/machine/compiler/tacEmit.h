@@ -13,11 +13,12 @@ inline tac::Identifier id(std::string name) {
     return "i_" + name;
 }
 
-inline tac::Identifier newTmp(tac::Function& func) {
+inline tac::Variable newTmp(tac::Function& func, tac::ValueType type) {
     static unsigned counter = 0;
     std::string name = "t_" + std::to_string(counter++);
-    func.currentLocals().add(name, tac::ValueType::I64);
-    return name;
+    tac::Variable var = { name, type };
+    func.addLocal(var);
+    return var;
 }
 
 
@@ -60,18 +61,18 @@ const std::unordered_map<std::string_view, tac::Opcode> unaryOps = {
 };
 
 const std::unordered_map<std::string_view, tac::ValueType> types = {
-    { "Int8", tac::ValueType::I8 },
-    { "Uint8", tac::ValueType::U8 },
-    { "Int16", tac::ValueType::I16 },
-    { "Uint16", tac::ValueType::U16 },
     { "Int32", tac::ValueType::I32 },
-    { "Uint32", tac::ValueType::U32 },
-    { "Int64", tac::ValueType::I64 },
-    { "Uint64", tac::ValueType::U64 },
-    { "Float32", tac::ValueType::Float },
-    { "Float64", tac::ValueType::Double },
+    { "Float", tac::ValueType::Double },
     // { "Ptr", tac::ValueType::Ptr }
 };
+
+inline tac::ValueType getType(std::string_view name) {
+    auto it = types.find(name);
+    if (it == types.end()) {
+        throw std::runtime_error("Invalid type");
+    }
+    return it->second;
+}
 
 
 template<bool Yield, bool Await>
@@ -143,7 +144,11 @@ tac::Arg emit(const ast::PrimaryExpression<Yield, Await>& primary, tac::Function
             throw std::runtime_error("This expressions are not supported");
         }
         tac::Arg operator()(const ast::IdentifierReference<Yield, Await>& identifier) {
-            return tac::Arg(id(identifier.identifier.name.name));
+            tac::Identifier ident = id(identifier.identifier.name.name);
+            if (!func.currentLocals().has(ident)) {
+                throw std::runtime_error("Identifier referenced before declaration (" + identifier.identifier.name.name + ")");
+            }
+            return func.currentLocals().get(ident);
         }
         tac::Arg operator()(const ast::Literal& literal) {
             return emit(literal);
@@ -206,7 +211,7 @@ tac::Arg emit(const ast::CallExpression<Yield, Await>& call, tac::Function& func
             }
             std::string fun = identifier->identifier.name.name;
 
-            tac::Identifier res = newTmp(func);
+            tac::Variable res = newTmp(func, tac::ValueType::I32);  // TODO: infer type from called function
 
             std::vector<Arg> args{res};
             for (const auto& [ spread, expr ] : call.second.arguments) {
@@ -269,7 +274,7 @@ tac::Arg emit(const ast::UpdateExpression<Yield, Await>& expr, tac::Function& fu
         tac::Function& func;
 
         tac::Arg operator()(const ast::UnaryExpressionPtr<Yield, Await>&) {
-            throw std::runtime_error("Unary expressions are not supported");
+            throw std::runtime_error("Update unary expressions are not supported");
         }
 
         tac::Arg operator()(const ast::LeftHandSideExpressionPtr<Yield, Await>& lhs) {
@@ -287,20 +292,21 @@ tac::Arg emit(const ast::UnaryExpression<Yield, Await>& expr, tac::Function& fun
         return emit(std::get<ast::UpdateExpression<Yield, Await>>(expr.value), func);
     }
 
-        tac::Arg arg = emit(*std::get<ast::UnaryExpressionPtr<Yield, Await>>(expr.value), func);
+    const auto& un = std::get<std::pair<ast::UnaryExpressionPtr<Yield, Await>, std::string_view>>(expr.value);
+    tac::Arg arg = emit(*(un.first), func);
 
-            auto it = unaryOps.find(expr.op);
-            if (it == unaryOps.end()) {
-                throw std::runtime_error("Unsupported unary operator '" + std::string(expr.op) + "'");
-            }
-            tac::Opcode op = it->second;
+    auto it = unaryOps.find(un.second);
+    if (it == unaryOps.end()) {
+        throw std::runtime_error("Unsupported unary operator '" + std::string(un.second) + "'");
+    }
+    tac::Opcode op = it->second;
 
-            func.currentBlock().statements.statements.emplace_back(tac::Operation{
-                .op = op,
-                .args = { arg, arg }
-            });
+    func.currentBlock().statements.statements.emplace_back(tac::Operation{
+        .op = op,
+        .args = { arg, arg }
+    });
 
-            return arg;
+    return arg;
 }
 
 
@@ -323,7 +329,7 @@ tac::Arg emit(const ast::BinaryExpression<In, Yield, Await>& expr, tac::Function
             }
             tac::Opcode op = it->second;
 
-            tac::Identifier res = newTmp(func);
+            tac::Variable res = newTmp(func, tac::resultType(op, lop.type(), rop.type()));
 
             func.currentBlock().statements.statements.emplace_back(tac::Operation{
                 .op = op,
@@ -398,13 +404,17 @@ tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Function& fu
     if (!std::holds_alternative<ast::IdentifierReference<Yield, Await>>(lhsPrimary.value)) {
         throw std::runtime_error("Only identifier references are supported as assignment targets");
     }
-    tac::Identifier target = id(std::get<ast::IdentifierReference<Yield, Await>>(lhsPrimary.value).identifier.name.name);
 
     tac::Arg rhs = emit(*assign.rhs, func);
 
     if (assign.op != "=") {
         throw std::runtime_error("Only simple assignments are supported");
     }
+
+    tac::Variable target{
+        id(std::get<ast::IdentifierReference<Yield, Await>>(lhsPrimary.value).identifier.name.name),
+        rhs.type()
+    };
 
     func.currentBlock().statements.statements.emplace_back(tac::Operation{
         .op = tac::Opcode::Copy,
@@ -423,20 +433,22 @@ void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Functi
 
     struct visitor {
         tac::Function& func;
+        tac::ValueType type;
 
         void operator()(const ast::BindingIdentifier<Yield, Await>& decl) {
-            func.currentLocals().add(id(decl.identifier.name.name), tac::ValueType::I64);
+            func.currentLocals().add(id(decl.identifier.name.name), type);
             // do nothing
         }
         void operator()(const std::pair<ast::BindingIdentifier<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>& assign) {
-            func.currentLocals().add(id(assign.first.identifier.name.name), tac::ValueType::I64);
-
             const auto& [binding, initializer] = assign;
 
             tac::Arg tmp = emit(*initializer, func);
+            tac::Variable res{ id(binding.identifier.name.name), type };  // XXX: the type can be easily inferred from the initializer
+            func.addLocal(res);
+
             func.currentBlock().statements.statements.emplace_back(tac::Operation{
                 .op = tac::Opcode::Copy,
-                .args = { id(binding.identifier.name.name), tmp }
+                .args = { res, tmp }
             });
         }
         void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>&) {
@@ -446,7 +458,10 @@ void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Functi
 
     const auto& lexical = std::get<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value);
     for (const ast::LexicalBinding<true, Yield, Await>& binding : lexical.bindings) {
-        std::visit(visitor{func}, binding.value);
+        if (!binding.type) {
+            throw std::runtime_error("Lexical bindings must have a type");
+        }
+        std::visit(visitor{ func, getType(binding.type->type.name.name) }, binding.value);
     }
 }
 
@@ -557,28 +572,24 @@ tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) 
     if (!decl.returnType) {
         throw std::runtime_error("Function declarations must have a return type");
     }
-    auto typeIt = types.find(decl.returnType->type.name.name);
-    if (typeIt == types.end()) {
-        throw std::runtime_error("Unsupported return type");
-    }
-    out.returnType = typeIt->second;
+    out.returnType = getType(decl.returnType->type.name.name);
 
-    for (const ast::FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
-        if (!std::holds_alternative<ast::BindingIdentifier<Yield, Await>>(arg.value)) {
-            throw std::runtime_error("Only binding identifiers are supported as function parameters");
-        }
-        const auto& binding = std::get<ast::BindingIdentifier<Yield, Await>>(arg.value);
+    {
+        std::vector<tac::Variable> args;
+        for (const ast::FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
+            if (!std::holds_alternative<ast::BindingIdentifier<Yield, Await>>(arg.value)) {
+                throw std::runtime_error("Only binding identifiers are supported as function parameters");
+            }
+            const auto& binding = std::get<ast::BindingIdentifier<Yield, Await>>(arg.value);
 
-        if (!arg.type) {
-            throw std::runtime_error("Function parameters must have a type");
-        }
+            if (!arg.type) {
+                throw std::runtime_error("Function parameters must have a type");
+            }
 
-        typeIt = types.find(arg.type->type.name.name);
-        if (typeIt == types.end()) {
-            throw std::runtime_error("Unsupported parameter type");
+            args.emplace_back(id(binding.identifier.name.name), getType(arg.type->type.name.name));
         }
 
-        out.args.emplace_back(id(binding.identifier.name.name), typeIt->second);
+        out.args = std::move(args);
     }
 
     // TODO
