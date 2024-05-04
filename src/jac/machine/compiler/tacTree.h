@@ -344,6 +344,8 @@ class FunctionBody {
     bool _blockClosed = true;
 
     Nesting* _current;
+public:
+    FunctionBody() : _current(&_root) { }
 
     Block& currentBlock() {
         if (_blockClosed || _current->nodes.empty()) {
@@ -352,8 +354,6 @@ class FunctionBody {
         }
         return std::get<Block>(_current->nodes.back());
     }
-public:
-    FunctionBody() : _current(&_root) { }
 
     void emitStatement(Statement statement) {
         auto& block = currentBlock();

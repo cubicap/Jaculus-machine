@@ -138,6 +138,10 @@ inline std::ostream& generate(std::ostream& os, const Block& b, const Nesting& p
     printIndent(os);
     switch (j.type) {
         case Jump::Next:
+            if (b.statements.statements.empty()) {
+                // TODO: find better solution
+                os << "bnes " << b.name << ", 0, 0\n";
+            }
             break;
         case Jump::NextParent:
             os << "jmp " << parent.nextParentLabel();
@@ -146,9 +150,9 @@ inline std::ostream& generate(std::ostream& os, const Block& b, const Nesting& p
             os << "jmp " << j.labelA;
             break;
         case Jump::Jnz:
-            os << "bnes " << j.labelA << ", ";
+            os << "bts " << j.labelA << ", ";
             generate(os, j.value);
-            os << ", 0\n";
+            os << "\n";
             printIndent(os);
             os << "jmp " << j.labelB;
             break;

@@ -209,4 +209,114 @@ TEST_CASE("Eval", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"0", "1", "1", "2", "3", "5", "8", "13", "21", "34"});
     }
+
+    SECTION("While") {
+        machine.initialize();
+        std::string code(R"(
+            function pow(a: Int32, b: Int32): Int32 {
+                let c: Int32 = 1;
+                while (b > 0) {
+                    c = c * a;
+                    b = b - 1;
+                }
+
+                return c;
+            }
+
+            report(pow(2, 8));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"256"});
+    }
+
+    SECTION("Empty while") {
+        machine.initialize();
+        std::string code(R"(
+            function pow(a: Int32, b: Int32): Int32 {
+                while (b == 0) {
+                }
+
+                return a;
+            }
+
+            report(pow(2, 8));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2"});
+    }
+
+    SECTION("Do while") {
+        machine.initialize();
+        std::string code(R"(
+            function add(a: Int32, b: Int32): Int32 {
+                let c: Int32 = 0;
+                do {
+                    c = c + a;
+                    b = b - 1;
+                } while (b > 0);
+
+                return c;
+            }
+
+            report(add(2, 8));
+            report(add(3, 0));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"16", "3"});
+    }
+
+    SECTION("For") {
+        machine.initialize();
+        std::string code(R"(
+            function mul(a: Int32, b: Int32): Int32 {
+                let c: Int32 = 0;
+                for (let i: Int32 = 0; i < b; i = i + 1) {
+                    c = c + a;
+                }
+
+                return c;
+            }
+
+            report(mul(2, 8));
+            report(mul(3, 0));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"16", "0"});
+    }
+
+    SECTION("Iterative fib") {
+        machine.initialize();
+        std::string code(R"(
+            function fib(n: Int32): Int32 {
+                let a: Int32 = 0;
+                let b: Int32 = 1;
+                let c: Int32 = 0;
+                for (let i: Int32 = 0; i < n; i = i + 1) {
+                    c = a + b;
+                    a = b;
+                    b = c;
+                }
+
+                return a;
+            }
+
+            report(fib(0));
+            report(fib(1));
+            report(fib(2));
+            report(fib(3));
+            report(fib(4));
+            report(fib(5));
+            report(fib(6));
+            report(fib(7));
+            report(fib(8));
+            report(fib(9));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"0", "1", "1", "2", "3", "5", "8", "13", "21", "34"});
+    }
 }

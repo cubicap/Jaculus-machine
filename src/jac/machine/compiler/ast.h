@@ -1115,24 +1115,161 @@ template<bool Yield, bool Await, bool Return>
 struct DoWhileStatement {
     StatementPtr<Yield, Await, Return> statement;
     Expression<true, Yield, Await> expression;
+
+    static std::optional<DoWhileStatement<Yield, Await, Return>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "do") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto statement = Statement<Yield, Await, Return>::parse(state);
+        if (!statement) {
+            state.error("Expected statement");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "while") {
+            state.error("Expected while");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto expr = Expression<true, Yield, Await>::parseParenthesised(state);
+        if (!expr) {
+            state.error("Expected expression");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+            state.error("Expected ;");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        StatementPtr<Yield, Await, Return> statementPtr = std::make_unique<Statement<Yield, Await, Return>>(std::move(*statement));
+        return DoWhileStatement<Yield, Await, Return>{std::move(statementPtr), std::move(*expr)};
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
 struct WhileStatement {
     Expression<true, Yield, Await> expression;
     StatementPtr<Yield, Await, Return> statement;
+
+    static std::optional<WhileStatement<Yield, Await, Return>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "while") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto expr = Expression<true, Yield, Await>::parseParenthesised(state);
+        if (!expr) {
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        auto statement = Statement<Yield, Await, Return>::parse(state);
+        if (!statement) {
+            state.error("Expected statement");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        StatementPtr<Yield, Await, Return> statementPtr = std::make_unique<Statement<Yield, Await, Return>>(std::move(*statement));
+        return WhileStatement<Yield, Await, Return>{std::move(*expr), std::move(statementPtr)};
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
 struct ForStatement {
     std::variant<
         std::monostate,
-        std::pair<LexicalDeclaration<false, Yield, Await>, Expression<true, Yield, Await>>,
-        Expression<false, Yield, Await>
+        Expression<false, Yield, Await>,
+        VariableDeclarationList<false, Yield, Await>,
+        LexicalDeclaration<false, Yield, Await>
     > init;
     std::optional<Expression<true, Yield, Await>> condition;
     std::optional<Expression<true, Yield, Await>> update;
     StatementPtr<Yield, Await, Return> statement;
+
+    static std::optional<ForStatement<Yield, Await, Return>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "for") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
+            state.error("Expected (");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        ForStatement<Yield, Await, Return> forStmt;
+
+        if (state.current().kind == lex::Token::Keyword && state.current().text == "var") {
+            throw std::runtime_error("Variable declarations in for loop are not supported");
+        }
+        if (state.current().kind == lex::Token::Keyword && (state.current().text == "let" || state.current().text == "const")) {
+            if (auto decl = LexicalDeclaration<false, Yield, Await>::parse(state)) {
+                forStmt.init = std::move(*decl);
+            }
+            else {
+                state.restorePosition(start);
+                return std::nullopt;
+            }
+        }
+        else if (auto expr = Expression<false, Yield, Await>::parse(state)) {
+            forStmt.init = std::move(*expr);
+            if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+                state.error("Expected ;");
+                state.restorePosition(start);
+                return std::nullopt;
+            }
+            state.advance();
+        }
+
+
+        if (auto cond = Expression<true, Yield, Await>::parse(state)) {
+            forStmt.condition = std::move(*cond);
+        }
+
+
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+            state.error("Expected ;");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        if (auto update = Expression<true, Yield, Await>::parse(state)) {
+            forStmt.update = std::move(*update);
+        }
+
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ")") {
+            state.error("Expected )");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto statement = Statement<Yield, Await, Return>::parse(state);
+        if (!statement) {
+            state.error("Expected statement");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        forStmt.statement = std::make_unique<Statement<Yield, Await, Return>>(std::move(*statement));
+        return forStmt;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1148,6 +1285,21 @@ struct IterationStatement {
         ForStatement<Yield, Await, Return>,
         ForInOfStatement<Yield, Await, Return>
     > value;
+
+    static std::optional<IterationStatement<Yield, Await, Return>> parse(ParserState& state) {
+        if (auto doWhile = DoWhileStatement<Yield, Await, Return>::parse(state)) {
+            return IterationStatement<Yield, Await, Return>{std::move(*doWhile)};
+        }
+        if (auto whileStmt = WhileStatement<Yield, Await, Return>::parse(state)) {
+            return IterationStatement<Yield, Await, Return>{std::move(*whileStmt)};
+        }
+        if (auto forStmt = ForStatement<Yield, Await, Return>::parse(state)) {
+            return IterationStatement<Yield, Await, Return>{std::move(*forStmt)};
+        }
+        // TODO: rest
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1166,6 +1318,11 @@ struct SwitchStatement {
     Expression<true, Yield, Await> expression;
     std::vector<CaseClause<Yield, Await, Return>> caseBlock;
     std::optional<DefaultClause<Yield, Await, Return>> defaultClause;
+
+    static std::optional<SwitchStatement<Yield, Await, Return>> parse(ParserState&) {
+        // TODO
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1174,6 +1331,17 @@ struct BreakableStatement {
         IterationStatement<Yield, Await, Return>,
         SwitchStatement<Yield, Await, Return>
     > value;
+
+    static std::optional<BreakableStatement<Yield, Await, Return>> parse(ParserState& state) {
+        if (auto iter = IterationStatement<Yield, Await, Return>::parse(state)) {
+            return BreakableStatement<Yield, Await, Return>{std::move(*iter)};
+        }
+        if (auto sw = SwitchStatement<Yield, Await, Return>::parse(state)) {
+            return BreakableStatement<Yield, Await, Return>{std::move(*sw)};
+        }
+
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -1363,6 +1531,9 @@ struct Statement {
         }
         if (auto if_ = IfStatement<Yield, Await, Return>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*if_)};
+        }
+        if (auto breakable = BreakableStatement<Yield, Await, Return>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*breakable)};
         }
         if (Return) {
             auto ret = ReturnStatement<Yield, Await>::parse(state);

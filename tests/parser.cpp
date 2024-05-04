@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
 
 #include <jac/machine/compiler/ast.h>
 
@@ -1317,6 +1318,47 @@ TEST_CASE("Assignment", "[parser]") {
 }
 
 
+TEST_CASE("Expression", "[parser]") {
+
+    SECTION("x < 10") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 3, "<", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "10", jac::lex::Token::NumericLiteral)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::Expression<false, false, false>::parse(state);
+
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->items.size() == 1);
+    }
+
+    SECTION("x++") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 2, "++", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::Expression<false, false, false>::parse(state);
+
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->items.size() == 1);
+    }
+}
+
+
 TEST_CASE("BlockStatement", "[parser]") {
 
     SECTION("{}") {
@@ -1545,5 +1587,116 @@ TEST_CASE("If statement", "[parser]") {
         REQUIRE(result);
 
         REQUIRE(result->alternate);
+    }
+}
+
+
+TEST_CASE("Loop statement", "[parser]") {
+
+    SECTION("while (x) {}") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "while", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 7, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 8, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 9, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 12, "}", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::WhileStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->statement);
+    }
+
+    SECTION("while (x) { y; }") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "while", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 7, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 8, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 9, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 13, "y", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 14, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 16, "}", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::WhileStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->statement);
+    }
+
+    SECTION("do { x; } while (y > 0);") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "do", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 4, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 6, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 7, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 9, "}", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "while", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 17, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 18, "y", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 20, ">", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 22, "0", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 23, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 24, ";", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::DoWhileStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->statement);
+    }
+
+    SECTION("for (let x = 0; x < 10; x++) { y; }") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "for", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 5, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 6, "let", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 10, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 12, "=", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 14, "0", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 15, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 17, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 19, "<", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 21, "10", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 23, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 25, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 26, "++", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 28, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 30, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 32, "y", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 33, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 35, "}", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::ForStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(std::holds_alternative<jac::ast::LexicalDeclaration<false, true, true>>(result->init));
+        REQUIRE(result->condition);
+        REQUIRE(result->update);
+        REQUIRE(result->statement);
     }
 }

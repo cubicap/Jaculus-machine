@@ -425,12 +425,8 @@ tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Function& fu
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Function& func) {
-    if (!std::holds_alternative<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value)) {
-        throw std::runtime_error("Only lexical declarations are supported");
-    }
-
+template<bool In, bool Yield, bool Await>
+void emit(const ast::LexicalDeclaration<In, Yield, Await>& lexical, tac::Function& func) {
     struct visitor {
         tac::Function& func;
         tac::ValueType type;
@@ -439,7 +435,7 @@ void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Functi
             func.currentLocals().add(id(decl.identifier.name.name), type);
             // do nothing
         }
-        void operator()(const std::pair<ast::BindingIdentifier<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>& assign) {
+        void operator()(const std::pair<ast::BindingIdentifier<Yield, Await>, ast::InitializerPtr<In, Yield, Await>>& assign) {
             const auto& [binding, initializer] = assign;
 
             tac::Arg tmp = emit(*initializer, func);
@@ -451,18 +447,27 @@ void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Functi
                 .args = { res, tmp }
             }});
         }
-        void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>&) {
+        void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<In, Yield, Await>>&) {
             throw std::runtime_error("Binding patterns are not supported");
         }
     };
 
-    const auto& lexical = std::get<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value);
-    for (const ast::LexicalBinding<true, Yield, Await>& binding : lexical.bindings) {
+    for (const ast::LexicalBinding<In, Yield, Await>& binding : lexical.bindings) {
         if (!binding.type) {
             throw std::runtime_error("Lexical bindings must have a type");
         }
         std::visit(visitor{ func, getType(binding.type->type.name.name) }, binding.value);
     }
+}
+
+
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Function& func) {
+    if (!std::holds_alternative<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value)) {
+        throw std::runtime_error("Only lexical declarations are supported");
+    }
+
+    emit(std::get<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value), func);
 }
 
 
@@ -509,6 +514,172 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, tac::Function& fun
 }
 
 
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, tac::Function& func) {
+    auto& condSkipBlock = func.body.endBlock(tac::Jump::unconditional("do"));
+
+    auto& condBlockStart = func.body.currentBlock();
+
+    tac::Arg cond = emit(stmt.expression, func);
+
+    tac::Variable res = newTmp(func, tac::ValueType::Bool);
+    func.body.emitStatement({tac::Operation{
+        .op = tac::Opcode::Copy,
+        .args = { res, cond }
+    }});
+
+    auto& condBlockEnd = func.body.endBlock(tac::Jump::jnz(res, "do", "end"));
+
+    auto& loopNest = func.body.nestingIn();
+    emit(*stmt.statement, func);
+    func.body.endBlock(tac::Jump::unconditional(condBlockStart.name));
+
+    auto& endBlock = func.body.endBlock(tac::Jump::nextParent());
+    func.body.nestingOut();
+
+    condSkipBlock.jump.labelA = loopNest.firstLabel();
+
+    condBlockEnd.jump.labelA = condSkipBlock.jump.labelA;
+    condBlockEnd.jump.labelB = endBlock.name;
+}
+
+
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, tac::Function& func) {
+    if (!func.body.currentBlock().statements.statements.empty()) {
+        func.body.endBlock(tac::Jump::next());
+    }
+
+    auto& condBlockStart = func.body.currentBlock();
+
+    tac::Arg cond = emit(stmt.expression, func);
+
+    tac::Variable res = newTmp(func, tac::ValueType::Bool);
+    func.body.emitStatement({tac::Operation{
+        .op = tac::Opcode::Copy,
+        .args = { res, cond }
+    }});
+
+    auto& condBlockEnd = func.body.endBlock(tac::Jump::jnz(res, "while", "end"));
+
+    auto& loopNest = func.body.nestingIn();
+    emit(*stmt.statement, func);
+    func.body.endBlock(tac::Jump::unconditional(condBlockStart.name));
+
+    auto& endBlock = func.body.endBlock(tac::Jump::nextParent());
+    func.body.nestingOut();
+
+    condBlockEnd.jump.labelA = loopNest.firstLabel();
+    condBlockEnd.jump.labelB = endBlock.name;
+}
+
+
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::ForStatement<Yield, Await, Return>& stmt, tac::Function& func) {
+    struct InitVisitor {
+        tac::Function& func;
+
+        void operator()(std::monostate) {
+            // do nothing
+        }
+        void operator()(const ast::Expression<false, Yield, Await>& expr) {
+            emit(expr, func);
+        }
+        void operator()(const ast::VariableDeclarationList<false, Yield, Await>&) {
+            throw std::runtime_error("Variable declarations are not supported");
+        }
+        void operator()(const ast::LexicalDeclaration<false, Yield, Await>& decl) {
+            emit(decl, func);
+        }
+    };
+
+    std::visit(InitVisitor{func}, stmt.init);
+
+    Block* skipUpdateBlock = nullptr;
+    if (stmt.update) {
+        skipUpdateBlock = &func.body.endBlock(tac::Jump::unconditional("cond"));
+    }
+
+    auto& forNest = func.body.nestingIn();
+
+    if (stmt.update) {
+        emit(*stmt.update, func);
+        func.body.endBlock(tac::Jump::next());
+    }
+
+    auto& condBlockStart = func.body.currentBlock();
+    if (!stmt.condition) {
+        throw std::runtime_error("For statements must have a condition");
+    }
+
+    tac::Arg cond = emit(*stmt.condition, func);
+
+    tac::Variable res = newTmp(func, tac::ValueType::Bool);
+    func.body.emitStatement({tac::Operation{
+        .op = tac::Opcode::Copy,
+        .args = { res, cond }
+    }});
+
+    auto& condBlockEnd = func.body.endBlock(tac::Jump::jnz(res, "for", "end"));
+
+    auto& forBlock = func.body.currentBlock();
+
+    emit(*stmt.statement, func);
+
+    func.body.endBlock(tac::Jump::unconditional(forNest.firstLabel()));
+
+    auto& endBlock = func.body.endBlock(tac::Jump::nextParent());
+    func.body.nestingOut();
+
+    condBlockEnd.jump.labelA = forBlock.name;
+    condBlockEnd.jump.labelB = endBlock.name;
+
+    if (skipUpdateBlock) {
+        skipUpdateBlock->jump.labelA = condBlockStart.name;
+    }
+}
+
+
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::IterationStatement<Yield, Await, Return>& stmt, tac::Function& func) {
+    struct visitor {
+        tac::Function& func;
+
+        void operator()(const ast::DoWhileStatement<Yield, Await, Return>& stmt) {
+            emit(stmt, func);
+        }
+        void operator()(const ast::WhileStatement<Yield, Await, Return>& stmt) {
+            emit(stmt, func);
+        }
+        void operator()(const ast::ForStatement<Yield, Await, Return>& stmt) {
+            emit(stmt, func);
+        }
+        void operator()(const ast::ForInOfStatement<Yield, Await, Return>&) {
+            throw std::runtime_error("For-in/of statements are not supported");
+        }
+    };
+
+    std::visit(visitor{func}, stmt.value);
+}
+
+
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::BreakableStatement<Yield, Await, Return>& stmt, tac::Function& func) {
+    struct visitor {
+        tac::Function& func;
+
+        void operator()(const ast::IterationStatement<Yield, Await, Return>& stmt) {
+            emit(stmt, func);
+        }
+        void operator()(const ast::SwitchStatement<Yield, Await, Return>&) {
+            throw std::runtime_error("Switch statements are not supported");
+        }
+    };
+
+    std::visit(visitor{func}, stmt.value);
+}
+
+
 template<bool Yield, bool Await>
 void emit(const ast::ReturnStatement<Yield, Await>& stmt, tac::Function& func) {
     if (!stmt.expression) {
@@ -545,8 +716,8 @@ void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Function& 
         void operator()(const ast::IfStatement<Yield, Await, Return>& stmt) {
             emit(stmt, func);
         }
-        void operator()(const ast::BreakableStatement<Yield, Await, Return>&) {
-            throw std::runtime_error("Breakable statements are not supported");
+        void operator()(const ast::BreakableStatement<Yield, Await, Return>& stmt) {
+            emit(stmt, func);
         }
         void operator()(const ast::ContinueStatement<Yield, Await>&) {
             throw std::runtime_error("Continue statements are not supported");
