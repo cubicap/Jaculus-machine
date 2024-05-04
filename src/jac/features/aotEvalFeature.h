@@ -163,7 +163,8 @@ class AotEvalFeature : public EvalFeature<Next> {
             MIR_load_external(mirCtx, i_name.c_str(), fn.ptr);
         }
 
-        MIR_link(mirCtx, MIR_set_interp_interface, nullptr);
+        MIR_gen_init(mirCtx, 1);
+        MIR_link(mirCtx, MIR_set_gen_interface, nullptr);
 
         std::string name = jac::tac::id(astFunc.name->identifier.name.name);
         MIR_item_t func = detail::MIR_get_global_item(mirCtx, name);
@@ -176,7 +177,6 @@ class AotEvalFeature : public EvalFeature<Next> {
             throw std::runtime_error("Caller not found");
         }
 
-        MIR_gen_init(mirCtx, 1);
         void* ptr = MIR_gen(mirCtx, 0, func);
         void* callerPtr = MIR_gen(mirCtx, 0, caller);
 
