@@ -82,7 +82,6 @@ class AotEvalFeature : public EvalFeature<Next> {
             if (name == astFunc.name->identifier.name.name) {
                 continue;
             }
-            std::cout << "    " << name << '\n';
             auto it = compiledHolder.find(name);
             if (it == compiledHolder.end()) {
                 throw std::runtime_error("Required function not found: " + name);

@@ -1,7 +1,7 @@
 #include <iostream>
-#include <string>
 
 #include <jac/features/basicStreamFeature.h>
+#include <jac/features/evalFeature.h>
 #include <jac/features/eventLoopFeature.h>
 #include <jac/features/eventQueueFeature.h>
 #include <jac/features/filesystemFeature.h>
@@ -16,6 +16,7 @@
 
 using Machine = jac::ComposeMachine<
     jac::MachineBase,
+    jac::EvalFeature,
     jac::EventQueueFeature,
     jac::BasicStreamFeature,
     jac::StdioFeature,
