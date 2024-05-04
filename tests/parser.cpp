@@ -1468,3 +1468,82 @@ TEST_CASE("Call expression", "[parser]") {
         REQUIRE(args.arguments.size() == 3);
     }
 }
+
+
+TEST_CASE("If statement", "[parser]") {
+
+    SECTION("if (x) {}") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "if", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 4, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 6, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 8, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 9, "}", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::IfStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE_FALSE(result->alternate);
+    }
+
+    SECTION("if (x) { y; } else { z; }") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "if", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 4, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "x", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 6, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 8, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 10, "y", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 11, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 13, "}", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 15, "else", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 20, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 22, "z", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 23, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 25, "}", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::IfStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->alternate);
+    }
+
+    SECTION("if (a == 4) b; else c;") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "if", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 4, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 7, "==", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 10, "4", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 11, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 13, "b", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 14, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 16, "else", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 21, "c", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 22, ";", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::IfStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->alternate);
+    }
+}

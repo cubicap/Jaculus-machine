@@ -113,4 +113,100 @@ TEST_CASE("Eval", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"7", "3"});
     }
+
+    SECTION("Block") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                let c: Int32 = 0;
+                {
+                    c = a + b;
+                }
+                return c;
+            }
+
+            report(fun(1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
+    }
+
+    SECTION("If") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                let c: Int32 = 0;
+                if (a > b) {
+                    c = a;
+                }
+                else {
+                    c = b;
+                }
+                return c;
+            }
+
+            report(fun(1, 2));
+            report(fun(4, 3));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2", "4"});
+    }
+
+    SECTION("Nested if") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32, c: Int32): Int32 {
+                if (a == 0) {
+                    if (b > c) {
+                        return b;
+                    }
+                    else {
+                        return c;
+                    }
+                }
+                else {
+                    return a;
+                }
+            }
+
+            report(fun(1, 2, 3));
+            report(fun(0, 2, 3));
+            report(fun(0, 4, 3));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1", "3", "4"});
+    }
+
+    SECTION("Recursive fib") {
+        machine.initialize();
+        std::string code(R"(
+            function fib(n: Int32): Int32 {
+                if (n == 0) {
+                    return 0;
+                }
+                else if (n == 1) {
+                    return 1;
+                }
+
+                return fib(n - 1) + fib(n - 2);
+            }
+
+            report(fib(0));
+            report(fib(1));
+            report(fib(2));
+            report(fib(3));
+            report(fib(4));
+            report(fib(5));
+            report(fib(6));
+            report(fib(7));
+            report(fib(8));
+            report(fib(9));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"0", "1", "1", "2", "3", "5", "8", "13", "21", "34"});
+    }
 }

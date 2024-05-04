@@ -871,6 +871,31 @@ struct Expression {
         state.restorePosition(last);
         return expr;
     }
+
+    static std::optional<Expression<In, Yield, Await>> parseParenthesised(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
+            state.error("Expected (");
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto expr = parse(state);
+        if (!expr) {
+            state.error("Expected expression");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ")") {
+            state.error("Expected )");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+        state.advance();
+
+        return expr;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1045,6 +1070,45 @@ struct IfStatement {
     Expression<true, Yield, Await> expression;
     StatementPtr<Yield, Await, Return> consequent;
     std::optional<StatementPtr<Yield, Await, Return>> alternate;
+
+    static std::optional<IfStatement<Yield, Await, Return>> parse(ParserState& state) {
+        auto start = state.getPosition();
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "if") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        auto expr = Expression<true, Yield, Await>::parseParenthesised(state);
+        if (!expr) {
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        auto consequent = Statement<Yield, Await, Return>::parse(state);
+        if (!consequent) {
+            state.error("Expected statement");
+            state.restorePosition(start);
+            return std::nullopt;
+        }
+
+        if (state.current().kind == lex::Token::Keyword && state.current().text == "else") {
+            state.advance();
+            auto alternate = Statement<Yield, Await, Return>::parse(state);
+
+            if (!alternate) {
+                state.error("Expected statement");
+                state.restorePosition(start);
+                return std::nullopt;
+            }
+
+            StatementPtr<Yield, Await, Return> consequentPtr = std::make_unique<Statement<Yield, Await, Return>>(std::move(*consequent));
+            StatementPtr<Yield, Await, Return> alternatePtr = std::make_unique<Statement<Yield, Await, Return>>(std::move(*alternate));
+            return IfStatement<Yield, Await, Return>{std::move(*expr), std::move(consequentPtr), std::move(alternatePtr)};
+        }
+
+        StatementPtr<Yield, Await, Return> consequentPtr = std::make_unique<Statement<Yield, Await, Return>>(std::move(*consequent));
+        return IfStatement<Yield, Await, Return>{std::move(*expr), std::move(consequentPtr), std::nullopt};
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1296,6 +1360,9 @@ struct Statement {
         }
         if (auto expression = ExpressionStatement<Yield, Await>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*expression)};
+        }
+        if (auto if_ = IfStatement<Yield, Await, Return>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*if_)};
         }
         if (Return) {
             auto ret = ReturnStatement<Yield, Await>::parse(state);

@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <map>
 #include <sstream>
 #include <stdexcept>
@@ -77,7 +78,11 @@ class AotEvalFeature : public EvalFeature<Next> {
         ss << "mod: module\n";
 
         // --- required functions prototypes ---
-        for (const auto& name : tacFunc.requiredFunctions) {
+        for (const auto& name : tacFunc.requiredFunctions()) {
+            if (name == astFunc.name->identifier.name.name) {
+                continue;
+            }
+            std::cout << "    " << name << '\n';
             auto it = compiledHolder.find(name);
             if (it == compiledHolder.end()) {
                 throw std::runtime_error("Required function not found: " + name);
@@ -87,10 +92,7 @@ class AotEvalFeature : public EvalFeature<Next> {
             ss << "    import i_" << name << '\n';
         }
 
-        // --- function ---
-        jac::tac::mir::generate(ss, tacFunc);
-
-        // prototype
+        // --- function prototype ---
         std::string prototype;
         {
             std::stringstream proto;
@@ -99,24 +101,27 @@ class AotEvalFeature : public EvalFeature<Next> {
         }
         ss << prototype;
 
+        // --- function implementation ---
+        jac::tac::mir::generate(ss, tacFunc);
+
         // --- caller ---
-        std::string callerName(std::string("caller_") + tacFunc.name);
+        std::string callerName(std::string("caller_") + tacFunc.name());
         ss << callerName << ": func i64, i64:argc, p:argv\n";
 
 
         ss << "    local i64:pos, i64:res";
-        for (size_t i = 0; i < tacFunc.args.size(); ++i) {
+        for (size_t i = 0; i < tacFunc.args().size(); ++i) {
             ss << ", i64:arg" << i;
         }
         ss << '\n';
         ss << "body:\n";
 
         // check number of arguments
-        ss << "    bgt fail, argc, " << tacFunc.args.size() << '\n';
+        ss << "    bgt fail, argc, " << tacFunc.args().size() << '\n';
 
         // prepare arguments
-        for (size_t i = 0; i < tacFunc.args.size(); ++i) {
-            const auto& [arg, type] = tacFunc.args[i];
+        for (size_t i = 0; i < tacFunc.args().size(); ++i) {
+            const auto& [arg, type] = tacFunc.args()[i];
             ss << "    mov pos, " << i * 2 << "\n";
             switch (type) {
                 case tac::ValueType::I32:
@@ -128,8 +133,8 @@ class AotEvalFeature : public EvalFeature<Next> {
         }
 
         // call
-        ss << "    call p_" << tacFunc.name << ", " << tacFunc.name << ", res";
-        for (size_t i = 0; i < tacFunc.args.size(); ++i) {
+        ss << "    call p_" << tacFunc.name() << ", " << tacFunc.name() << ", res";
+        for (size_t i = 0; i < tacFunc.args().size(); ++i) {
             ss << ", arg" << i;
         }
         ss << '\n';
@@ -149,7 +154,10 @@ class AotEvalFeature : public EvalFeature<Next> {
         MIR_module_t mod = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(mirCtx));
         MIR_load_module(mirCtx, mod);
 
-        for (const auto& name : tacFunc.requiredFunctions) {
+        for (const auto& name : tacFunc.requiredFunctions()) {
+            if (name == astFunc.name->identifier.name.name) {
+                continue;
+            }
             const auto& fn = compiledHolder.at(name);
             std::string i_name = "i_" + name;
 

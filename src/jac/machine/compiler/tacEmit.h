@@ -32,10 +32,10 @@ const std::unordered_map<std::string_view, tac::Opcode> binaryOps = {
     { "!=", tac::Opcode::Neq },
     // { "===", ... },
     // { "!==", ... },
-    { "<", tac::Opcode::SignedLt },
-    { "<=", tac::Opcode::SignedLte },
-    { ">", tac::Opcode::SignedGt },
-    { ">=", tac::Opcode::SignedGte },
+    { "<", tac::Opcode::Lt },
+    { "<=", tac::Opcode::Lte },
+    { ">", tac::Opcode::Gt },
+    { ">=", tac::Opcode::Gte },
     // { "in", ... },
     // { "instanceof", ... },
     { "<<", tac::Opcode::LShift },
@@ -222,10 +222,10 @@ tac::Arg emit(const ast::CallExpression<Yield, Await>& call, tac::Function& func
             }
 
 
-            func.currentBlock().statements.statements.emplace_back(tac::Call{
+            func.body.emitStatement({tac::Call{
                 .name = id(fun),
                 .args = args
-            });
+            }});
             func.addRequiredFunction(fun);
 
             return res;
@@ -301,10 +301,10 @@ tac::Arg emit(const ast::UnaryExpression<Yield, Await>& expr, tac::Function& fun
     }
     tac::Opcode op = it->second;
 
-    func.currentBlock().statements.statements.emplace_back(tac::Operation{
+    func.body.emitStatement({tac::Operation{
         .op = op,
         .args = { arg, arg }
-    });
+    }});
 
     return arg;
 }
@@ -331,10 +331,10 @@ tac::Arg emit(const ast::BinaryExpression<In, Yield, Await>& expr, tac::Function
 
             tac::Variable res = newTmp(func, tac::resultType(op, lop.type(), rop.type()));
 
-            func.currentBlock().statements.statements.emplace_back(tac::Operation{
+            func.body.emitStatement({tac::Operation{
                 .op = op,
                 .args = { res, lop, rop }
-            });
+            }});
 
             return res;
         }
@@ -416,10 +416,10 @@ tac::Arg emit(const ast::Assignment<In, Yield, Await>& assign, tac::Function& fu
         rhs.type()
     };
 
-    func.currentBlock().statements.statements.emplace_back(tac::Operation{
+    func.body.emitStatement({tac::Operation{
         .op = tac::Opcode::Copy,
         .args = { target, rhs }
-    });
+    }});
 
     return target;
 }
@@ -446,10 +446,10 @@ void emit(const ast::Declaration<Yield, Await, Return>& declaration, tac::Functi
             tac::Variable res{ id(binding.identifier.name.name), type };  // XXX: the type can be easily inferred from the initializer
             func.addLocal(res);
 
-            func.currentBlock().statements.statements.emplace_back(tac::Operation{
+            func.body.emitStatement({tac::Operation{
                 .op = tac::Opcode::Copy,
                 .args = { res, tmp }
-            });
+            }});
         }
         void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<true, Yield, Await>>&) {
             throw std::runtime_error("Binding patterns are not supported");
@@ -478,16 +478,51 @@ tac::Arg emit(const ast::Expression<In, Yield, Await>& expr, tac::Function& func
 }
 
 
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Function& func);
+
+
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::IfStatement<Yield, Await, Return>& stmt, tac::Function& func) {
+    tac::Arg cond = emit(stmt.expression, func);
+
+    tac::Variable res = newTmp(func, tac::ValueType::Bool);
+    func.body.emitStatement({tac::Operation{
+        .op = tac::Opcode::Copy,
+        .args = { res, cond }
+    }});
+
+    auto& condBlock = func.body.endBlock(tac::Jump::jnz(res, "if", "else"));
+
+    auto& ifNest = func.body.nestingIn();
+    emit(*stmt.consequent, func);
+    func.body.nestingOut();
+
+    auto& elseNest = func.body.nestingIn();
+    if (stmt.alternate) {
+        emit(**stmt.alternate, func);
+    }
+    func.body.nestingOut();
+
+    condBlock.jump.labelA = ifNest.firstLabel();
+    condBlock.jump.labelB = elseNest.firstLabel();
+}
+
+
 template<bool Yield, bool Await>
 void emit(const ast::ReturnStatement<Yield, Await>& stmt, tac::Function& func) {
     if (!stmt.expression) {
-        func.currentBlock().jump = tac::Jump::retVal(tac::Arg(0));
+        func.body.endBlock(tac::Jump::retVal(tac::Arg(0)));
         return;
     }
 
     tac::Arg arg = emit(*stmt.expression, func);
-    func.currentBlock().jump = tac::Jump::retVal(arg);
+    func.body.endBlock(tac::Jump::retVal(arg));
 }
+
+
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::Block<Yield, Await, Return>& block, tac::Function& func);
 
 
 template<bool Yield, bool Await, bool Return>
@@ -495,8 +530,8 @@ void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Function& 
     struct visitor {
         tac::Function& func;
 
-        void operator()(const ast::BlockStatement<Yield, Await, Return>&) {
-            throw std::runtime_error("Block statements are not supported");
+        void operator()(const ast::BlockStatement<Yield, Await, Return>& stmt) {
+            emit(stmt, func);
         }
         void operator()(const ast::VariableStatement<Yield, Await>&) {
             throw std::runtime_error("Variable statements are not supported");
@@ -504,11 +539,11 @@ void emit(const ast::Statement<Yield, Await, Return>& statement, tac::Function& 
         void operator()(const ast::EmptyStatement&) {
             throw std::runtime_error("Empty statements are not supported");
         }
-        void operator()(const ast::ExpressionStatement<Yield, Await>& statement) {
-            emit(statement.expression, func);
+        void operator()(const ast::ExpressionStatement<Yield, Await>& stmt) {
+            emit(stmt.expression, func);
         }
-        void operator()(const ast::IfStatement<Yield, Await, Return>&) {
-            throw std::runtime_error("If statements are not supported");
+        void operator()(const ast::IfStatement<Yield, Await, Return>& stmt) {
+            emit(stmt, func);
         }
         void operator()(const ast::BreakableStatement<Yield, Await, Return>&) {
             throw std::runtime_error("Breakable statements are not supported");
@@ -561,57 +596,63 @@ void emit(const ast::StatementList<Yield, Await, Return>& list, tac::Function& f
 }
 
 
+template<bool Yield, bool Await, bool Return>
+void emit(const ast::Block<Yield, Await, Return>& block, tac::Function& func) {
+    if (block.statementList) {
+        func.body.nestingIn();
+        emit(*block.statementList, func);
+        func.body.nestingOut();
+    }
+}
+
+
+template<bool Yield, bool Await, bool Default>
+std::vector<tac::Variable> getArgs(const ast::FunctionDeclaration<Yield, Await, Default>& decl) {
+    std::vector<tac::Variable> args;
+    for (const ast::FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
+        if (!std::holds_alternative<ast::BindingIdentifier<Yield, Await>>(arg.value)) {
+            throw std::runtime_error("Only binding identifiers are supported as function parameters");
+        }
+        const auto& binding = std::get<ast::BindingIdentifier<Yield, Await>>(arg.value);
+
+        if (!arg.type) {
+            throw std::runtime_error("Function parameters must have a type");
+        }
+
+        args.emplace_back(id(binding.identifier.name.name), getType(arg.type->type.name.name));
+    }
+
+    return args;
+}
+
 template<bool Yield, bool Await, bool Default>
 tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) {
-    tac::Function out;
     if (!decl.name) {
         throw std::runtime_error("Function declarations must have a name");
     }
-    out.name = id(decl.name->identifier.name.name);
-
     if (!decl.returnType) {
         throw std::runtime_error("Function declarations must have a return type");
     }
-    out.returnType = getType(decl.returnType->type.name.name);
 
-    {
-        std::vector<tac::Variable> args;
-        for (const ast::FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
-            if (!std::holds_alternative<ast::BindingIdentifier<Yield, Await>>(arg.value)) {
-                throw std::runtime_error("Only binding identifiers are supported as function parameters");
-            }
-            const auto& binding = std::get<ast::BindingIdentifier<Yield, Await>>(arg.value);
-
-            if (!arg.type) {
-                throw std::runtime_error("Function parameters must have a type");
-            }
-
-            args.emplace_back(id(binding.identifier.name.name), getType(arg.type->type.name.name));
-        }
-
-        out.args = std::move(args);
-    }
-
-    // TODO
-    out.body.blocks.push_back(tac::Block{
-        .name = "body",
-        .statements = {},
-        .jump = tac::Jump::next()
-    });
+    tac::Function out(
+        id(decl.name->identifier.name.name),
+        getArgs(decl),
+        getType(decl.returnType->type.name.name)
+    );
 
     emit(*decl.body, out);
 
-    if (out.body.blocks.front().statements.statements.empty()
-     && out.body.blocks.front().jump.type == tac::Jump::Type::Next) {
-        out.body.blocks.pop_back();
+    // out.endBlock(tac::Jump::next());
+
+    if (!out.body.isClosed()) {
+        throw std::runtime_error("Missing return statement");
+    }
+    if (!out.body.isRootNesting()) { // TODO: remove later
+        throw std::runtime_error("Invalid nesting emited");
     }
 
     // TODO: throw exception
-    out.body.blocks.push_back(tac::Block{
-        .name = "end",
-        .statements = {},
-        .jump = tac::Jump::retVal(tac::Arg(0))
-    });
+    out.body.endBlock(tac::Jump::retVal(tac::Arg(0)));
 
     return out;
 }

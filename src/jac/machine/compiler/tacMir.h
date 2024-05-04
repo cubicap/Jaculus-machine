@@ -69,10 +69,10 @@ inline std::ostream& generate(std::ostream& os, Opcode op) {
         case Opcode::BitXor: os << "xor"; break;
         case Opcode::Eq: os << "eq"; break;
         case Opcode::Neq: os << "ne"; break;
-        case Opcode::SignedGt: os << "gt"; break;
-        case Opcode::SignedGte: os << "ge"; break;
-        case Opcode::SignedLt: os << "lt"; break;
-        case Opcode::SignedLte: os << "le"; break;
+        case Opcode::Gt: os << "gt"; break;
+        case Opcode::Gte: os << "ge"; break;
+        case Opcode::Lt: os << "lt"; break;
+        case Opcode::Lte: os << "le"; break;
         case Opcode::Copy: os << "mov"; break;
         case Opcode::UnMinus: os << "neg"; break;
         case Opcode::UnPlus: os << "mov"; break;
@@ -128,18 +128,28 @@ inline std::ostream& generate(std::ostream& os, const StatementList& sl) {
 }
 
 
-static inline std::ostream& generate(std::ostream& os, const Jump& j) {
+
+
+inline std::ostream& generate(std::ostream& os, const Block& b, const Nesting& parent) {
+    os << b.name << ":\n";
+    generate(os, b.statements);
+
+    Jump j = b.jump;
     printIndent(os);
     switch (j.type) {
         case Jump::Next:
+            break;
+        case Jump::NextParent:
+            os << "jmp " << parent.nextParentLabel();
             break;
         case Jump::Unconditional:
             os << "jmp " << j.labelA;
             break;
         case Jump::Jnz:
-            os << "beqs " << j.labelA << ", ";
+            os << "bnes " << j.labelA << ", ";
             generate(os, j.value);
             os << ", 0\n";
+            printIndent(os);
             os << "jmp " << j.labelB;
             break;
         case Jump::Return:
@@ -155,30 +165,42 @@ static inline std::ostream& generate(std::ostream& os, const Jump& j) {
 }
 
 
-inline std::ostream& generate(std::ostream& os, const Block& b) {
-    os << b.name << ":\n";
-    generate(os, b.statements);
-    generate(os, b.jump);
+inline std::ostream& generate(std::ostream& os, const Nesting& n) {
+    struct visitor {
+        std::ostream& os;
+        const Nesting& parent;
+
+        void operator()(const Block& b) {
+            generate(os, b, parent);
+        }
+
+        void operator()(const Nesting& n) {
+            generate(os, n);
+        }
+    };
+
+    for (const auto& node : n.nodes) {
+        std::visit(visitor{os, n}, node);
+    }
+
     return os;
 }
 
 
 inline std::ostream& generate(std::ostream& os, const FunctionBody& fb) {
-    for (const auto& b : fb.blocks) {
-        generate(os, b);
-    }
+    generate(os, fb.root());
     return os;
 }
 
 
 inline std::ostream& generate(std::ostream& os, const Function& f) {
-    os << f.name << ": " << "func ";
-    if (f.returnType != ValueType::Void) {
-        generate(os, f.returnType);
+    os << f.name() << ": " << "func ";
+    if (f.returnType() != ValueType::Void) {
+        generate(os, f.returnType());
     }
-    if (!f.args.empty()) {
-        bool first = f.returnType == ValueType::Void;
-        for (const auto& [arg, type] : f.args) {
+    if (!f.args().empty()) {
+        bool first = f.returnType() == ValueType::Void;
+        for (const auto& [arg, type] : f.args()) {
             if (!first) {
                 os << ", ";
             }
@@ -217,13 +239,13 @@ inline std::ostream& generate(std::ostream& os, const Function& f) {
 
 
 inline std::ostream& generateProto(std::ostream& os, const Function& f) {
-    os << "p_" + f.name << ": proto ";
-    if (f.returnType != ValueType::Void) {
-        generate(os, f.returnType);
+    os << "p_" + f.name() << ": proto ";
+    if (f.returnType() != ValueType::Void) {
+        generate(os, f.returnType());
     }
-    if (!f.args.empty()) {
-        bool first = f.returnType == ValueType::Void;
-        for (const auto& [arg, type] : f.args) {
+    if (!f.args().empty()) {
+        bool first = f.returnType() == ValueType::Void;
+        for (const auto& [arg, type] : f.args()) {
             if (!first) {
                 os << ", ";
             }

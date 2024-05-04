@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -94,14 +95,10 @@ enum class Opcode {
     BitXor,
     Eq,
     Neq,
-    SignedGt,  // TODO: unify signed/float
-    SignedGte,
-    SignedLt,
-    SignedLte,
-    FloatGt,
-    FloatGte,
-    FloatLt,
-    FloatLte,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
 
     // Unary
     Copy,  // TODO: must support type conversion
@@ -206,14 +203,10 @@ namespace detail {
         { Opcode::BitXor, bitwise },
         { Opcode::Eq, relational },
         { Opcode::Neq, relational },
-        { Opcode::SignedGt, relational },
-        { Opcode::SignedGte, relational },
-        { Opcode::SignedLt, relational },
-        { Opcode::SignedLte, relational },
-        { Opcode::FloatGt, relational },
-        { Opcode::FloatGte, relational },
-        { Opcode::FloatLt, relational },
-        { Opcode::FloatLte, relational },
+        { Opcode::Gt, relational },
+        { Opcode::Gte, relational },
+        { Opcode::Lt, relational },
+        { Opcode::Lte, relational },
         { Opcode::Copy, copy },
         { Opcode::BoolNot, boolean },
         { Opcode::BitNot, bitwise },
@@ -255,6 +248,7 @@ struct StatementList {
 struct Jump {
     enum Type {
         Next,
+        NextParent,
         Unconditional,
         Jnz,
         Return,
@@ -268,6 +262,10 @@ struct Jump {
 
     static Jump next() {
         return { Next };
+    }
+
+    static Jump nextParent() {
+        return { NextParent };
     }
 
     static Jump unconditional(Identifier label) {
@@ -295,8 +293,107 @@ struct Block {
 };
 
 
-struct FunctionBody {
-    std::vector<Block> blocks;
+struct Nesting {
+    using Node = std::variant<Block, Nesting>;
+    std::list<Node> nodes;
+    std::pair<Nesting*, std::size_t> location;
+
+    Nesting(Nesting* parent, std::size_t index) : location(parent, index) { }
+
+    Identifier firstLabel() const {
+        if (nodes.empty()) {
+            throw std::runtime_error("No label to return");
+        }
+        if (std::holds_alternative<Block>(nodes.front())) {
+            return std::get<Block>(nodes.front()).name;
+        }
+        return std::get<Nesting>(nodes.front()).firstLabel();
+    }
+
+    Identifier nextParentLabel() const {
+        if (location.first == nullptr) {
+            throw std::runtime_error("No parent label to return");
+        }
+        return location.first->nextUpLabelAfter(location.second);
+    }
+
+    Identifier nextUpLabelAfter(std::size_t index) const {
+        // TODO: optimize
+        for (auto it = std::next(nodes.begin(), index); it != nodes.end(); ++it) {
+            if (std::holds_alternative<Block>(*it)) {
+                return std::get<Block>(*it).name;
+            }
+        }
+
+        if (location.first == nullptr) {
+            throw std::runtime_error("No parent label to return");
+        }
+        return location.first->nextUpLabelAfter(location.second);
+    }
+};
+
+
+inline tac::Identifier newBlockName(std::string prefix) {
+    static unsigned counter = 0;
+    return prefix + std::to_string(counter++);
+}
+
+
+class FunctionBody {
+    Nesting _root{ nullptr, 0 };
+    bool _blockClosed = true;
+
+    Nesting* _current;
+
+    Block& currentBlock() {
+        if (_blockClosed || _current->nodes.empty()) {
+            _current->nodes.emplace_back(Block{ newBlockName("L") });
+            _blockClosed = false;
+        }
+        return std::get<Block>(_current->nodes.back());
+    }
+public:
+    FunctionBody() : _current(&_root) { }
+
+    void emitStatement(Statement statement) {
+        auto& block = currentBlock();
+        block.statements.statements.push_back(statement);
+    }
+
+    Block& endBlock(Jump jump) {
+        auto& block = currentBlock();
+        block.jump = jump;
+        _blockClosed = true;
+
+        return block;
+    }
+
+    bool isClosed() {
+        return _blockClosed;
+    }
+
+    Nesting& nestingIn() {
+        if (!_blockClosed) {
+            endBlock(Jump::next());
+        }
+        _current->nodes.emplace_back(Nesting{ _current, _current->nodes.size() });
+        _current = &std::get<Nesting>(_current->nodes.back());
+
+        return *_current;
+    }
+
+    void nestingOut() {
+        endBlock(Jump::nextParent());
+        _current = _current->location.first;
+    }
+
+    bool isRootNesting() {
+        return _current == &_root;
+    }
+
+    const Nesting& root() const {
+        return _root;
+    }
 };
 
 
@@ -317,43 +414,61 @@ struct Locals {
 };
 
 
-struct Function {
-    Identifier name;
-    std::vector<Variable> args;
-    std::vector<Variable> innerVars;
-    ValueType returnType;
+class Function {
+    Identifier _name;
+    std::vector<Variable> _args;
+    std::vector<Variable> _innerVars;
+    ValueType _returnType;
+
+    Locals _locals;
+
+    std::set<std::string> _requiredFunctions;
+
+public:
     FunctionBody body;
 
-    Locals locals;
-
-    std::set<std::string> requiredFunctions;
-
-    Block& currentBlock() {
-        // TODO: block+locals tree
-        return body.blocks.back();
-    }
+    Function(Identifier name, std::vector<Variable> args, ValueType returnType):
+        _name(name), _args(args), _returnType(returnType) { }
 
     Locals& currentLocals() {
-        locals = {};
-        for (const auto& arg : args) {
-            locals.add(arg.first, arg.second);
+        // TODO: optimize
+        _locals = {};
+        for (const auto& arg : _args) {
+            _locals.add(arg.first, arg.second);
         }
-        for (const auto& var : innerVars) {
-            locals.add(var.first, var.second);
+        for (const auto& var : _innerVars) {
+            _locals.add(var.first, var.second);
         }
-        return locals;
-    }
-
-    void addLocal(tac::Variable var) {
-        innerVars.push_back(var);
+        return _locals;
     }
 
     std::vector<Variable> getInnerVars() const {
-        return innerVars;
+        return _innerVars;
     }
 
-    void addRequiredFunction(std::string name_) {
-        requiredFunctions.insert(name_);
+    void addRequiredFunction(std::string name) {
+        _requiredFunctions.insert(name);
+    }
+
+    void addLocal(tac::Variable var) {
+        // TODO: add to nested locals
+        _innerVars.push_back(var);
+    }
+
+    const auto& args() const {
+        return _args;
+    }
+
+    const auto& name() const {
+        return _name;
+    }
+
+    const auto& requiredFunctions() const {
+        return _requiredFunctions;
+    }
+
+    auto returnType() const {
+        return _returnType;
     }
 };
 
