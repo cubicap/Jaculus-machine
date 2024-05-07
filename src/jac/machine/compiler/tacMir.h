@@ -103,7 +103,7 @@ inline std::ostream& generate(std::ostream& os, const Operation& op) {
 
 inline std::ostream& generate(std::ostream& os, const Call& c) {
     printIndent(os);
-    os << "call p_" << c.name << ", " << c.name;
+    os << "call p_" << c.name << ", f_" << c.name;
     for (const auto& arg : c.args) {
         os << ", ";
         generate(os, arg);
@@ -198,7 +198,8 @@ inline std::ostream& generate(std::ostream& os, const FunctionBody& fb) {
 
 
 inline std::ostream& generate(std::ostream& os, const Function& f) {
-    os << f.name() << ": " << "func ";
+    os << "f_";
+    os << f.name() << ": func ";
     if (f.returnType() != ValueType::Void) {
         generate(os, f.returnType());
     }
@@ -261,6 +262,50 @@ inline std::ostream& generateProto(std::ostream& os, const Function& f) {
         }
     }
     os << '\n';
+
+    return os;
+}
+
+
+inline std::ostream& generateCaller(std::ostream& os, const Function& f) {
+    std::string callerName(std::string("caller_") + f.name());
+    os << callerName << ": func i64, i64:argc, p:argv\n";
+
+    os << "    local i64:pos, i64:res";
+    for (size_t i = 0; i < f.args().size(); ++i) {
+        os << ", i64:arg" << i;
+    }
+    os << '\n';
+    os << "body:\n";
+
+    // check number of arguments
+    os << "    bgt fail, argc, " << f.args().size() << '\n';
+
+    // prepare arguments
+    for (size_t i = 0; i < f.args().size(); ++i) {
+        const auto& [arg, type] = f.args()[i];
+        os << "    mov pos, " << i * 2 << "\n";
+        switch (type) {
+            case tac::ValueType::I32:
+                os << "    mov arg" << i << ", i32:(argv, pos, 8)\n";
+                break;
+            default:
+                throw std::runtime_error("Unsupported argument type" + std::to_string(static_cast<int>(type)));
+        }
+    }
+
+    // call
+    os << "    call p_" << f.name() << ", f_" << f.name() << ", res";
+    for (size_t i = 0; i < f.args().size(); ++i) {
+        os << ", arg" << i;
+    }
+    os << '\n';
+    os << "    ret res\n";
+
+    os << "fail:\n";
+    // TODO: throw exception
+    os << "    ret 0\n";
+    os << "endfunc\n\n";
 
     return os;
 }

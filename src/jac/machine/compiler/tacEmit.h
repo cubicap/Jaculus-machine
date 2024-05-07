@@ -223,7 +223,7 @@ tac::Arg emit(const ast::CallExpression<Yield, Await>& call, tac::Function& func
 
 
             func.body.emitStatement({tac::Call{
-                .name = id(fun),
+                .name = fun,
                 .args = args
             }});
             func.addRequiredFunction(fun);
@@ -806,7 +806,7 @@ tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) 
     }
 
     tac::Function out(
-        id(decl.name->identifier.name.name),
+        decl.name->identifier.name.name,
         getArgs(decl),
         getType(decl.returnType->type.name.name)
     );

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -299,6 +300,10 @@ struct Nesting {
     std::pair<Nesting*, std::size_t> location;
 
     Nesting(Nesting* parent, std::size_t index) : location(parent, index) { }
+    Nesting(const Nesting&) = delete;
+    Nesting& operator=(const Nesting&) = delete;
+    Nesting(Nesting&&) = delete;
+    Nesting& operator=(Nesting&&) = delete;
 
     Identifier firstLabel() const {
         if (nodes.empty()) {
@@ -340,12 +345,12 @@ inline tac::Identifier newBlockName(std::string prefix) {
 
 
 class FunctionBody {
-    Nesting _root{ nullptr, 0 };
+    std::unique_ptr<Nesting> _root = std::make_unique<Nesting>(nullptr, 0);
     bool _blockClosed = true;
 
     Nesting* _current;
 public:
-    FunctionBody() : _current(&_root) { }
+    FunctionBody() : _current(_root.get()) { }
 
     Block& currentBlock() {
         if (_blockClosed || _current->nodes.empty()) {
@@ -376,7 +381,7 @@ public:
         if (!_blockClosed) {
             endBlock(Jump::next());
         }
-        _current->nodes.emplace_back(Nesting{ _current, _current->nodes.size() });
+        _current->nodes.emplace_back(std::in_place_type_t<Nesting>{}, _current, _current->nodes.size());
         _current = &std::get<Nesting>(_current->nodes.back());
 
         return *_current;
@@ -388,11 +393,11 @@ public:
     }
 
     bool isRootNesting() {
-        return _current == &_root;
+        return _current == _root.get();
     }
 
     const Nesting& root() const {
-        return _root;
+        return *_root;
     }
 };
 
@@ -415,7 +420,7 @@ struct Locals {
 
 
 class Function {
-    Identifier _name;
+    std::string _name;
     std::vector<Variable> _args;
     std::vector<Variable> _innerVars;
     ValueType _returnType;
@@ -423,11 +428,10 @@ class Function {
     Locals _locals;
 
     std::set<std::string> _requiredFunctions;
-
 public:
     FunctionBody body;
 
-    Function(Identifier name, std::vector<Variable> args, ValueType returnType):
+    Function(std::string name, std::vector<Variable> args, ValueType returnType):
         _name(name), _args(args), _returnType(returnType) { }
 
     Locals& currentLocals() {
@@ -442,7 +446,7 @@ public:
         return _locals;
     }
 
-    std::vector<Variable> getInnerVars() const {
+    const std::vector<Variable>& getInnerVars() const {
         return _innerVars;
     }
 
