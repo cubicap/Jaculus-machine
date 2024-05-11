@@ -212,7 +212,7 @@ struct PrivateIdentifier {
 
 struct ThisExpr {
     static std::optional<ThisExpr> parse(ParserState& state) {
-        if (state.current().kind == lex::Token::IdentifierName && state.current().text == "this") {
+        if (state.current().kind == lex::Token::Keyword && state.current().text == "this") {
             state.advance();
             return ThisExpr{};
         }
@@ -223,7 +223,7 @@ struct ThisExpr {
 
 struct NullLiteral {
     static std::optional<NullLiteral> parse(ParserState& state) {
-        if (state.current().kind == lex::Token::IdentifierName && state.current().text == "null") {
+        if (state.current().kind == lex::Token::Keyword && state.current().text == "null") {
             state.advance();
             return NullLiteral{};
         }
@@ -236,7 +236,7 @@ struct BooleanLiteral {
     bool value;
 
     static std::optional<BooleanLiteral> parse(ParserState& state) {
-        if (state.current().kind == lex::Token::IdentifierName) {
+        if (state.current().kind == lex::Token::Keyword) {
             if (state.current().text == "true") {
                 state.advance();
                 return BooleanLiteral{true};
@@ -869,6 +869,9 @@ struct Expression {
             state.advance();
         }
         state.restorePosition(last);
+        if (expr.items.empty()) {
+            return std::nullopt;
+        }
         return expr;
     }
 
@@ -1043,7 +1046,15 @@ struct VariableStatement {
     VariableDeclarationList<true, Yield, Await> declarationList;
 };
 
-struct EmptyStatement {};
+struct EmptyStatement {
+    static std::optional<EmptyStatement> parse(ParserState& state) {
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+            return std::nullopt;
+        }
+        state.advance();
+        return EmptyStatement{};
+    }
+};
 
 template<bool Yield, bool Await>
 struct ExpressionStatement {
@@ -1526,6 +1537,9 @@ struct Statement {
         if (auto block = BlockStatement<Yield, Await, Return>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*block)};
         }
+        if (auto empty = EmptyStatement::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*empty)};
+        }
         if (auto expression = ExpressionStatement<Yield, Await>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*expression)};
         }
@@ -1535,7 +1549,7 @@ struct Statement {
         if (auto breakable = BreakableStatement<Yield, Await, Return>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*breakable)};
         }
-        if (Return) {
+        if constexpr (Return) {
             auto ret = ReturnStatement<Yield, Await>::parse(state);
             if (ret) {
                 return Statement<Yield, Await, Return>{std::move(*ret)};
