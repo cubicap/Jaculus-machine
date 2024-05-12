@@ -63,6 +63,7 @@ const std::unordered_map<std::string_view, tac::Opcode> unaryOps = {
 const std::unordered_map<std::string_view, tac::ValueType> types = {
     { "Int32", tac::ValueType::I32 },
     { "Float", tac::ValueType::Double },
+    { "Bool", tac::ValueType::Bool },
     // { "Ptr", tac::ValueType::Ptr }
 };
 
@@ -683,12 +684,24 @@ void emit(const ast::BreakableStatement<Yield, Await, Return>& stmt, tac::Functi
 template<bool Yield, bool Await>
 void emit(const ast::ReturnStatement<Yield, Await>& stmt, tac::Function& func) {
     if (!stmt.expression) {
-        func.body.endBlock(tac::Jump::retVal(tac::Arg(0)));
+        func.body.endBlock(tac::Jump::ret());
         return;
     }
 
     tac::Arg arg = emit(*stmt.expression, func);
-    func.body.endBlock(tac::Jump::retVal(arg));
+    tac::Variable res;
+    if (arg.isVariable()) {
+        res = std::get<tac::Variable>(arg.value);
+    }
+    else {
+        res = newTmp(func, func.returnType());
+        func.body.emitStatement({tac::Operation{
+            .op = tac::Opcode::Copy,
+            .args = { res, arg }
+        }});
+    }
+
+    func.body.endBlock(tac::Jump::retVal(res));
 }
 
 
@@ -823,7 +836,14 @@ tac::Function emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl) 
     }
 
     // TODO: throw exception
-    out.body.endBlock(tac::Jump::retVal(tac::Arg(0)));
+
+    tac::Variable res = newTmp(out, out.returnType());
+    out.body.emitStatement({tac::Operation{
+        .op = tac::Opcode::Copy,
+        .args = { res, 0 }
+    }});
+
+    out.body.endBlock(tac::Jump::retVal(res));
 
     return out;
 }

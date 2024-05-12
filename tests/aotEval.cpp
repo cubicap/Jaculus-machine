@@ -320,3 +320,78 @@ TEST_CASE("Eval", "[aot]") {
         REQUIRE(machine.getReports() == std::vector<std::string>{"0", "1", "1", "2", "3", "5", "8", "13", "21", "34"});
     }
 }
+
+
+TEST_CASE("Types", "[aot]") {
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::AotEvalFeature,
+        TestReportFeature
+    >;
+
+    Machine machine;
+
+    SECTION("Int32") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32): Int32 {
+                return a + 1;
+            }
+
+            report(fun(1234));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1235"});
+    }
+
+    SECTION("Float") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Float): Float {
+                return a + 1.2;
+            }
+
+            report(fun(1234.5));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1235.7"});
+    }
+
+    SECTION("Bool") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Bool): Bool {
+                return !a;
+            }
+
+            report(fun(true));
+            report(fun(false));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"false", "true"});
+    }
+
+    SECTION("Mixed") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Float, c: Bool): Float {
+                if (a < b) {
+                    return (a + b) + c;
+                }
+                else {
+                    return (a + c) - b;
+                }
+            }
+
+            report(fun(1, 2.5, false));
+            report(fun(3, 2.5, true));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"3.5", "1.5"});
+    }
+}
+

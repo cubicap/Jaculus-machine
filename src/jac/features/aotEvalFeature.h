@@ -50,6 +50,28 @@ inline MIR_item_t MIR_get_global_item(MIR_context_t ctx, std::string_view name) 
     return nullptr;
 }
 
+template<typename Res>
+struct wrapper {
+    void* callerPtr;
+
+    Res operator()(std::vector<ValueWeak> args) {
+        std::vector<JSValue> jsArgs;
+        for (ValueWeak& arg : args) {
+            jsArgs.push_back(arg.getVal());
+        }
+
+        if constexpr (std::is_same_v<Res, bool>) {
+            auto fn = reinterpret_cast<int32_t(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
+            return fn(jsArgs.size(), jsArgs.data());
+        }
+        else {
+            auto fn = reinterpret_cast<Res(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
+            return fn(jsArgs.size(), jsArgs.data());
+        }
+    }
+};
+
+
 } // namespace detail
 
 
@@ -191,16 +213,22 @@ class AotEvalFeature : public EvalFeature<Next> {
             void* callerPtr = MIR_gen(mirCtx, 0, caller);
 
             FunctionFactory ff(this->context());
-            Function jsFn = ff.newFunctionVariadic([callerPtr](std::vector<ValueWeak> args) {
-                std::vector<JSValue> jsArgs;
-                for (ValueWeak& arg : args) {
-                    jsArgs.push_back(arg.getVal());
+
+            Function jsFn = [&]() {
+                switch (tacFunc.first.returnType()) {
+                    case jac::tac::ValueType::I32:
+                        return ff.newFunctionVariadic(detail::wrapper<int32_t>{callerPtr});
+                    case jac::tac::ValueType::Double:
+                        return ff.newFunctionVariadic(detail::wrapper<double>{callerPtr});
+                    case jac::tac::ValueType::Bool:
+                        return ff.newFunctionVariadic(detail::wrapper<bool>{callerPtr});
+                    case jac::tac::ValueType::Void:
+                        return ff.newFunctionVariadic(detail::wrapper<void>{callerPtr});
+                    case jac::tac::ValueType::Ptr:
+                        throw std::runtime_error("Invalid return type");
                 }
-
-                auto fn = reinterpret_cast<int64_t(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
-
-                return static_cast<int32_t>(fn(jsArgs.size(), jsArgs.data()));
-            });
+                throw std::runtime_error("Invalid return type");
+            }();
 
             auto [it, was] = compiledHolder.emplace(name, FunctionInfo{ alias(ptr), jsFn });
             compiledFunctions.push_back({ &it->second, tacFunc.first.name(), tacFunc.second });
@@ -270,7 +298,12 @@ public:
      */
     Value eval(std::string code, std::string filename, EvalFlags flags = EvalFlags::Global) {
         try {
-            std::string newCode = tryAot(code, filename, flags);
+            code = tryAot(code, filename, flags);
+        }
+        catch (std::exception& e) {
+            std::cerr << "Error during AOT compilation: " << e.what() << '\n';
+            return EvalFeature<Next>::eval(std::move(code), filename, flags);
+        }
 
             // define the compiled functions in global scope
             jac::Object global = this->context().getGlobalObject();
@@ -279,11 +312,7 @@ public:
                 global.defineProperty(fn.alias, fn.fn);
             }
 
-            return EvalFeature<Next>::eval(std::move(newCode), filename, flags);
-        }
-        catch (...) {
-            return EvalFeature<Next>::eval(code, filename, flags);
-        }
+        return EvalFeature<Next>::eval(std::move(code), filename, flags);
     }
 };
 

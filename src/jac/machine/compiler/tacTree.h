@@ -76,6 +76,10 @@ struct Arg {
 
         return std::visit(visitor{}, value);
     }
+
+    bool isVariable() const {
+        return std::holds_alternative<Variable>(value);
+    }
 };
 
 enum class Opcode {
@@ -110,118 +114,6 @@ enum class Opcode {
 };
 constexpr Opcode MIN_UNARY_OP = Opcode::Copy;
 
-using ResMapping = ValueType(*)(ValueType, ValueType);
-
-namespace detail {
-
-    inline bool anyFloating(ValueType a, ValueType b) {
-        return isFloating(a) || isFloating(b);
-    }
-
-    inline bool anyVoid(ValueType a, ValueType b) {
-        return a == ValueType::Void || b == ValueType::Void;
-    }
-
-    inline bool anyPtr(ValueType a, ValueType b) {
-        return a == ValueType::Ptr || b == ValueType::Ptr;
-    }
-
-
-    inline ValueType additive(ValueType a, ValueType b) {
-        if (anyVoid(a, b) || anyPtr(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        if (anyFloating(a, b)) {
-            return ValueType::Double;
-        }
-        return ValueType::I32;
-    }
-
-    inline ValueType div(ValueType a, ValueType b) {
-        if (anyVoid(a, b) || anyPtr(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::Double;
-    }
-
-    inline ValueType pow(ValueType a, ValueType b) {
-        if (anyVoid(a, b) || anyPtr(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::Double;
-    }
-
-    inline ValueType shift(ValueType a, ValueType b) {
-        if (anyVoid(a, b) || anyPtr(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::I32;
-    }
-
-    inline ValueType boolean(ValueType a, ValueType b) {
-        if (anyVoid(a, b) || anyPtr(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::Bool;
-    }
-
-    inline ValueType bitwise(ValueType a, ValueType b) {
-        if (anyVoid(a, b) || anyPtr(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::I32;
-    }
-
-    inline ValueType relational(ValueType a, ValueType b) {
-        if (anyVoid(a, b) || anyPtr(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::Bool;
-    }
-
-    inline ValueType copy(ValueType a, ValueType) {
-        if (a == ValueType::Void || a == ValueType::Ptr) {
-            throw std::runtime_error("Invalid argument type");
-        }
-        return a;
-    }
-
-
-    const std::unordered_map<Opcode, ResMapping> opResults = {
-        { Opcode::Add, additive },
-        { Opcode::Sub, additive },
-        { Opcode::Mul, additive },
-        { Opcode::Div, div },
-        { Opcode::Mod, div },
-        { Opcode::Pow, pow },
-        { Opcode::LShift, shift },
-        { Opcode::RShift, shift },
-        { Opcode::URShift, shift },
-        { Opcode::BoolAnd, boolean },
-        { Opcode::BoolOr, boolean },
-        { Opcode::BitAnd, bitwise },
-        { Opcode::BitOr, bitwise },
-        { Opcode::BitXor, bitwise },
-        { Opcode::Eq, relational },
-        { Opcode::Neq, relational },
-        { Opcode::Gt, relational },
-        { Opcode::Gte, relational },
-        { Opcode::Lt, relational },
-        { Opcode::Lte, relational },
-        { Opcode::Copy, copy },
-        { Opcode::BoolNot, boolean },
-        { Opcode::BitNot, bitwise },
-        { Opcode::UnPlus, additive },
-        { Opcode::UnMinus, additive }
-    };
-
-} // namespace detail
-
-
-inline ValueType resultType(Opcode op, ValueType a, ValueType b) {
-    return detail::opResults.at(op)(a, b);
-}
-
 
 struct Operation {
     Opcode op;
@@ -236,8 +128,14 @@ struct Call {
 };
 
 
+struct Conversion {
+    Arg from;
+    Variable to;
+};
+
+
 struct Statement {
-    std::variant<Operation, Call> op;
+    std::variant<Operation, Call, Conversion> op;
 };
 
 
@@ -281,7 +179,7 @@ struct Jump {
         return { Return };
     }
 
-    static Jump retVal(Arg value) {
+    static Jump retVal(Variable value) {
         return { .type = ReturnValue, .value = value };
     }
 };
@@ -477,9 +375,190 @@ public:
 };
 
 
-struct TacEmitor {
-    Function out;
-};
+using ResMapping = ValueType(*)(ValueType, ValueType);
+using ArgsMapping = std::vector<ValueType>(*)(const Operation&);
+
+namespace detail {
+
+    inline bool anyFloating(ValueType a, ValueType b) {
+        return isFloating(a) || isFloating(b);
+    }
+
+    inline bool anyVoid(ValueType a, ValueType b) {
+        return a == ValueType::Void || b == ValueType::Void;
+    }
+
+    inline bool anyPtr(ValueType a, ValueType b) {
+        return a == ValueType::Ptr || b == ValueType::Ptr;
+    }
+
+
+    inline ValueType additiveRes(ValueType a, ValueType b) {
+        if (anyVoid(a, b) || anyPtr(a, b)) {
+            throw std::runtime_error("Invalid argument types");
+        }
+        if (anyFloating(a, b)) {
+            return ValueType::Double;
+        }
+        return ValueType::I32;
+    }
+
+    inline ValueType divRes(ValueType a, ValueType b) {
+        if (anyVoid(a, b) || anyPtr(a, b)) {
+            throw std::runtime_error("Invalid argument types");
+        }
+        return ValueType::Double;
+    }
+
+    inline ValueType powRes(ValueType a, ValueType b) {
+        if (anyVoid(a, b) || anyPtr(a, b)) {
+            throw std::runtime_error("Invalid argument types");
+        }
+        return ValueType::Double;
+    }
+
+    inline ValueType shiftRes(ValueType a, ValueType b) {
+        if (anyVoid(a, b) || anyPtr(a, b)) {
+            throw std::runtime_error("Invalid argument types");
+        }
+        return ValueType::I32;
+    }
+
+    inline ValueType booleanRes(ValueType a, ValueType b) {
+        if (anyVoid(a, b) || anyPtr(a, b)) {
+            throw std::runtime_error("Invalid argument types");
+        }
+        return ValueType::Bool;
+    }
+
+    inline ValueType bitwiseRes(ValueType a, ValueType b) {
+        if (anyVoid(a, b) || anyPtr(a, b)) {
+            throw std::runtime_error("Invalid argument types");
+        }
+        return ValueType::I32;
+    }
+
+    inline ValueType relationalRes(ValueType a, ValueType b) {
+        if (anyVoid(a, b) || anyPtr(a, b)) {
+            throw std::runtime_error("Invalid argument types");
+        }
+        return ValueType::Bool;
+    }
+
+    inline ValueType copyRes(ValueType a, ValueType) {
+        if (a == ValueType::Void || a == ValueType::Ptr) {
+            throw std::runtime_error("Invalid argument type");
+        }
+        return a;
+    }
+
+
+    const std::unordered_map<Opcode, ResMapping> opResults = {
+        { Opcode::Add, additiveRes },
+        { Opcode::Sub, additiveRes },
+        { Opcode::Mul, additiveRes },
+        { Opcode::Div, divRes },
+        { Opcode::Mod, divRes },
+        { Opcode::Pow, powRes },
+        { Opcode::LShift, shiftRes },
+        { Opcode::RShift, shiftRes },
+        { Opcode::URShift, shiftRes },
+        { Opcode::BoolAnd, booleanRes },
+        { Opcode::BoolOr, booleanRes },
+        { Opcode::BitAnd, bitwiseRes },
+        { Opcode::BitOr, bitwiseRes },
+        { Opcode::BitXor, bitwiseRes },
+        { Opcode::Eq, relationalRes },
+        { Opcode::Neq, relationalRes },
+        { Opcode::Gt, relationalRes },
+        { Opcode::Gte, relationalRes },
+        { Opcode::Lt, relationalRes },
+        { Opcode::Lte, relationalRes },
+        { Opcode::Copy, copyRes },
+        { Opcode::BoolNot, booleanRes },
+        { Opcode::BitNot, bitwiseRes },
+        { Opcode::UnPlus, additiveRes },
+        { Opcode::UnMinus, additiveRes }
+    };
+
+
+    inline std::vector<ValueType> arithmeticArgs(const Operation& op) {
+        if (op.args.size() < 2) {
+            throw std::runtime_error("Invalid number of arguments");
+        }
+        return std::vector<ValueType>(op.args.size() - 1, op.args[0].type());
+    }
+
+    inline std::vector<ValueType> bitwiseArgs(const Operation& op) {
+        if (op.args.size() < 2) {
+            throw std::runtime_error("Invalid number of arguments");
+        }
+        return std::vector<ValueType>(op.args.size() - 1, ValueType::I32);
+    }
+
+    inline std::vector<ValueType> booleanArgs(const Operation& op) {
+        if (op.args.size() < 2) {
+            throw std::runtime_error("Invalid number of arguments");
+        }
+        return std::vector<ValueType>(op.args.size() - 1, ValueType::Bool);
+    }
+
+    inline std::vector<ValueType> relationalArgs(const Operation& op) {
+        if (op.args.size() < 2) {
+            throw std::runtime_error("Invalid number of arguments");
+        }
+        if (anyFloating(op.args[1].type(), op.args[2].type())) {
+            return std::vector<ValueType>(op.args.size() - 1, ValueType::Double);
+        }
+        return std::vector<ValueType>(op.args.size() - 1, ValueType::I32);
+    }
+
+    inline std::vector<ValueType> copyArgs(const Operation& op) {
+        if (op.args.size() != 2) {
+            throw std::runtime_error("Invalid number of arguments");
+        }
+        return { op.args[0].type() };
+    }
+
+    const std::unordered_map<Opcode, ArgsMapping> argTypes = {
+        { Opcode::Add, arithmeticArgs },
+        { Opcode::Sub, arithmeticArgs },
+        { Opcode::Mul, arithmeticArgs },
+        { Opcode::Div, arithmeticArgs },
+        { Opcode::Mod, arithmeticArgs },
+        { Opcode::Pow, arithmeticArgs },
+        { Opcode::LShift, bitwiseArgs },
+        { Opcode::RShift, bitwiseArgs },
+        { Opcode::URShift, bitwiseArgs },
+        { Opcode::BoolAnd, booleanArgs },
+        { Opcode::BoolOr, booleanArgs },
+        { Opcode::BitAnd, bitwiseArgs },
+        { Opcode::BitOr, bitwiseArgs },
+        { Opcode::BitXor, bitwiseArgs },
+        { Opcode::Eq, relationalArgs },
+        { Opcode::Neq, relationalArgs },
+        { Opcode::Gt, relationalArgs },
+        { Opcode::Gte, relationalArgs },
+        { Opcode::Lt, relationalArgs },
+        { Opcode::Lte, relationalArgs },
+        { Opcode::Copy, copyArgs },
+        { Opcode::BoolNot, booleanArgs },
+        { Opcode::BitNot, bitwiseArgs },
+        { Opcode::UnPlus, arithmeticArgs },
+        { Opcode::UnMinus, arithmeticArgs }
+    };
+
+} // namespace detail
+
+
+inline ValueType resultType(Opcode op, ValueType a, ValueType b) {
+    return detail::opResults.at(op)(a, b);
+}
+
+
+inline std::vector<ValueType> argTypes(const Operation& op) {
+    return detail::argTypes.at(op.op)(op);
+}
 
 
 } // namespace jac::tac

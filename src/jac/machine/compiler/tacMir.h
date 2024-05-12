@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <ostream>
 #include <variant>
 
@@ -28,6 +29,17 @@ inline std::ostream& generate(std::ostream& os, ValueType type) {
     return os;
 }
 
+inline std::ostream& generateLocalType(std::ostream& os, ValueType type) {
+    switch (type) {
+        case ValueType::I32: os << "i64"; break;
+        case ValueType::Double: os << "d"; break;
+        case ValueType::Ptr: os << "i64"; break;
+        case ValueType::Void: throw std::runtime_error("Void type not supported");
+        case ValueType::Bool: os << "i64"; break;
+    }
+    return os;
+}
+
 namespace detail {
 
     struct ArgVisitor {
@@ -50,44 +62,183 @@ inline std::ostream& generate(std::ostream& os, const Arg& arg_) {
 }
 
 
-inline std::ostream& generate(std::ostream& os, Opcode op) {
-    // XXX: does not support other than word comparisons
-    switch (op) {
-        case Opcode::Add: os << "add"; break;
-        case Opcode::Sub: os << "sub"; break;
-        case Opcode::Mul: os << "mul"; break;
-        case Opcode::Div: os << "div"; break;
-        case Opcode::Mod: os << "rem"; break;
-        case Opcode::Pow: throw std::runtime_error("Pow not implemented");
-        case Opcode::LShift: os << "lsh"; break;
-        case Opcode::RShift: os << "rsh"; break;
-        case Opcode::URShift: os << "ursh"; break;
-        case Opcode::BoolAnd: os << "and"; break;
-        case Opcode::BoolOr: os << "or"; break;
-        case Opcode::BitAnd: os << "and"; break;
-        case Opcode::BitOr: os << "or"; break;
-        case Opcode::BitXor: os << "xor"; break;
-        case Opcode::Eq: os << "eq"; break;
-        case Opcode::Neq: os << "ne"; break;
-        case Opcode::Gt: os << "gt"; break;
-        case Opcode::Gte: os << "ge"; break;
-        case Opcode::Lt: os << "lt"; break;
-        case Opcode::Lte: os << "le"; break;
-        case Opcode::Copy: os << "mov"; break;
-        case Opcode::UnMinus: os << "neg"; break;
-        case Opcode::UnPlus: os << "mov"; break;
-        default:
-            throw std::runtime_error("Unknown operation");
+inline std::ostream& generate(std::ostream& os, ValueType type, Opcode op) {
+    switch (type) {
+        case ValueType::I32: switch (op) {
+            case Opcode::Add: os << "adds"; break;
+            case Opcode::Sub: os << "subs"; break;
+            case Opcode::Mul: os << "muls"; break;
+            case Opcode::Div: os << "div"; throw std::runtime_error("Division not supported on integers");
+            case Opcode::Mod: os << "mods"; break;
+            case Opcode::Pow: throw std::runtime_error("Pow not implemented");
+            case Opcode::LShift: os << "lshs"; break;
+            case Opcode::RShift: os << "rshs"; break;
+            case Opcode::URShift: os << "urshs"; break;
+            case Opcode::BoolAnd: throw std::runtime_error("BoolAnd not supported on integers");
+            case Opcode::BoolOr: throw std::runtime_error("BoolOr not supported on integers");
+            case Opcode::BoolNot: throw std::runtime_error("BoolNot not supported on integers");
+            case Opcode::BitAnd: os << "ands"; break;
+            case Opcode::BitOr: os << "ors"; break;
+            case Opcode::BitXor: os << "xors"; break;
+            case Opcode::BitNot: os << "xors"; break;
+            case Opcode::Eq: os << "eqs"; break;
+            case Opcode::Neq: os << "nes"; break;
+            case Opcode::Gt: os << "gts"; break;
+            case Opcode::Gte: os << "ges"; break;
+            case Opcode::Lt: os << "lts"; break;
+            case Opcode::Lte: os << "les"; break;
+            case Opcode::Copy: os << "mov"; break;
+            case Opcode::UnMinus: os << "negs"; break;
+            case Opcode::UnPlus: os << "mov"; break;
+        } break;
+        case ValueType::Double: switch (op) {
+            case Opcode::Add: os << "dadd"; break;
+            case Opcode::Sub: os << "dsub"; break;
+            case Opcode::Mul: os << "dmul"; break;
+            case Opcode::Div: os << "ddiv"; break;
+            case Opcode::Mod: throw std::runtime_error("Mod not supported on doubles");
+            case Opcode::Pow: throw std::runtime_error("Pow not implemented");
+            case Opcode::LShift: throw std::runtime_error("LShift not supported on doubles");
+            case Opcode::RShift: throw std::runtime_error("RShift not supported on doubles");
+            case Opcode::URShift: throw std::runtime_error("URShift not supported on doubles");
+            case Opcode::BoolAnd: throw std::runtime_error("BoolAnd not supported on doubles");
+            case Opcode::BoolOr: throw std::runtime_error("BoolOr not supported on doubles");
+            case Opcode::BoolNot: throw std::runtime_error("BoolNot not supported on doubles");
+            case Opcode::BitAnd: throw std::runtime_error("BitAnd not supported on doubles");
+            case Opcode::BitOr: throw std::runtime_error("BitOr not supported on doubles");
+            case Opcode::BitXor: throw std::runtime_error("BitXor not supported on doubles");
+            case Opcode::BitNot: throw std::runtime_error("BitNot not supported on doubles");
+            case Opcode::Eq: os << "deq"; break;
+            case Opcode::Neq: os << "dne"; break;
+            case Opcode::Gt: os << "dgt"; break;
+            case Opcode::Gte: os << "dge"; break;
+            case Opcode::Lt: os << "dlt"; break;
+            case Opcode::Lte: os << "dle"; break;
+            case Opcode::Copy: os << "dmov"; break;
+            case Opcode::UnMinus: os << "dneg"; break;
+            case Opcode::UnPlus: os << "dmov"; break;
+        } break;
+        case ValueType::Ptr: throw std::runtime_error("Pointer arithmetic not supported");
+        case ValueType::Void: throw std::runtime_error("Void type not supported");
+        case ValueType::Bool: switch (op) {
+            case Opcode::BoolAnd: os << "ands"; break;
+            case Opcode::BoolOr: os << "ors"; break;
+            case Opcode::BoolNot: os << "xors"; break;
+            case Opcode::Copy: os << "mov"; break;
+            default: throw std::runtime_error("Unsupported operation on bool " + std::to_string(static_cast<int>(op)));
+        }
     }
     return os;
 }
 
 
-inline std::ostream& generate(std::ostream& os, const Operation& op) {
+inline std::ostream& generateOpSuffix(std::ostream& os, ValueType type, Opcode op) {
+    switch (type) {
+        case ValueType::I32: switch (op) {
+            case Opcode::BitXor: os << ", 0xffffffff"; break;
+            default: break;
+        } break;
+        case ValueType::Bool: switch (op) {
+            case Opcode::BoolNot: os << ", 1"; break;
+            default: break;
+        } break;
+        default: break;
+    }
+    return os;
+}
+
+
+inline Identifier convId() {
+    static unsigned counter = 0;
+    std::string name = "tc_" + std::to_string(counter++);
+    return Identifier{name};
+}
+
+
+inline void generateConversion(std::ostream& os, Arg value, Variable to) {
+    auto& id = to.first;
+
     printIndent(os);
-    generate(os, op.op);
+    switch (value.type()) {
+        case ValueType::I32:
+            switch (to.second) {
+                case ValueType::I32: os << "mov " << id << ", "; generate(os, value); break;
+                case ValueType::Bool: os << "nes " << id << ", "; generate(os, value) << ", 0"; break;
+                case ValueType::Double: os << "i2d " << id << ", "; generate(os, value); break;
+                case ValueType::Ptr: throw std::runtime_error("Unsupported conversion to Ptr");
+                case ValueType::Void: throw std::runtime_error("Unsupported conversion to Void");
+            } break;
+        case ValueType::Bool:
+            switch (to.second) {
+                case ValueType::I32: os << "mov " << id << ", "; generate(os, value); break;
+                case ValueType::Bool: os << "mov " << id << ", "; generate(os, value); break;
+                case ValueType::Double: os << "i2d " << id << ", "; generate(os, value); break;
+                case ValueType::Ptr: throw std::runtime_error("Unsupported conversion to Ptr");
+                case ValueType::Void: throw std::runtime_error("Unsupported conversion to Void");
+            } break;
+        case ValueType::Double:
+            switch (to.second) {
+                case ValueType::I32: os << "d2i " << id << ", "; generate(os, value); break;
+                case ValueType::Bool: os << "dne " << id << ", "; generate(os, value) << ", 0"; break;
+                case ValueType::Double: os << "dmov " << id << ", "; generate(os, value); break;
+                case ValueType::Ptr: throw std::runtime_error("Unsupported conversion to Ptr");
+                case ValueType::Void: throw std::runtime_error("Unsupported conversion to Void");
+            } break;
+        case ValueType::Ptr: throw std::runtime_error("Unsupported conversion from Ptr");
+        case ValueType::Void: throw std::runtime_error("Unsupported conversion from Void");
+    }
+
+    os << '\n';
+}
+
+inline std::ostream& generateDummy(std::ostream& os, Variable ident) {
+    printIndent(os);
+    generate(os, ident.second, Opcode::Copy);
+    os << " " << ident.first << ", " << ident.first << '\n';
+    return os;
+
+}
+
+inline std::ostream& generate(std::ostream& os, const Operation& op) {
+    if (op.args.size() < 2) {
+        throw std::runtime_error("Operation with less than 2 arguments");
+    }
+    std::vector<Variable> args;
+    std::vector<ValueType> newTypes = argTypes(op);
+    args.reserve(op.args.size());
+
+    args.push_back(std::get<Variable>(op.args[0].value));
+
+    bool needsDummy = false;
+    for (size_t i = 1; i < op.args.size(); ++i) {
+        if (op.args[i].isVariable() && op.args[i].type() == newTypes[i - 1]) {
+            continue;
+        }
+        needsDummy = true;
+    }
+    if (needsDummy) {
+        generateDummy(os, args[0]);
+    }
+    for (size_t i = 1; i < op.args.size(); ++i) {
+        if (op.args[i].isVariable() && op.args[i].type() == newTypes[i - 1]) {
+            args.push_back(std::get<Variable>(op.args[i].value));
+            continue;
+        }
+        Variable arg(convId(), newTypes[i - 1]);
+
+        printIndent(os);
+        os << "local ";
+        generateLocalType(os, arg.second);
+        os << ":" << arg.first << '\n';
+
+        generateConversion(os, op.args[i], arg);
+        args.push_back(arg);
+    }
+
+    printIndent(os);
+    generate(os, newTypes[0], op.op);
     bool first = true;
-    for (const auto& arg : op.args) {
+    for (const auto& var : args) {
         if (!first) {
             os << ", ";
         }
@@ -95,8 +246,9 @@ inline std::ostream& generate(std::ostream& os, const Operation& op) {
             os << ' ';
             first = false;
         }
-        generate(os, arg);
+        generate(os, var);
     }
+    generateOpSuffix(os, newTypes[0], op.op);
     return os;
 }
 
@@ -108,6 +260,12 @@ inline std::ostream& generate(std::ostream& os, const Call& c) {
         os << ", ";
         generate(os, arg);
     }
+    return os;
+}
+
+
+inline std::ostream& generate(std::ostream& os, const Conversion& c) {
+    generateConversion(os, c.from, c.to);
     return os;
 }
 
@@ -126,8 +284,6 @@ inline std::ostream& generate(std::ostream& os, const StatementList& sl) {
     }
     return os;
 }
-
-
 
 
 inline std::ostream& generate(std::ostream& os, const Block& b, const Nesting& parent) {
@@ -230,7 +386,8 @@ inline std::ostream& generate(std::ostream& os, const Function& f) {
                 first = false;
             }
 
-            os << "i64:" << id;
+            generateLocalType(os, type);
+            os << ":" << id;
         }
         os << '\n';
     }
@@ -269,11 +426,17 @@ inline std::ostream& generateProto(std::ostream& os, const Function& f) {
 
 inline std::ostream& generateCaller(std::ostream& os, const Function& f) {
     std::string callerName(std::string("caller_") + f.name());
-    os << callerName << ": func i64, i64:argc, p:argv\n";
+    os << callerName << ": func ";
+    generate(os, f.returnType());
+    os << ", i64:argc, p:argv\n";
 
-    os << "    local i64:pos, i64:res";
+    os << "    local i64:pos, ";
+    generateLocalType(os, f.returnType());
+    os << ":res";
     for (size_t i = 0; i < f.args().size(); ++i) {
-        os << ", i64:arg" << i;
+        os << ", ";
+        generateLocalType(os, f.args()[i].second);
+        os << ":arg" << i;
     }
     os << '\n';
     os << "body:\n";
@@ -289,8 +452,14 @@ inline std::ostream& generateCaller(std::ostream& os, const Function& f) {
             case tac::ValueType::I32:
                 os << "    mov arg" << i << ", i32:(argv, pos, 8)\n";
                 break;
+            case tac::ValueType::Double:
+                os << "    dmov arg" << i << ", d:(argv, pos, 8)\n";
+                break;
+            case tac::ValueType::Bool:
+                os << "    nes arg" << i << ", i32:(argv, pos, 8), 0\n";
+                break;
             default:
-                throw std::runtime_error("Unsupported argument type" + std::to_string(static_cast<int>(type)));
+                throw std::runtime_error("Unsupported argument type " + std::to_string(static_cast<int>(type)));
         }
     }
 
@@ -304,7 +473,8 @@ inline std::ostream& generateCaller(std::ostream& os, const Function& f) {
 
     os << "fail:\n";
     // TODO: throw exception
-    os << "    ret 0\n";
+    generateConversion(os, Arg{0}, { "res", f.returnType() });
+    os << "    ret res\n";
     os << "endfunc\n\n";
 
     return os;
