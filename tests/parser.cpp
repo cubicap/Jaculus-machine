@@ -1803,7 +1803,7 @@ TEST_CASE("Loop statement", "[parser]") {
 }
 
 
-TEST_CASE("Statement") {
+TEST_CASE("Statement", "[parser]") {
 
     SECTION("report(fun(true));") {
         auto tokens = TokenVector{
@@ -1826,5 +1826,43 @@ TEST_CASE("Statement") {
         REQUIRE(result);
 
         REQUIRE(std::holds_alternative<jac::ast::ExpressionStatement<true, true>>(result->value));
+    }
+}
+
+
+TEST_CASE("Member access", "[parser]") {
+
+    SECTION("a.b") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 2, ".", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 3, "b", jac::lex::Token::IdentifierName)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::LeftHandSideExpression<false, false>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+    }
+
+    SECTION("return a.b;") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "return", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 8, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 9, ".", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 10, "b", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 11, ";", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::Statement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
     }
 }

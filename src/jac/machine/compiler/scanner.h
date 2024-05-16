@@ -321,12 +321,13 @@ class Scanner {
             return Token(_line, startColumn, std::string_view(start, _pos), Token::NumericLiteral);
         }
 
-        if (match('.')) {
-            if ((start + 1) == _pos && !std::isdigit(peek())) {
+        if (peek() == '.') {
+            if (start == _pos && !std::isdigit(peek(1))) {
                 // Dot without preceding and following digits
                 // TODO: return Punctuator at this point?
                 return Token(_line, startColumn, std::string_view(start, _pos), Token::NoToken);
             }
+            advance();
         }
 
         while (std::isdigit(peek()) || (lastSeparator = match('_'))) {

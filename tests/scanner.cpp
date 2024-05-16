@@ -430,3 +430,15 @@ R"(function test(a, b) {
         }));
     }
 }
+
+TEST_CASE("Member access", "[scanner]") {
+    SECTION("a.b") {
+        std::string input("a.b");
+        jac::lex::Scanner scanner(input, report);
+        REQUIRE(scanner.scan() == TokenVector({
+            jac::lex::Token(1, 1, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 3, ".", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 4, "b", jac::lex::Token::IdentifierName)
+        }));
+    }
+}
