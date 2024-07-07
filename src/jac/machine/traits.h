@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 #include <vector>
 
 #include "context.h"
@@ -33,59 +34,71 @@ struct ConvTraits<bool> {
 };
 
 namespace detail {
-    template<typename T>
-    struct IntConvBase {
-        static T from(ContextRef ctx, ValueWeak val) {
-            int32_t res;
-            int ex = JS_ToInt32(ctx, &res, val.getVal());
-            if (ex < 0) {
-                throw Exception::create(Exception::Type::TypeError, "Failed to convert to int");
-            }
-            return res;
-        }
-
-        static Value to(ContextRef ctx, T val) {
-            return Value(ctx, JS_NewInt32(ctx, val));
-        }
-    };
 
     template<typename T>
-    struct FloatConvBase {
-        static T from(ContextRef ctx, ValueWeak val) {
-            double res;
-            int ex = JS_ToFloat64(ctx, &res, val.getVal());
-            if (ex < 0) {
-                throw Exception::create(Exception::Type::TypeError, "Failed to convert to double");
-            }
-            return res;
-        }
+    constexpr bool is_leq_i32 = (std::is_signed_v<T> && sizeof(T) <= sizeof(int32_t))
+                             || (std::is_unsigned_v<T> && sizeof(T) < sizeof(int32_t));
 
-        static Value to(ContextRef ctx, T val) {
-            return Value(ctx, JS_NewFloat64(ctx, val));
-        }
-    };
 } // namespace detail
 
 
 template<typename T>
 struct ConvTraits<T, std::enable_if_t<
-           std::is_integral_v<T>
-        && std::is_signed_v<T>
-        && sizeof(T) <= sizeof(int32_t)
-, T>> : public detail::IntConvBase<T> {};
+       std::is_integral_v<T>
+    && detail::is_leq_i32<T>
+, T>> {
+    static T from(ContextRef ctx, ValueWeak val) {
+        int32_t res;
+        int ex = JS_ToInt32(ctx, &res, val.getVal());
+        if (ex < 0) {
+            throw Exception::create(Exception::Type::TypeError, "Failed to convert to int");
+        }
+        return res;
+    }
+
+    static Value to(ContextRef ctx, T val) {
+        return Value(ctx, JS_NewInt32(ctx, val));
+    }
+};
 
 template<typename T>
 struct ConvTraits<T, std::enable_if_t<
-           std::is_integral_v<T>
-        && std::is_unsigned_v<T>
-        && sizeof(T) < sizeof(int32_t)
-, T>> : public detail::IntConvBase<T> {};
+       std::is_floating_point_v<T>
+    && sizeof(T) <= sizeof(double)
+, T>> {
+    static T from(ContextRef ctx, ValueWeak val) {
+        double res;
+        int ex = JS_ToFloat64(ctx, &res, val.getVal());
+        if (ex < 0) {
+            throw Exception::create(Exception::Type::TypeError, "Failed to convert to double");
+        }
+        return res;
+    }
+
+    static Value to(ContextRef ctx, T val) {
+        return Value(ctx, JS_NewFloat64(ctx, val));
+    }
+};
 
 template<typename T>
 struct ConvTraits<T, std::enable_if_t<
-           std::is_floating_point_v<T>
-        && sizeof(T) <= sizeof(double)
-, T>> : public detail::FloatConvBase<T> {};
+       std::is_integral_v<T>
+    && sizeof(T) <= sizeof(int64_t)
+    && !detail::is_leq_i32<T>
+, T>> {
+    static T from(ContextRef ctx, ValueWeak val) {
+        int64_t res = 0;
+        int ex = JS_ToInt64(ctx, &res, val.getVal());
+        if (ex < 0) {
+            throw Exception::create(Exception::Type::TypeError, "Failed to convert to int");
+        }
+        return res;
+    }
+
+    static Value to(ContextRef ctx, T val) {
+        return Value(ctx, JS_NewInt64(ctx, val));
+    }
+};
 
 template<>
 struct ConvTraits<const char*> {
