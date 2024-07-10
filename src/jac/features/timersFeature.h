@@ -166,14 +166,14 @@ public:
 
                 this->scheduleEvent([timer, this]() mutable {
                     if (timer->isCancelled()) {
-                        std::lock_guard<std::mutex> lock(_timersMutex);
+                        std::lock_guard<std::mutex> lock_(_timersMutex);
                         int id = timer->getId();
                         _timersById.erase(id);
                         return;
                     }
                     timer->getCallback()();
 
-                    std::lock_guard<std::mutex> lock(_timersMutex);
+                    std::lock_guard<std::mutex> lock_(_timersMutex);
                     if (timer->isRepeating()) {
                         timer->update();
                         _timers.push(timer);
