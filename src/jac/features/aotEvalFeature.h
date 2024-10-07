@@ -305,12 +305,12 @@ public:
             return EvalFeature<Next>::eval(std::move(code), filename, flags);
         }
 
-            // define the compiled functions in global scope
-            jac::Object global = this->context().getGlobalObject();
+        // define the compiled functions in global scope
+        jac::Object global = this->context().getGlobalObject();
 
-            for (auto& [ _, fn ] : compiledHolder) {
-                global.defineProperty(fn.alias, fn.fn);
-            }
+        for (auto& [ _, fn ] : compiledHolder) {
+            global.defineProperty(fn.alias, fn.fn);
+        }
 
         return EvalFeature<Next>::eval(std::move(code), filename, flags);
     }

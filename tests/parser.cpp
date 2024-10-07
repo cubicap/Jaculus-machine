@@ -1865,4 +1865,22 @@ TEST_CASE("Member access", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
     }
+
+    SECTION("a.b.c[\"test\"]") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "a", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 2, ".", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 3, "b", jac::lex::Token::IdentifierName),
+            jac::lex::Token(1, 4, ".", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "c", jac::lex::Token::IdentifierName)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::MemberExpression<false, false>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+    }
 }

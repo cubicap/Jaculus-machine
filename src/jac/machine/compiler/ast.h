@@ -1977,20 +1977,17 @@ struct MemberExpression {
     using MemberExpressionPtr = std::unique_ptr<MemberExpression<Yield, Await>>;
 
     std::variant<
-        PrimaryExpression<Yield, Await>,
-        std::pair<MemberExpressionPtr, std::variant<
-            Expression<true, Yield, Await>,  // bracket
-            IdentifierName, // dot
-            PrivateIdentifier,  // dot
-            TemplateLiteral<Yield, Await, true>,  // tag
-            Arguments<Yield, Await>  // new
-        >>,
         SuperProperty<Yield, Await>,
-        MetaProperty
+        MetaProperty,
+        PrimaryExpression<Yield, Await>,
+        std::pair<MemberExpressionPtr, Expression<true, Yield, Await>>,  // bracket
+        std::pair<MemberExpressionPtr, IdentifierName>, // dot
+        std::pair<MemberExpressionPtr, PrivateIdentifier>,  // dot
+        std::pair<MemberExpressionPtr, TemplateLiteral<Yield, Await, true>>,  // tag
+        std::pair<MemberExpressionPtr, Arguments<Yield, Await>>  // new
     > value;
 
     static std::optional<MemberExpression<Yield, Await>> parse(ParserState& state) {
-        // FIXME: not recursive enough
         if (state.current().kind == lex::Token::Keyword && state.current().text == "new") {
             auto start = state.getPosition();
             state.advance();
@@ -2001,50 +1998,69 @@ struct MemberExpression {
                 }
             }
             state.restorePosition(start);
+            return std::nullopt;
         }
+
         std::optional<MemberExpression<Yield, Await>> member;
-        if (auto primary = PrimaryExpression<Yield, Await>::parse(state)) {
-            member.emplace(MemberExpression{ std::move(*primary) });
-        }
-        else if (auto super = SuperProperty<Yield, Await>::parse(state)) {
+        if (auto super = SuperProperty<Yield, Await>::parse(state)) {
             member.emplace(MemberExpression{ std::move(*super) });
         }
         else if (auto meta = MetaProperty::parse(state)) {
             member.emplace(MemberExpression{ std::move(*meta) });
         }
-        else {
+        else if (auto primary = PrimaryExpression<Yield, Await>::parse(state)) {
+            member.emplace(MemberExpression{ std::move(*primary) });
+        }
+
+        if (!member) {
             return std::nullopt;
         }
 
-        if (state.current().kind == lex::Token::Punctuator && state.current().text == ".") {
-            state.advance();
-            // TODO: handle private identifiers
-            if (auto identifier = IdentifierName::parse(state)) {
-                auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
-                return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*identifier)}};
-            }
-            state.backtrack();
-        }
-        else if (state.current().kind == lex::Token::Punctuator && state.current().text == "[") {
+        do {
             auto start = state.getPosition();
-            if (auto expr = Expression<true, Yield, Await>::parse(state)) {
-                if (state.current().kind == lex::Token::Punctuator && state.current().text == "]") {
-                    state.advance();
-                    auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
-                    return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*expr)}};
+
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == "[") {
+                state.advance();
+                if (auto expr = Expression<true, Yield, Await>::parse(state)) {
+                    if (state.current().kind == lex::Token::Punctuator && state.current().text == "]") {
+                        state.advance();
+                        auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
+                        member.emplace(MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*expr)}});
+                        continue;
+                    }
+                    state.error("Expected ]");
                 }
-                state.error("Expected ]");
+                state.restorePosition(start);
             }
+            if (state.current().kind == lex::Token::Punctuator && state.current().text == ".") {
+                state.advance();
+                if (auto identifier = IdentifierName::parse(state)) {
+                    auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
+                    member.emplace(MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*identifier)}});
+                    continue;
+                }
+                if (auto priv = PrivateIdentifier::parse(state)) {
+                    auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
+                    member.emplace(MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*priv)}});
+                    continue;
+                }
+                state.backtrack();
+            }
+            if (auto tplate = TemplateLiteral<Yield, Await, true>::parse(state)) {
+                auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
+                member.emplace(MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*tplate)}});
+                continue;
+            }
+
             state.restorePosition(start);
-        }
-        else if (auto tplate = TemplateLiteral<Yield, Await, true>::parse(state)) {
-            auto ptr = std::make_unique<MemberExpression<Yield, Await>>(std::move(*member));
-            return MemberExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*tplate)}};
-        }
+            break;
+        } while (true);
 
         return member;
     }
 };
+template<bool Yield, bool Await>
+using MemberExpressionPtr = std::unique_ptr<MemberExpression<Yield, Await>>;
 
 template<bool Yield, bool Await>
 struct NewExpression {
@@ -2071,6 +2087,8 @@ struct NewExpression {
         return std::nullopt;
     }
 };
+template<bool Yield, bool Await>
+using NewExpressionPtr = std::unique_ptr<NewExpression<Yield, Await>>;
 
 template<bool Yield, bool Await>
 struct SuperCall {
@@ -2118,7 +2136,7 @@ struct CallExpression {
     std::variant<
         SuperCall<Yield, Await>,
         ImportCall<Yield, Await>,
-        std::pair<MemberExpression<Yield, Await>, Arguments<Yield, Await>>,
+        std::pair<MemberExpression<Yield, Await>, Arguments<Yield, Await>>,  // cover grammar
         std::pair<CallExpressionPtr, Arguments<Yield, Await>>,
         std::pair<CallExpressionPtr, Expression<true, Yield, Await>>,  // bracket
         std::pair<CallExpressionPtr, IdentifierName>,  // dot
@@ -2132,11 +2150,10 @@ struct CallExpression {
         if (auto super = SuperCall<Yield, Await>::parse(state)) {
             call.emplace(CallExpression<Yield, Await>{std::move(*super)});
         }
-        if (auto import = ImportCall<Yield, Await>::parse(state)) {
+        else if (auto import = ImportCall<Yield, Await>::parse(state)) {
             call.emplace(CallExpression<Yield, Await>{std::move(*import)});
         }
-
-        if (auto cover = CoverCallExpressionAndAsyncArrowHead<Yield, Await>::parse(state)) {
+        else if (auto cover = CoverCallExpressionAndAsyncArrowHead<Yield, Await>::parse(state)) {
             call.emplace(CallExpression<Yield, Await>{std::pair{std::move(cover->memberExpression), std::move(cover->arguments)}});
         }
 
@@ -2146,13 +2163,13 @@ struct CallExpression {
 
         do {
             auto start = state.getPosition();
+
             if (auto args = Arguments<Yield, Await>::parse(state)) {
                 auto ptr = std::make_unique<CallExpression<Yield, Await>>(std::move(*call));
                 call.emplace(CallExpression<Yield, Await>{std::pair{std::move(ptr), std::move(*args)}});
                 continue;
             }
             if (state.current().kind == lex::Token::Punctuator && state.current().text == "[") {
-                auto post = state.getPosition();
                 state.advance();
                 if (auto expr = Expression<true, Yield, Await>::parse(state)) {
                     if (state.current().kind == lex::Token::Punctuator && state.current().text == "]") {
@@ -2163,8 +2180,7 @@ struct CallExpression {
                     }
                     state.error("Expected ]");
                 }
-
-                state.restorePosition(post);
+                state.restorePosition(start);
             }
             if (state.current().kind == lex::Token::Punctuator && state.current().text == ".") {
                 state.advance();
@@ -2187,7 +2203,8 @@ struct CallExpression {
             }
 
             state.restorePosition(start);
-        } while (false);
+            break;
+        } while (true);
 
         return call;
     }
