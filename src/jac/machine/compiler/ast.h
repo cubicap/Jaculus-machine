@@ -2062,13 +2062,19 @@ struct MemberExpression {
 template<bool Yield, bool Await>
 using MemberExpressionPtr = std::unique_ptr<MemberExpression<Yield, Await>>;
 
+
+template<bool Yield, bool Await>
+struct NewExpression;
+
+template<bool Yield, bool Await>
+using NewExpressionPtr = std::unique_ptr<NewExpression<Yield, Await>>;
+
 template<bool Yield, bool Await>
 struct NewExpression {
-    using NewExpressionPtr = std::unique_ptr<NewExpression<Yield, Await>>;
 
     std::variant<
         MemberExpression<Yield, Await>,
-        NewExpressionPtr
+        NewExpressionPtr<Yield, Await>
     > value;
 
     static std::optional<NewExpression<Yield, Await>> parse(ParserState& state) {

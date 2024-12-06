@@ -3,13 +3,18 @@
 
 #include <string>
 
-#include <jac/features/aotEvalFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
 
 #include "util.h"
+
+#ifdef COMPILE_CFG_ONLY
+    #include "compiler/compileInterpEvalFeature.h"
+#else
+    #include <jac/features/aotEvalFeature.h>
+#endif
 
 
 TEST_CASE("Eval", "[aot]") {
@@ -191,7 +196,9 @@ TEST_CASE("Eval", "[aot]") {
                     return 1;
                 }
 
-                return fib(n - 1) + fib(n - 2);
+                let first: Int32 = fib(n - 1);
+                let second: Int32 = fib(n - 2);
+                return first + second;
             }
 
             report(fib(0));
@@ -318,6 +325,26 @@ TEST_CASE("Eval", "[aot]") {
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"0", "1", "1", "2", "3", "5", "8", "13", "21", "34"});
+    }
+
+    SECTION("Early return") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                if (a > b) {
+                    return a;
+                }
+                else {
+                    return b;
+                }
+            }
+
+            report(fun(1, 2));
+            report(fun(4, 3));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2", "4"});
     }
 }
 

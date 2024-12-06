@@ -7,6 +7,8 @@
 #include "values.h"
 
 
+// TODO: replace std::function for signature deduction
+
 namespace jac {
 
 /**
@@ -51,7 +53,7 @@ public:
      */
     template<class Func>
     Function newFunction(Func func) {
-        return newFunctionHelper(func, std::function(func));
+        return newFunctionHelper(func, decltype(std::function(std::move(func))){});
     }
 
     /**
@@ -69,7 +71,7 @@ public:
      */
     template<class Func>
     Function newFunctionVariadic(Func func) {
-        return newFunctionVariadicHelper(func, std::function(func));
+        return newFunctionVariadicHelper(func, decltype(std::function(std::move(func))){});
     }
 
     /**
@@ -87,7 +89,7 @@ public:
      */
     template<class Func>
     Function newFunctionThis(Func func) {
-        return newFunctionThisHelper(func, std::function(func));
+        return newFunctionThisHelper(func, decltype(std::function(std::move(func))){});
     }
 
     /**
@@ -105,7 +107,7 @@ public:
      */
     template<class Func>
     Function newFunctionThisVariadic(Func func) {
-        return newFunctionThisVariadicHelper(func, std::function(func));
+        return newFunctionThisVariadicHelper(func, decltype(std::function(std::move(func))){});
     }
 };
 

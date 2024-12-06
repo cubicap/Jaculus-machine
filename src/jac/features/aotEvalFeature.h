@@ -224,10 +224,9 @@ class AotEvalFeature : public EvalFeature<Next> {
                         return ff.newFunctionVariadic(detail::wrapper<bool>{callerPtr});
                     case jac::tac::ValueType::Void:
                         return ff.newFunctionVariadic(detail::wrapper<void>{callerPtr});
-                    case jac::tac::ValueType::Ptr:
+                    default:
                         throw std::runtime_error("Invalid return type");
                 }
-                throw std::runtime_error("Invalid return type");
             }();
 
             auto [it, was] = compiledHolder.emplace(name, FunctionInfo{ alias(ptr), jsFn });

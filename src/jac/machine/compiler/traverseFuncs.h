@@ -19,6 +19,7 @@ struct Functions {
         }
     }
 };
+
 template<bool Yield, bool Await, bool Return>
 void funcs(const Statement<Yield, Await, Return>& statement, Functions& out) {
     // TODO

@@ -30,12 +30,22 @@ add_test_executable(values)
 add_test_executable(functionFactory)
 add_test_executable(class)
 add_test_executable(plugins)
-add_test_executable(aotEval)
-add_test_executable(regression)
 
 add_test_executable(scanner)
 add_test_executable(parser)
 
 add_test_executable(asScanner)
+
+add_executable(compileCfg compile.cpp)
+target_compile_definitions(compileCfg PRIVATE COMPILE_CFG_ONLY)
+target_link_libraries(compileCfg PUBLIC jac-machine Catch2::Catch2WithMain)
+add_test(NAME compileCfg COMMAND ${EXECUTABLE_OUTPUT_PATH}/compileCfg)
+
+add_executable(compileNative compile.cpp)
+target_link_libraries(compileNative PUBLIC jac-machine Catch2::Catch2WithMain)
+add_test(NAME compileNative COMMAND ${EXECUTABLE_OUTPUT_PATH}/compileNative)
+
+add_test_executable(cfgInterp)
+add_test_executable(regression)
 
 file(COPY test_files DESTINATION "./")
