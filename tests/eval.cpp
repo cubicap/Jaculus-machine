@@ -49,6 +49,16 @@ TEST_CASE("TestReportFeature", "[reportFeature]") {
                 }
                 return v;
             }()
+        },
+        sgn {
+            "Eval lexical global",
+            "let x = 'hello world'; let text = 'x'; report(eval(text))",
+            {"hello world"}
+        },
+        sgn {
+            "Eval lexical local",
+            "let text = 'x'; (() => { let x = 'hello world'; report(eval(text)) }) ()",
+            {"hello world"}
         }
     );
 

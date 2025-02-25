@@ -1,13 +1,11 @@
 #pragma once
 
-#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <forward_list>
 #include <list>
 #include <map>
 #include <memory>
-#include <ranges>
 #include <set>
 #include <string>
 #include <tuple>
@@ -148,10 +146,10 @@ struct Statement {  // FIXME: rename, unify
 struct BasicBlock;
 using BasicBlockPtr = BasicBlock*;
 
-struct Jump {
+struct Terminal {
     enum Type {
-        Unconditional,
-        Conditional,
+        Jump,
+        Branch,
         Return,
         ReturnValue,
         Throw,
@@ -163,34 +161,34 @@ struct Jump {
     BasicBlockPtr target;
     BasicBlockPtr other;
 
-    static Jump unconditional(BasicBlockPtr target) {
-        return { Unconditional, {}, target, nullptr };
+    static Terminal jump(BasicBlockPtr target) {
+        return { Jump, {}, target, nullptr };
     }
 
-    static Jump conditional(RValue condition, BasicBlockPtr target, BasicBlockPtr other) {
-        return { Conditional, condition, target, other };
+    static Terminal branch(RValue condition, BasicBlockPtr target, BasicBlockPtr other) {
+        return { Branch, condition, target, other };
     }
 
-    static Jump ret() {
+    static Terminal ret() {
         return { Return, {}, nullptr, nullptr };
     }
 
-    static Jump retVal(RValue retValue) {
+    static Terminal retVal(RValue retValue) {
         return { ReturnValue, retValue, nullptr, nullptr };
     }
 
-    static Jump throw_(RValue exception) {
+    static Terminal throw_(RValue exception) {
         return { Throw, exception, nullptr, nullptr };
     }
 
-    static Jump none() {
+    static Terminal none() {
         return { None, {}, nullptr, nullptr };
     }
 };
 
 struct BasicBlock {
     std::list<Statement> statements;
-    Jump jump = Jump::none();
+    Terminal jump = Terminal::none();
 };
 
 
@@ -243,13 +241,14 @@ struct Function {
     BasicBlockPtr entry;
     std::vector<std::unique_ptr<BasicBlock>> blocks;
     std::vector<LVRef> args;
+    ValueType ret;
     std::string _name;
     std::set<Identifier> requiredFunctions;
 
     std::string name() const { return _name; }
 };
 
-struct FunctionEmitter {  // TODO: make members private, think about lists more
+struct FunctionEmitter {  // TODO: make members private, think about lists once again
     const std::map<cfg::Identifier, cfg::SignaturePtr>& _otherSignatures;
 
     SignaturePtr signature;
@@ -388,6 +387,7 @@ struct FunctionEmitter {  // TODO: make members private, think about lists more
             .entry = entry,
             .blocks = std::move(blockPtrs),
             .args = std::move(args),
+            .ret = signature->ret,
             ._name = std::move(_name),
             .requiredFunctions = std::move(requiredFunctions)
         };

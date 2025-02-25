@@ -22,7 +22,7 @@ struct Functions {
 
 template<bool Yield, bool Await, bool Return>
 void funcs(const Statement<Yield, Await, Return>& statement, Functions& out) {
-    // TODO
+    // XXX: ignore for now (ignores nested functions)
 }
 
 template<bool Yield, bool Await, bool Default>

@@ -1,6 +1,3 @@
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
-
 #include <string>
 
 #include <jac/features/filesystemFeature.h>
@@ -8,13 +5,18 @@
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
 
-#include "util.h"
-
 #ifdef COMPILE_CFG_ONLY
     #include "compiler/compileInterpEvalFeature.h"
 #else
     #include <jac/features/aotEvalFeature.h>
 #endif
+
+#undef CHECK
+
+
+#include "util.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 
 TEST_CASE("Eval", "[aot]") {
@@ -401,6 +403,20 @@ TEST_CASE("Types", "[aot]") {
         REQUIRE(machine.getReports() == std::vector<std::string>{"false", "true"});
     }
 
+    SECTION("Void") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(): Void {
+                return;
+            }
+
+            fun();
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"false", "true"});
+    }
+
     SECTION("Mixed") {
         machine.initialize();
         std::string code(R"(
@@ -422,3 +438,27 @@ TEST_CASE("Types", "[aot]") {
     }
 }
 
+
+TEST_CASE("Object", "[aot]") {
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::AotEvalFeature,
+        TestReportFeature
+    >;
+
+    Machine machine;
+
+    SECTION("Get") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Object): Int32 {
+                return a.b;
+            }
+
+            report(fun(o));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1234"});
+    }
+}

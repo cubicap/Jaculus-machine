@@ -5,15 +5,24 @@
 #include <jac/machine/machine.h>
 
 #include <jac/machine/compiler/ast.h>
+#include <jac/machine/compiler/cfg.h>
+#include <jac/machine/compiler/cfgEmit.h>
+#include <jac/machine/compiler/cfgSimplify.h>
 #include <jac/machine/compiler/scanner.h>
-#include <jac/machine/compiler/tacEmit.h>
-#include <jac/machine/compiler/tacMir.h>
-#include <jac/machine/compiler/tacTree.h>
 #include <jac/machine/compiler/traverseFuncs.h>
 
 #include <list>
-#include <mir-gen.h>
-#include <mir.h>
+
+#include "BE/Base/ir.h"
+#include "BE/Base/serialize.h"
+#include "BE/CodeGenX64/codegen.h"
+#include "BE/CodeGenX64/legalize.h"
+#include "BE/CodeGenX64/regs.h"
+#include "BE/CpuX64/assembler.h"
+#include "Util/assert.h"
+#include "Util/assert.h"
+#include "Util/stripe.h"
+#include "jac/machine/compiler/cfgCwerg.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -24,6 +33,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <sys/mman.h>
 #include <utility>
 #include <vector>
 
@@ -31,27 +41,18 @@
 namespace jac {
 
 
+struct CompFn {
+    std::string name;
+    std::string alias;
+    std::string_view code;
+    std::optional<Function> jsFn;
+};
+
 namespace detail {
 
-inline MIR_item_t MIR_get_global_item(MIR_context_t ctx, std::string_view name) {
-    for (MIR_module_t module = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(ctx));
-         module != nullptr;
-         module = DLIST_NEXT(MIR_module_t, module)
-    ) {
-        for (MIR_item_t item = DLIST_HEAD(MIR_item_t, module->items);
-             item != nullptr;
-             item = DLIST_NEXT(MIR_item_t, item)
-        ) {
-            if (name == MIR_item_name(ctx, item)) {
-                return item;
-            }
-        }
-    }
-    return nullptr;
-}
 
 template<typename Res>
-struct wrapper {
+struct CompiledCallable {
     void* callerPtr;
 
     Res operator()(std::vector<ValueWeak> args) {
@@ -77,20 +78,7 @@ struct wrapper {
 
 template<class Next>
 class AotEvalFeature : public EvalFeature<Next> {
-    struct FunctionInfo {
-        std::string alias;
-        Function fn;
-    };
-
-    struct CompFn {
-        FunctionInfo* fn;
-        std::string name;
-        std::string_view code;
-    };
-
-    std::vector<MIR_context_t> mirContexts;
-
-    std::map<std::string, FunctionInfo> compiledHolder;
+    std::map<std::string, CompFn> compiledHolder;
 
     std::string alias(const void* ptr) {
         return "__jac_aot_func_" + std::to_string(reinterpret_cast<uint64_t>(ptr));  // NOLINT
@@ -126,18 +114,32 @@ class AotEvalFeature : public EvalFeature<Next> {
         return std::move(*script);
     }
 
-    std::list<std::pair<jac::tac::Function, std::string_view>> transformFunctions(const jac::ast::traverse::Functions& functions) {
-        std::list<std::pair<jac::tac::Function, std::string_view>> result;
-
-        std::set<std::string> simpleFunctions;
+    std::list<std::pair<jac::cfg::Function, std::string_view>> transformFunctions(const jac::ast::traverse::Functions& functions) {
+        std::list<std::pair<jac::cfg::Function, std::string_view>> result;
+        std::map<cfg::Identifier, cfg::SignaturePtr> signatures;
+        for (const auto& astFunc : functions.functions) {
+            if (!astFunc->name) {
+                continue;
+            }
+            auto sig = jac::cfg::getSignature(*astFunc);
+            if (sig) {
+                signatures.emplace(astFunc->name->identifier.name.name, sig);
+            }
+        }
 
         for (const auto& astFunc : functions.functions) {
+            if (!astFunc->name) {
+                continue;
+            }
             try {
-                result.emplace_back(jac::tac::emit(*astFunc), astFunc->code);
-                simpleFunctions.insert(result.back().first.name());
+                auto sig = signatures.at(astFunc->name->identifier.name.name);
+                auto cfgFuncEm = jac::cfg::emit(*astFunc, sig, signatures);
+                auto cfgFunc = cfgFuncEm.output();
+                result.emplace_back(std::move(cfgFunc), astFunc->code);
             }
             catch (const std::exception& e) {
                 std::cerr << "Error compiling function " << astFunc->name->identifier.name.name << ": " << e.what() << '\n';
+                signatures.erase(astFunc->name->identifier.name.name);
                 continue;
             }
         }
@@ -148,10 +150,10 @@ class AotEvalFeature : public EvalFeature<Next> {
             erased = false;
             auto it = result.begin();
             while (it != result.end()) {
-                auto& tacFunc = it->first;
-                for (const auto& req : tacFunc.requiredFunctions()) {
-                    if (!simpleFunctions.contains(req)) {
-                        simpleFunctions.erase(tacFunc.name());
+                auto& cfgFunc = it->first;
+                for (const auto& req : cfgFunc.requiredFunctions) {
+                    if (!signatures.contains(req)) {
+                        signatures.erase(cfgFunc.name());
                         result.erase(it++);
                         erased = true;
                         goto next;
@@ -165,95 +167,21 @@ class AotEvalFeature : public EvalFeature<Next> {
         return result;
     }
 
-    std::string getMir(const std::list<std::pair<jac::tac::Function, std::string_view>>& tacFunctions) {
-        std::ostringstream mir;
-        mir << "mod: module\n";
-
-        for (const auto& tacFunc : tacFunctions) {
-            jac::tac::mir::generateProto(mir, tacFunc.first);
-        }
-
-        for (const auto& tacFunc : tacFunctions) {
-            jac::tac::mir::generate(mir, tacFunc.first);
-            jac::tac::mir::generateCaller(mir, tacFunc.first);
-        }
-
-        mir << "endmodule\n";
-
-        return mir.str();
-    }
-
-    auto compileMir(std::string& mir, const std::list<std::pair<jac::tac::Function, std::string_view>>& tacFunctions) {
-        std::vector<CompFn> compiledFunctions;
-
-        MIR_context_t mirCtx = MIR_init();
-        mirContexts.push_back(mirCtx);
-
-        MIR_scan_string(mirCtx, mir.c_str());
-
-        MIR_module_t mod = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(mirCtx));
-        MIR_load_module(mirCtx, mod);
-
-        MIR_gen_init(mirCtx, 1);
-        MIR_link(mirCtx, MIR_set_gen_interface, nullptr);
-
-        for (auto& tacFunc : tacFunctions) {
-            std::string name = "f_" + tacFunc.first.name();
-            MIR_item_t func = detail::MIR_get_global_item(mirCtx, name);
-            if (!func) {
-                throw std::runtime_error("Function not found " + name);
-            }
-
-            MIR_item_t caller = detail::MIR_get_global_item(mirCtx, "caller_" + tacFunc.first.name());
-            if (!caller) {
-                throw std::runtime_error("Caller not found");
-            }
-
-            void* ptr = MIR_gen(mirCtx, 0, func);
-            void* callerPtr = MIR_gen(mirCtx, 0, caller);
-
-            FunctionFactory ff(this->context());
-
-            Function jsFn = [&]() {
-                switch (tacFunc.first.returnType()) {
-                    case jac::tac::ValueType::I32:
-                        return ff.newFunctionVariadic(detail::wrapper<int32_t>{callerPtr});
-                    case jac::tac::ValueType::Double:
-                        return ff.newFunctionVariadic(detail::wrapper<double>{callerPtr});
-                    case jac::tac::ValueType::Bool:
-                        return ff.newFunctionVariadic(detail::wrapper<bool>{callerPtr});
-                    case jac::tac::ValueType::Void:
-                        return ff.newFunctionVariadic(detail::wrapper<void>{callerPtr});
-                    default:
-                        throw std::runtime_error("Invalid return type");
-                }
-            }();
-
-            auto [it, was] = compiledHolder.emplace(name, FunctionInfo{ alias(ptr), jsFn });
-            compiledFunctions.push_back({ &it->second, tacFunc.first.name(), tacFunc.second });
-        }
-
-        MIR_gen_finish(mirCtx);
-
-        return compiledFunctions;
-    }
-
-    std::string placeStubs(std::string_view js, const std::vector<CompFn>& compiledFunctions) {
+    std::string placeStubs(std::string_view js, const std::list<CompFn*>& compiledFunctions) {
         std::stringstream newJs;
         auto begin = js.begin();
-        for (const auto& compFn : compiledFunctions) {
+        for (const auto& fn : compiledFunctions) {
+            newJs << std::string_view(begin, fn->code.begin());
 
-            newJs << std::string_view(begin, compFn.code.begin());
-
-            newJs << "var ";
-            newJs << compFn.name;
+            newJs << "const ";
+            newJs << fn->name;
             newJs << " = ";
-            newJs << compFn.fn->alias;
+            newJs << fn->alias;
             newJs << "; /* compiled from: ";
-            newJs << compFn.code;
+            newJs << fn->code;
             newJs << " */";
 
-            begin = compFn.code.end();
+            begin = fn->code.end();
         }
 
         newJs << std::string_view(begin, js.end());
@@ -261,28 +189,93 @@ class AotEvalFeature : public EvalFeature<Next> {
         return newJs.str();
     }
 
-    std::string tryAot(std::string_view js, std::string_view filename, EvalFlags flags) {
+    std::list<CompFn*> compile(std::list<std::pair<jac::cfg::Function, std::string_view>> cfgFunctions) {
+        std::list<CompFn*> results;
+
+        cwerg::base::Unit unit = cwerg::base::UnitNew(cwerg::base::StrNew("jit"));
+        for (auto& [cfgFunc, code] : cfgFunctions) {
+            auto res = jac::cfg::compile(unit, cfgFunc);
+            cwerg::base::FunRenderToAsm(res, &std::cout);
+        }
+
+        cwerg::code_gen_x64::LegalizeAll(unit, false, nullptr);
+        cwerg::code_gen_x64::RegAllocGlobal(unit, false, nullptr);
+        cwerg::code_gen_x64::RegAllocLocal(unit, false, nullptr);
+
+        cwerg::x64::X64Unit x64unit = cwerg::code_gen_x64::EmitUnitAsBinary(unit);
+        auto textMemory = static_cast<uint32_t*>(mmap(nullptr, 4096, PROT_READ | PROT_WRITE | PROT_EXEC,
+                                                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+
+        x64unit.sec_text->shdr.sh_addr = reinterpret_cast<uint64_t>(textMemory);  // NOLINT
+        memcpy(textMemory, x64unit.sec_text->data->data(), x64unit.sec_text->data->size());
+
+        for (auto& sym : x64unit.symbols) {
+            ASSERT(sym->sym.st_value != ~0U, "undefined symbol " << sym->name);
+            if (sym->section != nullptr) {
+                ASSERT(sym->section->shdr.sh_addr != ~0U,
+                            sym->name << "has bad sec " << *sym->section);
+                sym->sym.st_value += sym->section->shdr.sh_addr;
+                std::cerr << "sym [" << sym->name << "]: 0x" <<   sym->sym.st_value << "\n";
+            }
+        }
+        for (auto& rel : x64unit.relocations) {
+            cwerg::x64::ApplyRelocation(rel);
+        }
+
+        for (auto& [cfgFunc, code] : cfgFunctions) {
+            auto aliasName = alias(cfgFunc.entry);
+            auto name = cfgFunc.name();
+            auto compFn = CompFn{ name, aliasName, code, {} };
+
+            auto [it, _] = compiledHolder.emplace(name, std::move(compFn));
+
+            // TODO: add caller converting args from array
+            auto jsFn = detail::CompiledCallable<int32_t>{ ??? };  // NOLINT
+
+            FunctionFactory ff(this->context());
+            Function jsFnObj = ff.newFunctionThisVariadic(jsFn);
+
+            it->second.jsFn = jsFnObj;
+
+            results.push_back(&it->second);
+        }
+
+        return results;
+    }
+
+    std::string tryAot(std::string_view js, [[maybe_unused]] std::string_view filename, [[maybe_unused]] EvalFlags flags) {
         jac::ast::Script script = parseScript(js);
 
         jac::ast::traverse::Functions astFunctions;
         jac::ast::traverse::funcs(script, astFunctions);
 
-        std::list<std::pair<jac::tac::Function, std::string_view>> simple = transformFunctions(astFunctions);
+        auto simple = transformFunctions(astFunctions);
 
-        auto mirStr = getMir(simple);
-        auto compiledFunctions = compileMir(mirStr, simple);
+        auto compiledFunctions = compile(std::move(simple));
 
-        std::sort(compiledFunctions.begin(), compiledFunctions.end(), [](const CompFn& a, const CompFn& b) {
-            return a.code.begin() < b.code.begin();
+        compiledFunctions.sort([](const CompFn* a, const CompFn* b) {
+            return a->code.begin() < b->code.begin();
         });
 
-        return placeStubs(js, compiledFunctions);
+        auto newJS = placeStubs(js, compiledFunctions);
+
+        // define the compiled functions in global scope
+        jac::Object global = this->context().getGlobalObject();
+
+        for (auto& fn : compiledFunctions) {
+            assert(fn->jsFn);
+            global.defineProperty(fn->alias, *(fn->jsFn));
+        }
+
+        return newJS;
     }
 public:
-
-    ~AotEvalFeature() {
-        for (auto& ctx : mirContexts) {
-            MIR_finish(ctx);
+    AotEvalFeature(): EvalFeature<Next>() {
+        static bool initialized = false;
+        if (!initialized) {
+            cwerg::InitStripes(10);  // FIXME: reset, reinitialize
+            cwerg::code_gen_x64::InitCodeGenX64();
+            initialized = true;
         }
     }
 
@@ -298,17 +291,11 @@ public:
     Value eval(std::string code, std::string filename, EvalFlags flags = EvalFlags::Global) {
         try {
             code = tryAot(code, filename, flags);
+            std::cout << code << '\n';
         }
         catch (std::exception& e) {
             std::cerr << "Error during AOT compilation: " << e.what() << '\n';
             return EvalFeature<Next>::eval(std::move(code), filename, flags);
-        }
-
-        // define the compiled functions in global scope
-        jac::Object global = this->context().getGlobalObject();
-
-        for (auto& [ _, fn ] : compiledHolder) {
-            global.defineProperty(fn.alias, fn.fn);
         }
 
         return EvalFeature<Next>::eval(std::move(code), filename, flags);

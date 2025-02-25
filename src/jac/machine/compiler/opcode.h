@@ -1,13 +1,13 @@
 #pragma once
 
-#include <stdexcept>
+#include <cassert>
 #include <unordered_map>
 
 
 namespace jac::cfg {
 
 
-enum class ValueType {
+enum class ValueType {  // XXX: replace Void with undefined?
     Void,
     I32,
     Double,
@@ -18,34 +18,49 @@ enum class ValueType {
     Any
 };
 
-
-inline bool isSigned(ValueType type) {
+inline  bool isNumeric(ValueType type) {
     switch (type) {
-        case ValueType::I32:
-        case ValueType::Double:
+        case ValueType::Void:
+            assert(false);
+        case ValueType::I32:  case ValueType::Double:  case ValueType::Bool:
             return true;
-        default:
+        case ValueType::Object:  case ValueType::String:
+        case ValueType::Buffer:  case ValueType::Any:
             return false;
     }
+    assert(false);
 }
 
 inline bool isIntegral(ValueType type) {
     switch (type) {
+        case ValueType::Void:
+            assert(false);
         case ValueType::I32:
         case ValueType::Bool:
             return true;
-        default:
+        case ValueType::Double:  case ValueType::Object:  case ValueType::String:
+        case ValueType::Buffer:  case ValueType::Any:
             return false;
     }
+    assert(false);
 }
 
-inline bool isFloating(ValueType type) {
+inline ValueType toNumber(ValueType type) {
+    return isIntegral(type) ? ValueType::I32 : ValueType::Double;
+}
+
+inline ValueType toPrimitive(ValueType type) {  // XXX: not by spec
     switch (type) {
-        case ValueType::Double:
-            return true;
-        default:
-            return false;
+        case ValueType::Void:
+            assert(false);
+        case ValueType::I32:  case ValueType::Double:  case ValueType::Bool:
+            return type;
+        case ValueType::String:
+            return ValueType::String;
+        case ValueType::Object:  case ValueType::Buffer:  case ValueType::Any:
+            return ValueType::Any;
     }
+    assert(false);
 }
 
 
@@ -95,10 +110,6 @@ using ResMapping = ValueType(*)(ValueType, ValueType);
 
 namespace detail {  // FIXME: check conversions
 
-    inline bool anyFloating(ValueType a, ValueType b) {
-        return isFloating(a) || isFloating(b);
-    }
-
     inline bool anyVoid(ValueType a, ValueType b) {
         return a == ValueType::Void || b == ValueType::Void;
     }
@@ -111,77 +122,78 @@ namespace detail {  // FIXME: check conversions
         return a == ValueType::Any || b == ValueType::Any;
     }
 
-
-    inline ValueType additiveRes(ValueType a, ValueType b) {
-        if (anyVoid(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        if (anyFloating(a, b)) {
+    inline ValueType numericUpcast(ValueType a, ValueType b) {
+        if (a == ValueType::Double || b == ValueType::Double) {
             return ValueType::Double;
         }
         return ValueType::I32;
     }
 
-    inline ValueType divRes(ValueType a, ValueType b) {
-        if (anyVoid(a, b)) {
-            throw std::runtime_error("Invalid argument types");
+    inline ValueType additiveRes(ValueType a, ValueType b) {
+        auto aPrim = toPrimitive(a);
+        auto bPrim = toPrimitive(b);
+
+        if (aPrim == bPrim) {
+            return aPrim;
         }
-        return ValueType::Double;
+        if (aPrim == ValueType::String || bPrim == ValueType::String) {
+            return ValueType::String;
+        }
+        if (aPrim == ValueType::Any || bPrim == ValueType::Any) {
+            return ValueType::Any;
+        }
+        return numericUpcast(a, b);
     }
 
-    inline ValueType powRes(ValueType a, ValueType b) {
-        if (anyVoid(a, b)) {
-            throw std::runtime_error("Invalid argument types");
+    inline ValueType subtractiveRes(ValueType a, ValueType b) {
+        auto aPrim = toPrimitive(a);
+        auto bPrim = toPrimitive(b);
+
+        if (isNumeric(aPrim) && isNumeric(bPrim)) {
+            return numericUpcast(a, b);
         }
-        return ValueType::Double;
+        return ValueType::Any;
     }
 
-    inline ValueType shiftRes(ValueType a, ValueType b) {
-        if (anyVoid(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::I32;
-    }
-
-    inline ValueType booleanRes(ValueType a, ValueType b) {
-        if (anyVoid(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::Bool;
-    }
-
-    inline ValueType bitwiseRes(ValueType a, ValueType b) {
-        if (anyVoid(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::I32;
-    }
-
-    inline ValueType relationalRes(ValueType a, ValueType b) {
-        if (anyVoid(a, b)) {
-            throw std::runtime_error("Invalid argument types");
-        }
-        return ValueType::Bool;
-    }
-
-    inline ValueType setRes(ValueType a, ValueType) {
-        if (a == ValueType::Void) {
-            throw std::runtime_error("Invalid argument type");
-        }
+    inline ValueType idRes(ValueType a, ValueType) {
+        assert(a != ValueType::Void);
         return a;
     }
 
+    inline ValueType unBitwiseRes(ValueType a, ValueType) {
+        assert(a != ValueType::Void);
+        return ValueType::I32;
+    }
+
+    inline ValueType bitwiseRes(ValueType a, ValueType b) {
+        assert(!anyVoid(a, b));
+        return ValueType::I32;
+    }
+
+    inline ValueType booleanRes(ValueType a, ValueType) {
+        assert(a != ValueType::Void);
+        return ValueType::Bool;
+    }
+
+    inline ValueType relationalRes(ValueType a, ValueType b) {
+        assert(!anyVoid(a, b));
+        return ValueType::Bool;
+    }
+
+    inline ValueType toNumberRes(ValueType a, ValueType) {
+        return toNumber(a);
+    }
 
     const std::unordered_map<Opcode, ResMapping> opResults = {
         { Opcode::Add, additiveRes },
-        { Opcode::Sub, additiveRes },
-        { Opcode::Mul, additiveRes },
-        { Opcode::Div, divRes },
-        { Opcode::Rem, divRes },
-        { Opcode::Pow, powRes },
-        { Opcode::LShift, shiftRes },
-        { Opcode::RShift, shiftRes },
-        { Opcode::URShift, shiftRes },
+        { Opcode::Sub, subtractiveRes },
+        { Opcode::Mul, subtractiveRes },
+        { Opcode::Div, subtractiveRes },
+        { Opcode::Rem, subtractiveRes },
+        { Opcode::Pow, subtractiveRes },
+        { Opcode::LShift, bitwiseRes },
+        { Opcode::RShift, bitwiseRes },
+        { Opcode::URShift, bitwiseRes },
         { Opcode::BitAnd, bitwiseRes },
         { Opcode::BitOr, bitwiseRes },
         { Opcode::BitXor, bitwiseRes },
@@ -191,17 +203,18 @@ namespace detail {  // FIXME: check conversions
         { Opcode::Gte, relationalRes },
         { Opcode::Lt, relationalRes },
         { Opcode::Lte, relationalRes },
-        { Opcode::Set, setRes },
+        { Opcode::Set, idRes },
         { Opcode::BoolNot, booleanRes },
-        { Opcode::BitNot, bitwiseRes },
-        { Opcode::UnPlus, additiveRes },
-        { Opcode::UnMinus, additiveRes }
+        { Opcode::BitNot, unBitwiseRes },
+        { Opcode::UnPlus, toNumberRes },
+        { Opcode::UnMinus, toNumberRes }
     };
 
 } // namespace detail
 
 
 inline ValueType resultType(Opcode op, ValueType a, ValueType b) {
+    // FIXME: completely wrong
     return detail::opResults.at(op)(a, b);
 }
 
@@ -212,16 +225,11 @@ inline ValueType commonUpcast(ValueType a, ValueType b) {
     if (detail::anyAny(a, b) || detail::anyObject(a, b)) {
         return ValueType::Any;
     }
-    if (detail::anyFloating(a, b)) {
+    if (a == ValueType::Double || b == ValueType::Double) {
         return ValueType::Double;
     }
     return ValueType::I32;
 }
-
-
-// inline std::vector<ValueType> argTypes(const Operation& op) {
-//     return detail::argTypes.at(op.op)(op);
-// }
 
 
 }  // namespace jac::cfg

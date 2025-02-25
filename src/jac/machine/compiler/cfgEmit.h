@@ -715,9 +715,9 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& f
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Jump::unconditional(condBlock);
-    ifBlock->jump = Jump::unconditional(postBlock);
-    elseBlock->jump = Jump::unconditional(postBlock);
+    preBlock->jump = Terminal::jump(condBlock);
+    ifBlock->jump = Terminal::jump(postBlock);
+    elseBlock->jump = Terminal::jump(postBlock);
 
     // condition block
     func.setActiveBlock(condBlock);
@@ -732,7 +732,7 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& f
 
     RValue resR = giveSimple(res, func);
     emitPushFree(resR, func);
-    condBlock->jump = Jump::conditional(resR, ifBlock, elseBlock);
+    condBlock->jump = Terminal::branch(resR, ifBlock, elseBlock);
 
     // if block
     func.setActiveBlock(ifBlock);
@@ -756,8 +756,8 @@ void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitt
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Jump::unconditional(loopBlock);
-    loopBlock->jump = Jump::unconditional(condBlock);
+    preBlock->jump = Terminal::jump(loopBlock);
+    loopBlock->jump = Terminal::jump(condBlock);
 
     // condition block
     func.setActiveBlock(condBlock);
@@ -772,7 +772,7 @@ void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitt
 
     RValue resR = giveSimple(res, func);
     emitPushFree(resR, func);
-    condBlock->jump = Jump::conditional(resR, loopBlock, postBlock);
+    condBlock->jump = Terminal::branch(resR, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -794,8 +794,8 @@ void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Jump::unconditional(condBlock);
-    loopBlock->jump = Jump::unconditional(condBlock);
+    preBlock->jump = Terminal::jump(condBlock);
+    loopBlock->jump = Terminal::jump(condBlock);
 
     // condition block
     func.setActiveBlock(condBlock);
@@ -810,7 +810,7 @@ void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter
 
     RValue resR = giveSimple(res, func);
     emitPushFree(resR, func);
-    condBlock->jump = Jump::conditional(resR, loopBlock, postBlock);
+    condBlock->jump = Terminal::branch(resR, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -852,10 +852,10 @@ void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& 
     BasicBlockPtr postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Jump::unconditional(initBlock);
-    initBlock->jump = Jump::unconditional(condBlock);
-    loopBlock->jump = Jump::unconditional(updateBlock);
-    updateBlock->jump = Jump::unconditional(condBlock);
+    preBlock->jump = Terminal::jump(initBlock);
+    initBlock->jump = Terminal::jump(condBlock);
+    loopBlock->jump = Terminal::jump(updateBlock);
+    updateBlock->jump = Terminal::jump(condBlock);
 
     auto _ = func.pushScope();
 
@@ -877,10 +877,10 @@ void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& 
 
         RValue resR = giveSimple(res, func);
         emitPushFree(resR, func);
-        condBlock->jump = Jump::conditional(resR, loopBlock, postBlock);
+        condBlock->jump = Terminal::branch(resR, loopBlock, postBlock);
     }
     else {
-        condBlock->jump = Jump::unconditional(loopBlock);
+        condBlock->jump = Terminal::jump(loopBlock);
     }
 
     // update block
@@ -947,14 +947,14 @@ void emit(const ast::BreakableStatement<Yield, Await, Return>& stmt, FunctionEmi
 template<bool Yield, bool Await>
 void emit(const ast::ReturnStatement<Yield, Await>& stmt, FunctionEmitter& func) {
     if (!stmt.expression) {
-        func.getActiveBlock()->jump = Jump::ret();
+        func.getActiveBlock()->jump = Terminal::ret();
         return;
     }
 
     Value arg = { emit(*stmt.expression, func) };
     RValue argR = materialize(arg, func);
 
-    func.getActiveBlock()->jump = Jump::retVal(argR);
+    func.getActiveBlock()->jump = Terminal::retVal(argR);
 }
 
 
@@ -1090,8 +1090,8 @@ FunctionEmitter emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl
 
     emit(*decl.body, out);
 
-    if (out.getActiveBlock()->jump.type == Jump::None) {
-        out.getActiveBlock()->jump = Jump::ret();
+    if (out.getActiveBlock()->jump.type == Terminal::None) {
+        out.getActiveBlock()->jump = Terminal::ret();
     }
 
     return out;

@@ -146,41 +146,41 @@ inline void print(std::ostream& os, const BasicBlock& block, std::set<const Basi
         os << "\\l";
     }
     switch (block.jump.type) {
-        case Jump::None:
+        case Terminal::None:
             os << "|<<none>>";
             break;
-        case Jump::Conditional:
+        case Terminal::Branch:
             os << "|if (_" << block.jump.value->id << ")";
             break;
-        case Jump::Unconditional:
+        case Terminal::Jump:
             break;
-        case Jump::Return:
+        case Terminal::Return:
             os << "|return";
             break;
-        case Jump::ReturnValue:
+        case Terminal::ReturnValue:
             os << "|return _" << block.jump.value->id << "";
             break;
-        case Jump::Throw:
+        case Terminal::Throw:
             os << "|throw _" << block.jump.value->id << "";
             break;
     }
     os << "}\"];\n";
 
     switch (block.jump.type) {
-        case Jump::None:
+        case Terminal::None:
             break;
-        case Jump::Conditional:
+        case Terminal::Branch:
             os << "  block" << &block << " -> block" << block.jump.target << " [label=\"true\"];\n";
             os << "  block" << &block << " -> block" << block.jump.other << " [label=\"false\"];\n";
             break;
-        case Jump::Unconditional:
+        case Terminal::Jump:
             os << "  block" << &block << " -> block" << block.jump.target << ";\n";
             break;
-        case Jump::Return:
+        case Terminal::Return:
             break;
-        case Jump::ReturnValue:
+        case Terminal::ReturnValue:
             break;
-        case Jump::Throw:
+        case Terminal::Throw:
             break;
     }
 

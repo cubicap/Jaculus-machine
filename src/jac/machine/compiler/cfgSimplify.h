@@ -41,10 +41,10 @@ inline void removeEmptyBlocks(FunctionEmitter& emitter) {
         if (!block->statements.empty()) {
             continue;
         }
-        if (block->jump.type == Jump::Unconditional) {
+        if (block->jump.type == Terminal::Jump) {
             replacements[block->jump.target].push_back(block.get());
         }
-        else if (block->jump.type == Jump::Conditional) {
+        else if (block->jump.type == Terminal::Branch) {
             if (block->jump.target == block->jump.other) {
                 replacements[block->jump.target].push_back(block.get());
             }

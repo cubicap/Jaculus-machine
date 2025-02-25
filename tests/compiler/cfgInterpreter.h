@@ -539,10 +539,10 @@ public:
             }
 
             switch (activeBlock->jump.type) {
-                case Jump::Unconditional:
+                case Terminal::Jump:
                     activeBlock = activeBlock->jump.target;
                     break;
-                case Jump::Conditional:
+                case Terminal::Branch:
                     if (std::get<bool>(getReg(activeBlock->jump.value->id))) {
                         activeBlock = activeBlock->jump.target;
                     }
@@ -550,9 +550,9 @@ public:
                         activeBlock = activeBlock->jump.other;
                     }
                     break;
-                case Jump::Return:
+                case Terminal::Return:
                     return JS_UNDEFINED;
-                case Jump::ReturnValue: {
+                case Terminal::ReturnValue: {
                     switch (activeBlock->jump.value->type) {
                         case ValueType::I32:
                             return convert<JSValue>(ctx, convert<int32_t>(ctx, getReg(activeBlock->jump.value->id)));
@@ -578,9 +578,9 @@ public:
                     }
                     abort();
                 }
-                case Jump::Throw:
+                case Terminal::Throw:
                     throw std::runtime_error("Not implemented (throw)");
-                case Jump::None:
+                case Terminal::None:
                     throw std::runtime_error("Invalid jump (None)");
             }
         }
