@@ -3,6 +3,7 @@
 
 #include <list>
 #include <map>
+#include <stack>
 
 #include "cfg.h"
 
@@ -31,10 +32,49 @@ namespace detail {
         }
     }
 
+    inline std::set<BasicBlockPtr> findReachable(BasicBlockPtr entry) {
+        std::set<BasicBlockPtr> seen;
+        std::stack<BasicBlockPtr> stack;
+        stack.push(entry);
+
+        auto push = [&](BasicBlockPtr block) {
+            if (!seen.contains(block)) {
+                stack.push(block);
+            }
+        };
+
+        while (!stack.empty()) {
+            auto block = stack.top();
+            stack.pop();
+            seen.insert(block);
+            if (block->jump.type == Terminal::Branch) {
+                push(block->jump.target);
+                push(block->jump.other);
+            }
+            else if (block->jump.type == Terminal::Jump) {
+                push(block->jump.target);
+            }
+        }
+        return seen;
+    }
+
 }  // namespace detail
 
 
 inline void removeEmptyBlocks(FunctionEmitter& emitter) {
+    {
+        auto reachable = detail::findReachable(emitter.getEntry());
+        for (auto it = emitter.blocks.begin(); it != emitter.blocks.end();) {
+            if (!reachable.contains(it->get())) {
+                assert(it->get()->statements.empty());
+                it = emitter.blocks.erase(it);
+            }
+            else {
+                ++it;
+            }
+        }
+    }
+
     Replacements replacements;
 
     for (auto& block : emitter.blocks) {

@@ -1,5 +1,10 @@
 #pragma once
 
+#include "jac/machine/compiler/opcode.h"
+#include "jac/machine/context.h"
+#include "jac/machine/internal/declarations.h"
+#include "mir.h"
+#include "quickjs.h"
 #include <jac/features/evalFeature.h>
 #include <jac/machine/functionFactory.h>
 #include <jac/machine/machine.h>
@@ -7,27 +12,18 @@
 #include <jac/machine/compiler/ast.h>
 #include <jac/machine/compiler/cfg.h>
 #include <jac/machine/compiler/cfgEmit.h>
+#include <jac/machine/compiler/cfgMir.h>
 #include <jac/machine/compiler/cfgSimplify.h>
 #include <jac/machine/compiler/scanner.h>
 #include <jac/machine/compiler/traverseFuncs.h>
 
-#include <list>
-
-#include "BE/Base/ir.h"
-#include "BE/Base/serialize.h"
-#include "BE/CodeGenX64/codegen.h"
-#include "BE/CodeGenX64/legalize.h"
-#include "BE/CodeGenX64/regs.h"
-#include "BE/CpuX64/assembler.h"
-#include "Util/assert.h"
-#include "Util/assert.h"
-#include "Util/stripe.h"
-#include "jac/machine/compiler/cfgCwerg.h"
+#include <mir-gen.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
+#include <list>
 #include <map>
 #include <sstream>
 #include <stdexcept>
@@ -55,13 +51,17 @@ template<typename Res>
 struct CompiledCallable {
     void* callerPtr;
 
-    Res operator()(std::vector<ValueWeak> args) {
+    Res operator()(ContextRef, ValueWeak, std::vector<ValueWeak> args) {
         std::vector<JSValue> jsArgs;
         for (ValueWeak& arg : args) {
             jsArgs.push_back(arg.getVal());
         }
 
-        if constexpr (std::is_same_v<Res, bool>) {
+        if constexpr (std::is_same_v<Res, void>) {
+            auto fn = reinterpret_cast<void(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
+            fn(jsArgs.size(), jsArgs.data());
+        }
+        else if constexpr (std::is_same_v<Res, bool>) {
             auto fn = reinterpret_cast<int32_t(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
             return fn(jsArgs.size(), jsArgs.data());
         }
@@ -79,6 +79,7 @@ struct CompiledCallable {
 template<class Next>
 class AotEvalFeature : public EvalFeature<Next> {
     std::map<std::string, CompFn> compiledHolder;
+    std::vector<MIR_context_t> mirContexts;
 
     std::string alias(const void* ptr) {
         return "__jac_aot_func_" + std::to_string(reinterpret_cast<uint64_t>(ptr));  // NOLINT
@@ -134,6 +135,8 @@ class AotEvalFeature : public EvalFeature<Next> {
             try {
                 auto sig = signatures.at(astFunc->name->identifier.name.name);
                 auto cfgFuncEm = jac::cfg::emit(*astFunc, sig, signatures);
+                jac::cfg::removeEmptyBlocks(cfgFuncEm);
+
                 auto cfgFunc = cfgFuncEm.output();
                 result.emplace_back(std::move(cfgFunc), astFunc->code);
             }
@@ -192,36 +195,39 @@ class AotEvalFeature : public EvalFeature<Next> {
     std::list<CompFn*> compile(std::list<std::pair<jac::cfg::Function, std::string_view>> cfgFunctions) {
         std::list<CompFn*> results;
 
-        cwerg::base::Unit unit = cwerg::base::UnitNew(cwerg::base::StrNew("jit"));
+        MIR_context_t ctx = MIR_init();
+        MIR_module_t mod = MIR_new_module(ctx, "aot");
+
+        mirContexts.push_back(ctx);
+
+        std::vector<MIR_item_t> funcs;
+
+        std::map<std::string, std::pair<MIR_item_t, MIR_item_t>> prototypes;
         for (auto& [cfgFunc, code] : cfgFunctions) {
-            auto res = jac::cfg::compile(unit, cfgFunc);
-            cwerg::base::FunRenderToAsm(res, &std::cout);
+            auto proto = cfg::mir_emit::getPrototype(ctx, cfgFunc);
+            auto forward = MIR_new_forward(ctx, cfgFunc.name().c_str());
+            prototypes.emplace(cfgFunc.name(), std::make_pair(proto, forward));
         }
 
-        cwerg::code_gen_x64::LegalizeAll(unit, false, nullptr);
-        cwerg::code_gen_x64::RegAllocGlobal(unit, false, nullptr);
-        cwerg::code_gen_x64::RegAllocLocal(unit, false, nullptr);
-
-        cwerg::x64::X64Unit x64unit = cwerg::code_gen_x64::EmitUnitAsBinary(unit);
-        auto textMemory = static_cast<uint32_t*>(mmap(nullptr, 4096, PROT_READ | PROT_WRITE | PROT_EXEC,
-                                                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-
-        x64unit.sec_text->shdr.sh_addr = reinterpret_cast<uint64_t>(textMemory);  // NOLINT
-        memcpy(textMemory, x64unit.sec_text->data->data(), x64unit.sec_text->data->size());
-
-        for (auto& sym : x64unit.symbols) {
-            ASSERT(sym->sym.st_value != ~0U, "undefined symbol " << sym->name);
-            if (sym->section != nullptr) {
-                ASSERT(sym->section->shdr.sh_addr != ~0U,
-                            sym->name << "has bad sec " << *sym->section);
-                sym->sym.st_value += sym->section->shdr.sh_addr;
-                std::cerr << "sym [" << sym->name << "]: 0x" <<   sym->sym.st_value << "\n";
-            }
-        }
-        for (auto& rel : x64unit.relocations) {
-            cwerg::x64::ApplyRelocation(rel);
+        for (auto& [cfgFunc, code] : cfgFunctions) {
+            funcs.push_back(jac::cfg::mir_emit::compile(ctx, prototypes, cfgFunc));
         }
 
+        std::vector<MIR_item_t> callers;
+        for (auto& [cfgFunc, code] : cfgFunctions) {
+            auto proto = prototypes.at(cfgFunc.name()).first;
+            auto fun = prototypes.at(cfgFunc.name()).second;
+            auto caller = jac::cfg::mir_emit::compileCaller(ctx, cfgFunc, fun, proto);
+            callers.push_back(caller);
+        }
+
+        MIR_finish_module(ctx);
+        MIR_load_module(ctx, mod);
+
+        MIR_gen_init(ctx, 1);
+        MIR_link(ctx, MIR_set_interp_interface, nullptr);
+
+        size_t i = 0;
         for (auto& [cfgFunc, code] : cfgFunctions) {
             auto aliasName = alias(cfgFunc.entry);
             auto name = cfgFunc.name();
@@ -229,16 +235,35 @@ class AotEvalFeature : public EvalFeature<Next> {
 
             auto [it, _] = compiledHolder.emplace(name, std::move(compFn));
 
-            // TODO: add caller converting args from array
-            auto jsFn = detail::CompiledCallable<int32_t>{ ??? };  // NOLINT
+            MIR_gen(ctx, 0, funcs[i]);
+            void* ptr = MIR_gen(ctx, 0, callers[i]);
+            i++;
 
             FunctionFactory ff(this->context());
-            Function jsFnObj = ff.newFunctionThisVariadic(jsFn);
+            Value jsFnObj = Value::undefined(this->context());
+            auto getObj = [&]<typename T>(T) {
+                auto jsFn = detail::CompiledCallable<T>{ ptr };
+                return ff.newFunctionThisVariadic(jsFn);
+            };
+            switch (cfgFunc.ret) {
+                case jac::cfg::ValueType::I32:    jsFnObj = getObj(int32_t{}); break;
+                case jac::cfg::ValueType::Bool:   jsFnObj = getObj(bool{});    break;
+                case jac::cfg::ValueType::Double: jsFnObj = getObj(double{});  break;
+                case jac::cfg::ValueType::Void: {
+                    auto jsFn = detail::CompiledCallable<void>{ ptr };
+                    jsFnObj = ff.newFunctionThisVariadic(jsFn);
+                    break;
+                } break;
+                default:
+                    throw std::runtime_error("Unsupported return type");
+            }
 
-            it->second.jsFn = jsFnObj;
+            it->second.jsFn = jsFnObj.to<Function>();
 
             results.push_back(&it->second);
         }
+
+        MIR_gen_finish(ctx);
 
         return results;
     }
@@ -270,14 +295,6 @@ class AotEvalFeature : public EvalFeature<Next> {
         return newJS;
     }
 public:
-    AotEvalFeature(): EvalFeature<Next>() {
-        static bool initialized = false;
-        if (!initialized) {
-            cwerg::InitStripes(10);  // FIXME: reset, reinitialize
-            cwerg::code_gen_x64::InitCodeGenX64();
-            initialized = true;
-        }
-    }
 
     /**
      * @brief Evaluate a string containing javascript code, while compiling some
@@ -291,7 +308,6 @@ public:
     Value eval(std::string code, std::string filename, EvalFlags flags = EvalFlags::Global) {
         try {
             code = tryAot(code, filename, flags);
-            std::cout << code << '\n';
         }
         catch (std::exception& e) {
             std::cerr << "Error during AOT compilation: " << e.what() << '\n';
@@ -299,6 +315,12 @@ public:
         }
 
         return EvalFeature<Next>::eval(std::move(code), filename, flags);
+    }
+
+    ~AotEvalFeature() {
+        for (auto& ctx : mirContexts) {
+            MIR_finish(ctx);
+        }
     }
 };
 

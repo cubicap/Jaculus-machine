@@ -32,11 +32,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(QuickJS)
 
 FetchContent_Declare(
-    Cwerg
-    URL               https://github.com/robertmuth/Cwerg/archive/b36921f76d61c93a2836073e6110dcd118627a12.tar.gz
+    MIR
+    URL               https://github.com/vnmakarov/mir/archive/refs/tags/v0.1.2.tar.gz
+    CMAKE_ARGS        -D
 )
-FetchContent_MakeAvailable(Cwerg)
-set(CWERG_DIR ${cwerg_SOURCE_DIR})
+FetchContent_MakeAvailable(MIR)
+set(MIR_INCLUDE_DIR ${mir_SOURCE_DIR}/include)
 
 
 if(ESP_PLATFORM)
@@ -44,9 +45,9 @@ if(ESP_PLATFORM)
 else()
 
     add_library(jac-machine STATIC ${JAC_MACHINE_SRC})
-    target_include_directories(jac-machine PUBLIC . ${CWERG_DIR})
+    target_include_directories(jac-machine PUBLIC . ${mir_SOURCE_DIR})
     set_target_properties(jac-machine PROPERTIES LINKER_LANGUAGE CXX)
-    target_link_libraries(jac-machine PUBLIC quickjs UTIL_LIB BASE_LIB CODEGENX64_LIB CPUX64_LIB ELF_LIB)
+    target_link_libraries(jac-machine PUBLIC quickjs mir)
     target_compile_options(jac-machine PRIVATE -Wall -Wold-style-cast -Wshadow)
 
 

@@ -2,6 +2,8 @@
 
 #include "ast.h"
 #include "cfg.h"
+#include "opcode.h"
+
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -64,13 +66,14 @@ const std::unordered_map<std::string_view, ValueType> types = {
     { "Float", ValueType::Double },
     { "Bool", ValueType::Bool },
     { "Object", ValueType::Object },
+    { "Void", ValueType::Void },
     { "any", ValueType::Any }
 };
 
 inline ValueType getType(std::string_view name) {
     auto it = types.find(name);
     if (it == types.end()) {
-        throw std::runtime_error("Invalid type");
+        throw std::runtime_error("Invalid type literal");
     }
     return it->second;
 }
@@ -181,6 +184,19 @@ inline RValue giveSimple(LVRef lv, FunctionEmitter&) {
     return { lv.type, lv.id };
 }
 
+inline RValue emitCast(RValue val, ValueType type, FunctionEmitter& func) {
+    if (val.type == type) {
+        return val;
+    }
+    LVRef res = LVRef::direct(type, getTmpId(), false);
+    func.emitStatement({Operation{
+        .op = Opcode::Set,
+        .a = val,
+        .res = res
+    }});
+    return giveSimple(res, func);
+}
+
 inline RValue materialize(LVRef lv, FunctionEmitter& func) {
     if (!lv.isMember()) {
         auto v = RValue{ lv.type, lv.id };
@@ -188,6 +204,7 @@ inline RValue materialize(LVRef lv, FunctionEmitter& func) {
         return v;
     }
 
+    // TODO: solve conversion of parent/accessor types
     LVRef res = LVRef::direct(ValueType::Any, getTmpId(), false);
     func.emitStatement({Operation{
         .op = Opcode::GetMember,
@@ -531,15 +548,28 @@ template<bool In, bool Yield, bool Await>
             RValue ropR = materialize(rop, func);
             emitPushFree(ropR, func);
 
-            LVRef res = LVRef::direct(resultType(op, lopR.type, ropR.type), getTmpId(), false);
+            ValueType resType = resultType(op, lopR.type, ropR.type);
+            LVRef res = LVRef::direct(resType, getTmpId(), false);
+
+            RValue lopRType;
+            RValue ropRType;
+
+            if (isArithmetic(op) || isBitwise(op)) {
+                lopRType = emitCast(lopR, resType, func);
+                ropRType = emitCast(ropR, resType, func);
+            }
+            else {
+                ValueType commonType = commonUpcast(lopR.type, ropR.type);
+                lopRType = emitCast(lopR, commonType, func);
+                ropRType = emitCast(ropR, commonType, func);
+            }
 
             func.emitStatement({Operation{
                 .op = op,
-                .a = lopR,
-                .b = ropR,
+                .a = lopRType,
+                .b = ropRType,
                 .res = res
             }});
-
             return { giveSimple(res, func) };
         }
         Value operator()(const ast::UnaryExpression<Yield, Await>& unary) {

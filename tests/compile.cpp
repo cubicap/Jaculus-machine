@@ -410,11 +410,11 @@ TEST_CASE("Types", "[aot]") {
                 return;
             }
 
-            fun();
+            report(fun());
         )");
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
-        REQUIRE(machine.getReports() == std::vector<std::string>{"false", "true"});
+        REQUIRE(machine.getReports() == std::vector<std::string>{"undefined"});
     }
 
     SECTION("Mixed") {

@@ -141,6 +141,19 @@ struct Statement {  // FIXME: rename, unify
     Call& asCall() {
         return std::get<Call>(op);
     }
+
+    RValue res() {
+        if (auto op_ = std::get_if<Operation>(&op)) {
+            return { op_->res.type, op_->res.id };
+        }
+        else if (auto call = std::get_if<Call>(&op)) {
+            return call->res;
+        }
+        else if (auto init = std::get_if<ConstInit>(&op)) {
+            return { init->type(), init->id };
+        }
+        assert(false);
+    }
 };
 
 struct BasicBlock;

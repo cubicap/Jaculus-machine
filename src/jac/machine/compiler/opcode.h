@@ -18,7 +18,7 @@ enum class ValueType {  // XXX: replace Void with undefined?
     Any
 };
 
-inline  bool isNumeric(ValueType type) {
+inline bool isNumeric(ValueType type) {
     switch (type) {
         case ValueType::Void:
             assert(false);
@@ -66,39 +66,51 @@ inline ValueType toPrimitive(ValueType type) {  // XXX: not by spec
 
 enum class Opcode {
     // Binary
-    Add = 1,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Pow,
-    LShift,
-    RShift,
-    URShift,
-    BitAnd,
-    BitOr,
-    BitXor,
-    Eq,
-    Neq,
-    Gt,
-    Gte,
-    Lt,
-    Lte,
-    GetMember,
+    Add = 1,    // a a -> a
+    Sub,        // a a -> a
+    Mul,        // a a -> a
+    Div,        // a a -> a
+    Rem,        // a a -> a
+    Pow,        // a a -> a
+    LShift,     // Int32 Int32 -> Int32
+    RShift,     // Int32 Int32 -> Int32
+    URShift,    // Int32 Int32 -> Int32
+    BitAnd,     // Int32 Int32 -> Int32
+    BitOr,      // Int32 Int32 -> Int32
+    BitXor,     // Int32 Int32 -> Int32
+    Eq,         // a a -> Bool
+    Neq,        // a a -> Bool
+    Gt,         // a a -> Bool
+    Gte,        // a a -> Bool
+    Lt,         // a a -> Bool
+    Lte,        // a a -> Bool
+    GetMember,  // Any a -> Any
 
     // Unary
-    Set,  // TODO: must support type conversion
-    BoolNot,
-    BitNot,
-    UnPlus,
-    UnMinus,
-    Dup,
-    PushFree
+    Set,        // a -> b   // FIXME: rework
+    BoolNot,    // a -> Bool
+    BitNot,     // Int32 -> Int32
+    UnPlus,     // a -> Number
+    UnMinus,    // a -> a
+    Dup,        // a -> void
+    PushFree    // a -> void
 };
 constexpr Opcode MIN_UNARY_OP = Opcode::Set;
 
 inline bool isBinary(Opcode op) {
     return op < MIN_UNARY_OP;
+}
+
+inline bool isArithmetic(Opcode op) {
+    return op >= Opcode::Add && op <= Opcode::Pow;
+}
+
+inline bool isBitwise(Opcode op) {
+    return op >= Opcode::LShift && op <= Opcode::BitXor;
+}
+
+inline bool isComparison(Opcode op) {
+    return op >= Opcode::Eq && op <= Opcode::Lte;
 }
 
 inline bool hasResult(Opcode op) {

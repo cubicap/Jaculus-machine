@@ -131,12 +131,16 @@ inline void print(std::ostream& os, const Statement& statement) {
 }
 
 
-inline void print(std::ostream& os, const BasicBlock& block, std::set<const BasicBlock*>& seen) {
+inline void print(std::ostream& os, const BasicBlock& block, std::set<const BasicBlock*>& seen, bool isEntry = false) {
     if (seen.contains(&block)) {
         return;
     }
     seen.insert(&block);
-    os << "  block" << &block << " [label=\"{" << &block;
+    os << "  block" << &block << " [label=\"{";
+    if (isEntry) {
+        os << "*";
+    }
+    os << &block;
     if (!block.statements.empty()) {
         os << "|";
     }
@@ -184,12 +188,12 @@ inline void print(std::ostream& os, const BasicBlock& block, std::set<const Basi
             break;
     }
 
-    if (block.jump.target) {
-        print(os, *block.jump.target, seen);
-    }
-    if (block.jump.other) {
-        print(os, *block.jump.other, seen);
-    }
+    // if (block.jump.target) {
+    //     print(os, *block.jump.target, seen);
+    // }
+    // if (block.jump.other) {
+    //     print(os, *block.jump.other, seen);
+    // }
 }
 
 inline void print(std::ostream& os, const FunctionEmitter& emitter) {
@@ -198,7 +202,10 @@ inline void print(std::ostream& os, const FunctionEmitter& emitter) {
     os << "digraph {\n";
     os << "  node [shape=record fontname=\"consolas\"];\n";
     os << "  edge [fontname=\"consolas\"];\n";
-    print(os, *emitter.getEntry(), seen);
+    print(os, *emitter.getEntry(), seen, true);
+    for (auto& block : emitter.blocks) {
+        print(os, *block, seen);
+    }
     os << "}\n";
 }
 
