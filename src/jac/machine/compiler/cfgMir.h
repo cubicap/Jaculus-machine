@@ -1,11 +1,16 @@
 #pragma once
 
 #include "cfg.h"
+#include "stackAllocator.h"
+#include "mirUtil.h"
+#include "mirBuiltins.h"
 #include "opcode.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 
+#include <jac/util.h>
 #include <mir.h>
 #include <quickjs.h>
 
@@ -13,17 +18,29 @@
 namespace jac::cfg::mir_emit {
 
 
-inline MIR_type_t getMIRType(ValueType type) {
+inline std::pair<MIR_type_t, size_t> getMIRArgType(ValueType type) {
     switch (type) {
         case ValueType::I32:
-            return MIR_T_I32;
+            return { MIR_T_I32, 0 };
         case ValueType::Double:
-            return MIR_T_D;
+            return { MIR_T_D, 0 };
         case ValueType::Bool:
-            return MIR_T_I32;
+            return { MIR_T_I32, 0 };
+        case ValueType::Object:
+            return { MIR_T_P, 0 };
+        case ValueType::String:
+            return { MIR_T_P, 0 };
+        case ValueType::Any:
+            return { MIR_type_t(MIR_T_BLK + 1), sizeof(JSValue) };
         default:
             throw std::runtime_error("Invalid MIR type");
     }
+}
+
+inline MIR_type_t getMIRRetType(ValueType type) {
+    auto [mirType, size] = getMIRArgType(type);
+    assert(!MIR_all_blk_type_p(mirType));
+    return mirType;
 }
 
 inline MIR_type_t getMIRRegType(ValueType type) {
@@ -190,17 +207,35 @@ inline MIR_insn_code_t chooseConversion(ValueType from, ValueType to) {
 }
 
 
+inline bool hasRetArg(Function& cfg) {
+    return cfg.ret == ValueType::Any;
+}
+
+
 // output arguments to prevent relocation of the strings
 inline void getArgs(Function& cfg, std::vector<std::string>& arg_names, std::vector<MIR_var_t>& args) {
-    arg_names.reserve(cfg.args.size());
-    args.reserve(cfg.args.size());
+    bool retArg = hasRetArg(cfg);
+
+    arg_names.reserve(cfg.args.size() + retArg);
+    args.reserve(cfg.args.size() + retArg);
     for (const auto& arg : cfg.args) {
-        arg_names.push_back(name(arg.id));
+        arg_names.emplace_back(name(arg.id));
+        auto [type, size] = getMIRArgType(arg.type);
         MIR_var_t var = {
-            .type = getMIRType(arg.type),
+            .type = type,
+            .name = arg_names.back().c_str(),
+            .size = size
+        };
+        args.emplace_back(var);
+    }
+
+    if (retArg) {
+        arg_names.emplace_back("res");
+        MIR_var_t var = {
+            .type = MIR_T_P,
             .name = arg_names.back().c_str()
         };
-        args.push_back(var);
+        args.emplace_back(var);
     }
 }
 
@@ -212,17 +247,23 @@ inline MIR_item_t getPrototype(MIR_context_t ctx, Function& cfg) {
 
     std::string name = "_proto_" + cfg.name();
 
-    if (cfg.ret == ValueType::Void) {
+    if (cfg.ret == ValueType::Void || hasRetArg(cfg)) {
         return MIR_new_proto_arr(ctx, name.c_str(), 0, nullptr, args.size(), args.data());
     }
-    MIR_type_t resType = getMIRType(cfg.ret);
-    return MIR_new_proto_arr(ctx, name.c_str(), 1, &resType, args.size(), args.data());
+    auto retType = getMIRRetType(cfg.ret);
+    return MIR_new_proto_arr(ctx, name.c_str(), 1, &retType, args.size(), args.data());
 }
 
 
-inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_item_t, MIR_item_t>>& prototypes, Function& cfg) {
+inline bool isRegType(ValueType type) {
+    return type != ValueType::Any && type != ValueType::Void;
+}
+
+
+inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_item_t, MIR_item_t>>& prototypes, Function& cfg, Builtins& builtins) {
     std::map<TmpId, MIR_reg_t> regs;  // TODO: deduplicate information in MIR
     std::map<BasicBlockPtr, MIR_label_t> labels;
+    std::map<TmpId, int> stackSlots = allocateStackSlots(cfg);
 
     MIR_item_t fun;
     MIR_func_t func;
@@ -232,20 +273,27 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
         std::vector<MIR_var_t> args;
         getArgs(cfg, arg_names, args);
 
-        if (cfg.ret == ValueType::Void) {
+        if (cfg.ret == ValueType::Void || hasRetArg(cfg)) {
             fun = MIR_new_func_arr(ctx, cfg.name().c_str(), 0, nullptr, args.size(), args.data());
         }
         else {
-            MIR_type_t resType = getMIRType(cfg.ret);
-            fun = MIR_new_func_arr(ctx, cfg.name().c_str(), 1, &resType, args.size(), args.data());
+            auto retType = getMIRRetType(cfg.ret);
+            fun = MIR_new_func_arr(ctx, cfg.name().c_str(), 1, &retType, args.size(), args.data());
         }
 
         func = MIR_get_item_func(ctx, fun);
 
-        for (size_t i = 0; i < args.size(); ++i) {
+        for (size_t i = 0; i < cfg.args.size(); ++i) {
             regs.emplace(cfg.args[i].id, MIR_reg(ctx, args[i].name, func));
         }
     }
+
+    Defer d ([&] {
+        MIR_finish_func(ctx);
+    });
+
+    MIR_reg_t allocaPtr = MIR_new_func_reg(ctx, func, MIR_T_I64, "allocaPtr");
+    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ALLOCA, MIR_new_reg_op(ctx, allocaPtr), MIR_new_int_op(ctx, sizeof(JSValue) * stackSlots.size())));
 
     auto label = [&](BasicBlockPtr block) {
         auto it = labels.find(block);
@@ -254,6 +302,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
         }
         return it->second;
     };
+
     auto labelOp = [&](BasicBlockPtr block) {
         return MIR_new_label_op(ctx, label(block));
     };
@@ -269,15 +318,41 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
         return MIR_new_reg_op(ctx, it->second);
     };
 
+    auto calcOff = [&](MIR_reg_t base, int off, size_t size) {
+        auto addr = MIR_new_func_reg(ctx, func, MIR_T_I64, ("_addr" + std::to_string(getId())).c_str());
+        MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, addr), MIR_new_reg_op(ctx, base), MIR_new_int_op(ctx, off * size)));
+        return addr;
+    };
+
+    auto jsValAddr = [&](TmpId id) -> MIR_reg_t{
+        auto it = stackSlots.find(id);
+        if (it == stackSlots.end()) {
+            return regs.at(id);
+        }
+        return calcOff(allocaPtr, it->second, sizeof(JSValue));
+    };
+
+    auto insert = [&](MIR_insn_t insn) {
+        MIR_append_insn(ctx, fun, insn);
+    };
+
+    auto copyJSVal = [&](MIR_reg_t srcAddr, MIR_reg_t dstAddr) {
+        static_assert(sizeof(JSValue) == 2 * sizeof(int64_t));
+
+        auto srcL = MIR_new_mem_op(ctx, MIR_T_I64, 0,               srcAddr, 0, 0);
+        auto srcH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), srcAddr, 0, 0);
+        auto dstL = MIR_new_mem_op(ctx, MIR_T_I64, 0,               dstAddr, 0, 0);
+        auto dstH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), dstAddr, 0, 0);
+        insert(MIR_new_insn(ctx, MIR_MOV, dstL, srcL));
+        insert(MIR_new_insn(ctx, MIR_MOV, dstH, srcH));
+    };
+
     for (auto& block : cfg.blocks) {
         MIR_append_insn(ctx, fun, label(block.get()));
-        auto insert = [&](MIR_insn_t insn) {
-            MIR_append_insn(ctx, fun, insn);
-        };
 
         for (auto statement : block->statements) {
             if (auto op = std::get_if<Operation>(&statement.op)) {
-                if (op->res.type != ValueType::Void) {
+                if (isRegType(op->res.type)) {
                     regOp(op->res.id, op->res.type);
                 }
                 switch (op->op) {
@@ -305,10 +380,24 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                         throw std::runtime_error("GetMember is not supported");
 
                     // Unary
-                    case Opcode::Set:  case Opcode::UnPlus: {
+                    case Opcode::Set: {
+                        if (op->a.type == ValueType::Any && op->res.type == ValueType::Any) {
+                            auto baseSrc = jsValAddr(op->a.id);
+                            auto baseDst = jsValAddr(op->res.id);
+                            copyJSVal(baseSrc, baseDst);
+                            break;
+                        }
+                        else if (op->a.type == ValueType::Any) {
+                            throw std::runtime_error("Set Any to non-Any is not supported");
+                        }
+                        else if (op->res.type == ValueType::Any) {
+                            throw std::runtime_error("Set non-Any to Any is not supported");
+                        }
                         insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
-
                     } break;
+                    case Opcode::UnPlus:
+                        insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
+                        break;
                     case Opcode::BoolNot: {
                         switch (op->a.type) {
                             case ValueType::I32:  case ValueType::Bool:
@@ -334,9 +423,19 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                             regOp(op->res.id), regOp(op->a.id)));
                     } break;
                     case Opcode::Dup:
+                        if (op->a.type == ValueType::Any) {
+                            insertCallJV(ctx, fun, builtins.jvProto, builtins.rtCtx, builtins.dup, jsValAddr(op->a.id), 0);
+                        }
+                        else if (!isNumeric(op->a.type)) {
+                            throw std::runtime_error("Dup is not fully supported");
+                        }
+                        break;
                     case Opcode::PushFree:
-                        if (!isNumeric(op->a.type)) {
-                            throw std::runtime_error("Dup/PushFree is not supported");
+                        if (op->a.type == ValueType::Any) {
+                            insertCallJV(ctx, fun, builtins.jvProto, builtins.rtCtx,builtins.free, jsValAddr(op->a.id), 0);  // FIXME: not immediately - push to stack
+                        }
+                        else if (!isNumeric(op->a.type)) {
+                            throw std::runtime_error("PushFree is not fully supported");
                         }
                         break;
                     default:
@@ -396,17 +495,25 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
             case Terminal::Return:
                 insert(MIR_new_ret_insn(ctx, 0));
                 break;
-            case Terminal::ReturnValue: {
-                insert(MIR_new_ret_insn(ctx, 1, regOp(block->jump.value->id)));
-            } break;
+            case Terminal::ReturnValue:
+                if (hasRetArg(cfg)) {
+                    auto res = block->jump.value;
+                    assert(res->type == cfg.ret);
+                    auto addr = jsValAddr(res->id);
+                    auto resReg = MIR_reg(ctx, "res", func);
+                    copyJSVal(addr, resReg);
+                    insert(MIR_new_ret_insn(ctx, 0));
+                }
+                else {
+                    insert(MIR_new_ret_insn(ctx, 1, regOp(block->jump.value->id)));
+                }
+                break;
             case Terminal::Throw:
                 throw std::runtime_error("Throw is not supported");
             default:
                 std::cout << "Jump type not implemented: " << static_cast<int>(block->jump.type) << std::endl;
         }
     }
-
-    MIR_finish_func(ctx);
 
     return fun;
 }
@@ -420,13 +527,17 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
         { .type = MIR_T_P, .name = "argv" }
     };
 
+    if (hasRetArg(cfg)) {
+        args.push_back({ .type = MIR_T_P, .name = "res" });
+    }
+
     MIR_item_t caller;
-    if (cfg.ret != ValueType::Void) {
-        MIR_type_t resType = getMIRType(cfg.ret);
-        caller = MIR_new_func_arr(ctx, callerName.c_str(), 1, &resType, args.size(), args.data());
+    if (cfg.ret == ValueType::Void || hasRetArg(cfg)) {
+        caller = MIR_new_func_arr(ctx, callerName.c_str(), 0, nullptr, args.size(), args.data());
     }
     else {
-        caller = MIR_new_func_arr(ctx, callerName.c_str(), 0, nullptr, args.size(), args.data());
+        auto retType = getMIRRetType(cfg.ret);
+        caller = MIR_new_func_arr(ctx, callerName.c_str(), 1, &retType, args.size(), args.data());
     }
     auto callerFunc = MIR_get_item_func(ctx, caller);
 
@@ -438,7 +549,7 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
     insert(entry);
     MIR_label_t fail = MIR_new_label(ctx);
 
-    std::vector<MIR_reg_t> regs;
+    std::vector<MIR_op_t> argOps;
     MIR_reg_t argcReg = MIR_reg(ctx, "argc", callerFunc);
     MIR_reg_t argvReg = MIR_reg(ctx, "argv", callerFunc);
     MIR_reg_t posReg;
@@ -449,24 +560,34 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
 
     insert(MIR_new_insn(ctx, MIR_BGT, MIR_new_label_op(ctx, fail), MIR_new_reg_op(ctx, argcReg), MIR_new_int_op(ctx, cfg.args.size())));
 
-    regs.reserve(cfg.args.size());
+    argOps.reserve(cfg.args.size());
     for (size_t i = 0; i < cfg.args.size(); ++i) {
         auto& arg = cfg.args[i];
-        std::string name = "_arg" + std::to_string(i);
-        regs.push_back(MIR_new_func_reg(ctx, callerFunc, getMIRRegType(arg.type), name.c_str()));
 
+        std::string name = "_arg" + std::to_string(i);
         insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, posReg), MIR_new_int_op(ctx, i)));
 
         static constexpr size_t argOffset = sizeof(JSValue);
 
         switch (arg.type) {
             case ValueType::I32:
-            case ValueType::Bool:
-                insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, regs.back()), MIR_new_mem_op(ctx, getMIRType(arg.type), 0, argvReg, posReg, argOffset)));
-                break;
-            case ValueType::Double:
-                insert(MIR_new_insn(ctx, MIR_DMOV, MIR_new_reg_op(ctx, regs.back()), MIR_new_mem_op(ctx, getMIRType(arg.type), 0, argvReg, posReg, argOffset)));
-                break;
+            case ValueType::Bool: {
+                auto reg = MIR_new_func_reg(ctx, callerFunc, getMIRRegType(arg.type), name.c_str());
+                insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, reg), MIR_new_mem_op(ctx, getMIRRegType(arg.type), 0, argvReg, posReg, argOffset)));
+                argOps.push_back(MIR_new_reg_op(ctx, reg));
+            } break;
+            case ValueType::Double: {
+                auto reg = MIR_new_func_reg(ctx, callerFunc, getMIRRegType(arg.type), name.c_str());
+                insert(MIR_new_insn(ctx, MIR_DMOV, MIR_new_reg_op(ctx, reg), MIR_new_mem_op(ctx, getMIRRegType(arg.type), 0, argvReg, posReg, argOffset)));
+                argOps.push_back(MIR_new_reg_op(ctx, reg));
+            } break;
+            case ValueType::Any: {
+                auto addr = MIR_new_func_reg(ctx, callerFunc, MIR_T_I64, name.c_str());
+                insert(MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, addr), MIR_new_reg_op(ctx, argvReg), MIR_new_int_op(ctx, argOffset * i)));
+                auto [type, size] = getMIRArgType(ValueType::Any);
+                auto op = MIR_new_mem_op(ctx, type, size, addr, 0, 0);
+                argOps.push_back(op);
+            } break;
             default:
                 throw std::runtime_error("Invalid arg type");
         }
@@ -476,17 +597,20 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
     callArgs.push_back(MIR_new_ref_op(ctx, proto));
     callArgs.push_back(MIR_new_ref_op(ctx, fun));
     MIR_reg_t resReg;
-    if (cfg.ret != ValueType::Void) {
+    if (cfg.ret != ValueType::Void && !hasRetArg(cfg)) {
         std::string name = "res";
         resReg = MIR_new_func_reg(ctx, callerFunc, getMIRRegType(cfg.ret), name.c_str());
         callArgs.push_back(MIR_new_reg_op(ctx, resReg));
     }
-    for (auto& reg : regs) {
-        callArgs.push_back(MIR_new_reg_op(ctx, reg));
+    for (auto& op : argOps) {
+        callArgs.push_back(op);
+    }
+    if (hasRetArg(cfg)) {
+        callArgs.push_back(MIR_new_reg_op(ctx, MIR_reg(ctx, "res", callerFunc)));
     }
     insert(MIR_new_insn_arr(ctx, MIR_CALL, callArgs.size(), callArgs.data()));
 
-    if (cfg.ret != ValueType::Void) {
+    if (cfg.ret != ValueType::Void && !hasRetArg(cfg)) {
         insert(MIR_new_ret_insn(ctx, 1, MIR_new_reg_op(ctx, resReg)));
     }
 
@@ -500,6 +624,7 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
             insert(MIR_new_ret_insn(ctx, 1, MIR_new_double_op(ctx, 0)));
             break;
         case ValueType::Void:
+        case ValueType::Any:
             insert(MIR_new_ret_insn(ctx, 0));
             break;
         default:

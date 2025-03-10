@@ -283,7 +283,5 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
         auto res = jac::Value(machine.context(), result);
         REQUIRE(res.to<int>() == 42);
-
-        std::cout << "DONE" << std::endl;
     }
 }

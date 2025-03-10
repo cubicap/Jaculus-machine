@@ -439,7 +439,7 @@ TEST_CASE("Types", "[aot]") {
 }
 
 
-TEST_CASE("Object", "[aot]") {
+TEST_CASE("Any", "[aot]") {
     using Machine = jac::ComposeMachine<
         jac::MachineBase,
         jac::AotEvalFeature,
@@ -448,17 +448,41 @@ TEST_CASE("Object", "[aot]") {
 
     Machine machine;
 
-    SECTION("Get") {
+    SECTION("Copy") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Object): Int32 {
-                return a.b;
+            function fun(a: any): any {
+                let b: any = a;
+                return b;
             }
 
-            report(fun(o));
+            let o = new Object();
+            o.x = 1234;
+            report(fun(o).x);
         )");
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"1234"});
+    }
+
+    SECTION("Copy multiple") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: any, b: any): any {
+                let c: any = a;
+                let d: any = b;
+
+                return d;
+            }
+
+            let o = new Object();
+            o.x = 1234;
+            let p = new Object();
+            p.x = 5678;
+            report(fun(o, p).x);
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"5678"});
     }
 }

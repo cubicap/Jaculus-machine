@@ -119,22 +119,6 @@ const std::optional<Identifier> memberGetIdentifier(const ast::MemberExpression<
 }
 
 
-[[nodiscard]] inline RValue emitConst(auto value, FunctionEmitter& func) {
-    TmpId id = getTmpId();
-    ConstInit init = ConstInit{
-        .id = id,
-        .value = value
-    };
-    func.emitStatement(init);
-    return RValue{ init.type(), id };
-}
-
-[[nodiscard]] inline RValue emit(const ast::NumericLiteral& lit, FunctionEmitter &func) {
-    return std::visit([&func](auto value) {
-        return emitConst(value, func);
-    }, lit.value);
-}
-
 inline void emitDup(RValue val, FunctionEmitter& func) {
     func.emitStatement({Operation{
         .op = Opcode::Dup,
@@ -155,6 +139,22 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
     }
 }
 
+[[nodiscard]] inline RValue emitConst(auto value, FunctionEmitter& func) {
+    TmpId id = getTmpId();
+    ConstInit init = ConstInit{
+        .id = id,
+        .value = value
+    };
+    func.emitStatement(init);
+    emitPushFree(RValue{ init.type(), id }, func);
+    return RValue{ init.type(), id };
+}
+
+[[nodiscard]] inline RValue emit(const ast::NumericLiteral& lit, FunctionEmitter &func) {
+    return std::visit([&func](auto value) {
+        return emitConst(value, func);
+    }, lit.value);
+}
 
 [[nodiscard]] inline RValue emit(const ast::Literal& lit, FunctionEmitter &func) {
     struct visitor {

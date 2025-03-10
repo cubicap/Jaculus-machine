@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include <jac/machine/compiler/cfg.h>
+#include <jac/util.h>
 #include <quickjs.h>
 
 #include "types.h"
@@ -287,7 +288,7 @@ class CFGInterpreter {
     }
 
     void evalDup(JSContext* ctx, const Operation& op) {
-        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool) {
+        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool || op.a.type == ValueType::String) {
             return;  // no op
         }
         if (op.a.type == ValueType::Any || op.a.type == ValueType::Object) {
@@ -299,7 +300,7 @@ class CFGInterpreter {
     }
 
     void evalPushFree(JSContext* ctx, const Operation& op) {
-        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool) {
+        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool || op.a.type == ValueType::String) {
             return;  // no op
         }
         if (op.a.type == ValueType::Any || op.a.type == ValueType::Object) {
@@ -495,16 +496,11 @@ public:
         registers.clear();
         freeStack.clear();
 
-        struct Deferrer {
-            std::vector<JSValue>& stack;
-            JSContext* ctx;
-
-            ~Deferrer() {
-                for (auto& val : stack) {
-                    JS_FreeValue(ctx, val);
-                }
+        Defer d([&] {
+            for (auto& val : freeStack) {
+                JS_FreeValue(ctx, val);
             }
-        } deferrer(freeStack);
+        });
 
         for (size_t i = 0; i < func.args.size(); i++) {
             if (i >= static_cast<size_t>(argc)) {
@@ -526,6 +522,9 @@ public:
                 } break;
                 case ValueType::Object: {
                     setReg(func.args[i].id, ObjectPtr{ JS_VALUE_GET_PTR(argv[i]) });
+                } break;
+                case ValueType::Any: {
+                    setReg(func.args[i].id, argv[i]);
                 } break;
                 default:
                     throw std::runtime_error("Not implemented (arg type)");

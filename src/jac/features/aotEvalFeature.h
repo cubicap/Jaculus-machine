@@ -1,13 +1,12 @@
 #pragma once
 
-#include "jac/machine/compiler/opcode.h"
-#include "jac/machine/context.h"
-#include "jac/machine/internal/declarations.h"
-#include "mir.h"
-#include "quickjs.h"
 #include <jac/features/evalFeature.h>
+#include <jac/machine/compiler/opcode.h>
+#include <jac/machine/context.h>
 #include <jac/machine/functionFactory.h>
+#include <jac/machine/internal/declarations.h>
 #include <jac/machine/machine.h>
+#include <jac/util.h>
 
 #include <jac/machine/compiler/ast.h>
 #include <jac/machine/compiler/cfg.h>
@@ -18,6 +17,8 @@
 #include <jac/machine/compiler/traverseFuncs.h>
 
 #include <mir-gen.h>
+#include <mir.h>
+#include <quickjs.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -51,7 +52,7 @@ template<typename Res>
 struct CompiledCallable {
     void* callerPtr;
 
-    Res operator()(ContextRef, ValueWeak, std::vector<ValueWeak> args) {
+    Res operator()(ContextRef ctx, ValueWeak, std::vector<ValueWeak> args) {
         std::vector<JSValue> jsArgs;
         for (ValueWeak& arg : args) {
             jsArgs.push_back(arg.getVal());
@@ -64,6 +65,12 @@ struct CompiledCallable {
         else if constexpr (std::is_same_v<Res, bool>) {
             auto fn = reinterpret_cast<int32_t(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
             return fn(jsArgs.size(), jsArgs.data());
+        }
+        else if constexpr (std::is_same_v<Res, Value>) {
+            auto fn = reinterpret_cast<JSValue(*)(int64_t, JSValue*, JSValue*)>(callerPtr); // NOLINT
+            JSValue res;
+            fn(jsArgs.size(), jsArgs.data(), &res);
+            return Value(ctx, res);
         }
         else {
             auto fn = reinterpret_cast<Res(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
@@ -80,6 +87,8 @@ template<class Next>
 class AotEvalFeature : public EvalFeature<Next> {
     std::map<std::string, CompFn> compiledHolder;
     std::vector<MIR_context_t> mirContexts;
+
+    cfg::mir_emit::RuntimeContext rtCtx;
 
     std::string alias(const void* ptr) {
         return "__jac_aot_func_" + std::to_string(reinterpret_cast<uint64_t>(ptr));  // NOLINT
@@ -197,31 +206,37 @@ class AotEvalFeature : public EvalFeature<Next> {
 
         MIR_context_t ctx = MIR_init();
         MIR_module_t mod = MIR_new_module(ctx, "aot");
-
-        mirContexts.push_back(ctx);
-
         std::vector<MIR_item_t> funcs;
-
-        std::map<std::string, std::pair<MIR_item_t, MIR_item_t>> prototypes;
-        for (auto& [cfgFunc, code] : cfgFunctions) {
-            auto proto = cfg::mir_emit::getPrototype(ctx, cfgFunc);
-            auto forward = MIR_new_forward(ctx, cfgFunc.name().c_str());
-            prototypes.emplace(cfgFunc.name(), std::make_pair(proto, forward));
-        }
-
-        for (auto& [cfgFunc, code] : cfgFunctions) {
-            funcs.push_back(jac::cfg::mir_emit::compile(ctx, prototypes, cfgFunc));
-        }
-
         std::vector<MIR_item_t> callers;
-        for (auto& [cfgFunc, code] : cfgFunctions) {
-            auto proto = prototypes.at(cfgFunc.name()).first;
-            auto fun = prototypes.at(cfgFunc.name()).second;
-            auto caller = jac::cfg::mir_emit::compileCaller(ctx, cfgFunc, fun, proto);
-            callers.push_back(caller);
+
+        {
+            Defer d([&] {
+                MIR_finish_module(ctx);
+            });
+
+            mirContexts.push_back(ctx);
+
+            cfg::mir_emit::Builtins builtins = jac::cfg::mir_emit::generateBuiltins(ctx, &rtCtx);
+
+            std::map<std::string, std::pair<MIR_item_t, MIR_item_t>> prototypes;
+            for (auto& [cfgFunc, code] : cfgFunctions) {
+                auto proto = cfg::mir_emit::getPrototype(ctx, cfgFunc);
+                auto forward = MIR_new_forward(ctx, cfgFunc.name().c_str());
+                prototypes.emplace(cfgFunc.name(), std::make_pair(proto, forward));
+            }
+
+            for (auto& [cfgFunc, code] : cfgFunctions) {
+                funcs.push_back(jac::cfg::mir_emit::compile(ctx, prototypes, cfgFunc, builtins));
+            }
+
+            for (auto& [cfgFunc, code] : cfgFunctions) {
+                auto proto = prototypes.at(cfgFunc.name()).first;
+                auto fun = prototypes.at(cfgFunc.name()).second;
+                auto caller = jac::cfg::mir_emit::compileCaller(ctx, cfgFunc, fun, proto);
+                callers.push_back(caller);
+            }
         }
 
-        MIR_finish_module(ctx);
         MIR_load_module(ctx, mod);
 
         MIR_gen_init(ctx, 1);
@@ -249,6 +264,7 @@ class AotEvalFeature : public EvalFeature<Next> {
                 case jac::cfg::ValueType::I32:    jsFnObj = getObj(int32_t{}); break;
                 case jac::cfg::ValueType::Bool:   jsFnObj = getObj(bool{});    break;
                 case jac::cfg::ValueType::Double: jsFnObj = getObj(double{});  break;
+                case jac::cfg::ValueType::Any:    jsFnObj = getObj(Value::undefined(this->context())); break;
                 case jac::cfg::ValueType::Void: {
                     auto jsFn = detail::CompiledCallable<void>{ ptr };
                     jsFnObj = ff.newFunctionThisVariadic(jsFn);
@@ -284,7 +300,7 @@ class AotEvalFeature : public EvalFeature<Next> {
 
         auto newJS = placeStubs(js, compiledFunctions);
 
-        // define the compiled functions in global scope
+        // define the compiled functions on globalThis
         jac::Object global = this->context().getGlobalObject();
 
         for (auto& fn : compiledFunctions) {
@@ -295,6 +311,11 @@ class AotEvalFeature : public EvalFeature<Next> {
         return newJS;
     }
 public:
+
+    void initialize() {
+        Next::initialize();
+        rtCtx.ctx = this->context();
+    }
 
     /**
      * @brief Evaluate a string containing javascript code, while compiling some
