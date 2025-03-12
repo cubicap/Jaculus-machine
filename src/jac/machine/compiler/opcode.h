@@ -96,10 +96,11 @@ enum class Opcode {
     Gte,        // a a -> Bool
     Lt,         // a a -> Bool
     Lte,        // a a -> Bool
-    GetMember,  // Any a -> Any
+    GetMember,  // a b -> Any        (a: Object | Any)
+    SetMember,  // id val -> parent  (id: StringConst, parent: Object | Any)
 
     // Unary
-    Set,        // a -> b   // FIXME: rework
+    Set,        // a -> b
     BoolNot,    // a -> Bool
     BitNot,     // Int32 -> Int32
     UnPlus,     // a -> Number

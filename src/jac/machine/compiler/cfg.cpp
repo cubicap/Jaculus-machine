@@ -4,7 +4,7 @@
 namespace jac::cfg {
 
 
-TmpId getTmpId() {
+TmpId newTmpId() {
     static TmpId id = 1;
     if (id == 0) {
         id = 1;

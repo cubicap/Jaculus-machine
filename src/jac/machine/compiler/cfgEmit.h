@@ -140,14 +140,14 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
 }
 
 [[nodiscard]] inline RValue emitConst(auto value, FunctionEmitter& func) {
-    TmpId id = getTmpId();
     ConstInit init = ConstInit{
-        .id = id,
+        .id = newTmpId(),
         .value = value
     };
     func.emitStatement(init);
-    emitPushFree(RValue{ init.type(), id }, func);
-    return RValue{ init.type(), id };
+    RValue initR = { init.type(), init.id };
+    emitPushFree(initR, func);
+    return initR;
 }
 
 [[nodiscard]] inline RValue emit(const ast::NumericLiteral& lit, FunctionEmitter &func) {
@@ -181,39 +181,39 @@ inline RValue giveSimple(LVRef lv, FunctionEmitter&) {
     if (lv.isMember()) {
         throw std::runtime_error("Cannot move member");
     }
-    return { lv.type, lv.id };
+    return { lv.self };
 }
 
 inline RValue emitCast(RValue val, ValueType type, FunctionEmitter& func) {
-    if (val.type == type) {
+    if (val.type() == type) {
         return val;
     }
-    LVRef res = LVRef::direct(type, getTmpId(), false);
+    RValue res = { Temp::create(type) };
     func.emitStatement({Operation{
         .op = Opcode::Set,
         .a = val,
         .res = res
     }});
-    return giveSimple(res, func);
+    return res;
 }
 
 inline RValue materialize(LVRef lv, FunctionEmitter& func) {
     if (!lv.isMember()) {
-        auto v = RValue{ lv.type, lv.id };
+        RValue v = { lv.self };
         emitDup(v, func);
         return v;
     }
 
     // TODO: solve conversion of parent/accessor types
-    LVRef res = LVRef::direct(ValueType::Any, getTmpId(), false);
+    RValue res = { Temp::create(lv.type()) };
     func.emitStatement({Operation{
         .op = Opcode::GetMember,
-        .a = { lv.parentType, lv.id },
-        .b = *lv.member,
+        .a = { lv.self.type, lv.self.id },
+        .b = *lv.memberIdent,
         .res = res
     }});
 
-    return giveSimple(res, func);
+    return res;
 }
 
 inline RValue materialize(Value val, FunctionEmitter& func) {
@@ -285,9 +285,10 @@ template<bool Yield, bool Await>
         throw std::runtime_error("Function not found: " + ident);
     }
 
-    RValue res = { sig->ret, getTmpId() };
+    RValue res = { Temp::create(sig->ret) };
 
-    std::list<RValue> args;
+    std::vector<Temp> args;
+    args.reserve(args_.arguments.size());
     for (const auto& [ spread, expr ] : args_.arguments) {  // TODO: check arguments count
         if (spread) {
             throw std::runtime_error("Spread arguments are not supported");
@@ -329,9 +330,9 @@ template<bool Yield, bool Await>
             RValue objR = materialize(obj, func);
             emitPushFree(objR, func);
 
-            RValue res = { ValueType::Any, getTmpId() };  // TODO: infer type from called function
+            RValue res = { Temp::create(ValueType::Any) };  // TODO: infer type from called function
 
-            std::list<RValue> args;
+            std::vector<Temp> args;
             for (const auto& [ spread, expr ] : call.second.arguments) {
                 if (spread) {
                     throw std::runtime_error("Spread arguments are not supported");
@@ -383,7 +384,7 @@ template<bool Yield, bool Await>
 
     RValue identR = emitConst(ident.name, func);
 
-    LVRef res = LVRef::mbr(ValueType::Any, objR.id, identR, objR.type, false);
+    LVRef res = LVRef::mbr(objR, identR, false);
 
     return { res };
 }
@@ -498,7 +499,7 @@ template<bool Yield, bool Await>
     Opcode op = it->second;
 
     RValue argR = materialize(arg, func);
-    LVRef res = LVRef::direct(argR.type, getTmpId(), false);
+    RValue res = { Temp::create(argR.type()) };
 
     func.emitStatement({Operation{
         .op = op,
@@ -506,7 +507,7 @@ template<bool Yield, bool Await>
         .res = res
     }});
 
-    return { giveSimple(res, func) };
+    return { res };
 }
 
 
@@ -548,8 +549,8 @@ template<bool In, bool Yield, bool Await>
             RValue ropR = materialize(rop, func);
             emitPushFree(ropR, func);
 
-            ValueType resType = resultType(op, lopR.type, ropR.type);
-            LVRef res = LVRef::direct(resType, getTmpId(), false);
+            ValueType resType = resultType(op, lopR.type(), ropR.type());
+            RValue res = { Temp::create(resType) };
 
             RValue lopRType;
             RValue ropRType;
@@ -559,7 +560,7 @@ template<bool In, bool Yield, bool Await>
                 ropRType = emitCast(ropR, resType, func);
             }
             else {
-                ValueType commonType = commonUpcast(lopR.type, ropR.type);
+                ValueType commonType = commonUpcast(lopR.type(), ropR.type());
                 lopRType = emitCast(lopR, commonType, func);
                 ropRType = emitCast(ropR, commonType, func);
             }
@@ -570,7 +571,7 @@ template<bool In, bool Yield, bool Await>
                 .b = ropRType,
                 .res = res
             }});
-            return { giveSimple(res, func) };
+            return { res };
         }
         Value operator()(const ast::UnaryExpression<Yield, Await>& unary) {
             return emit(unary, func);
@@ -659,11 +660,26 @@ template<bool In, bool Yield, bool Await>
     Value rhs = emit(*assign.rhs, func);
     RValue rhsR = materialize(rhs, func);
 
-    func.emitStatement({Operation{
-        .op = Opcode::Set,
-        .a = rhsR,
-        .res = target.asLVRef()
-    }});
+    auto targetLV = target.asLVRef();
+
+    if (targetLV.isMember()) {
+        RValue parent = { targetLV.self };
+        RValue ident = { *targetLV.memberIdent };
+
+        func.emitStatement({Operation{
+            .op = Opcode::SetMember,
+            .a = ident,
+            .b = rhsR,
+            .res = parent
+        }});
+    }
+    else {
+        func.emitStatement({Operation{
+            .op = Opcode::Set,
+            .a = rhsR,
+            .res = giveSimple(targetLV, func)
+        }});
+    }
 
     return rhsR;
 }
@@ -691,7 +707,7 @@ void emit(const ast::LexicalDeclaration<In, Yield, Await>& lexical, FunctionEmit
             func.emitStatement({Operation{
                 .op = Opcode::Set,
                 .a = rhsR,
-                .res = target
+                .res = giveSimple(target, func)
             }});
         }
         void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<In, Yield, Await>>&) {
@@ -753,16 +769,15 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& f
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
     emitPushFree(cond, func);
-    LVRef res = LVRef::direct(ValueType::Bool, getTmpId(), false);
+    RValue res = { Temp::create(ValueType::Bool) };
     func.emitStatement({Operation{
         .op = Opcode::Set,
         .a = cond,
         .res = res
     }});
 
-    RValue resR = giveSimple(res, func);
-    emitPushFree(resR, func);
-    condBlock->jump = Terminal::branch(resR, ifBlock, elseBlock);
+    emitPushFree(res, func);
+    condBlock->jump = Terminal::branch(res, ifBlock, elseBlock);
 
     // if block
     func.setActiveBlock(ifBlock);
@@ -793,16 +808,15 @@ void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitt
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
     emitPushFree(cond, func);
-    LVRef res = LVRef::direct(ValueType::Bool, getTmpId(), false);
+    RValue res = { Temp::create(ValueType::Bool) };
     func.emitStatement({Operation{
         .op = Opcode::Set,
         .a = cond,
         .res = res
     }});
 
-    RValue resR = giveSimple(res, func);
-    emitPushFree(resR, func);
-    condBlock->jump = Terminal::branch(resR, loopBlock, postBlock);
+    emitPushFree(res, func);
+    condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -831,16 +845,15 @@ void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
     emitPushFree(cond, func);
-    LVRef res = LVRef::direct(ValueType::Bool, getTmpId(), false);
+    RValue res = { Temp::create(ValueType::Bool) };
     func.emitStatement({Operation{
         .op = Opcode::Set,
         .a = cond,
         .res = res
     }});
 
-    RValue resR = giveSimple(res, func);
-    emitPushFree(resR, func);
-    condBlock->jump = Terminal::branch(resR, loopBlock, postBlock);
+    emitPushFree(res, func);
+    condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -898,16 +911,15 @@ void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& 
         func.setActiveBlock(condBlock);
         RValue cond = emit(*stmt.condition, func);
         emitPushFree(cond, func);
-        LVRef res = LVRef::direct(ValueType::Bool, getTmpId(), false);
+        RValue res = { Temp::create(ValueType::Bool) };
         func.emitStatement({Operation{
             .op = Opcode::Set,
             .a = cond,
             .res = res
         }});
 
-        RValue resR = giveSimple(res, func);
-        emitPushFree(resR, func);
-        condBlock->jump = Terminal::branch(resR, loopBlock, postBlock);
+        emitPushFree(res, func);
+        condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
     }
     else {
         condBlock->jump = Terminal::jump(loopBlock);

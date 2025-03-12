@@ -334,23 +334,7 @@ class CFGInterpreter {
     }
 
     void evalSet(JSContext* ctx, const Operation& op) {
-        if (op.res.isMember()) {
-            auto val = convert<JSValue>(ctx, getReg(op.a.id));
-            auto obj = convert<JSValue>(ctx, getReg(op.res.id));
-            JS_DupValue(ctx, val);
-
-            auto res = std::visit(
-                detail::SetMbrVisitor{ ctx, obj, val },
-                getReg(op.res.member->id)
-            );
-            if (res < 0) {
-                JS_FreeValue(ctx, val);
-                throw std::runtime_error("Failed to set member");
-            }
-        }
-        else {
-            setReg(op.res.id, convert(ctx, getReg(op.a.id), op.res.type));
-        }
+        setReg(op.res.id, convert(ctx, getReg(op.a.id), op.res.type));
     }
 
     template<typename Op>
@@ -375,6 +359,19 @@ class CFGInterpreter {
 
         auto res = std::visit(detail::GetMbrVisitor{ ctx, val }, getReg(op.b.id));
         setReg(op.res.id, res);
+    }
+
+    void evalSetMember(JSContext* ctx, const Operation op) {
+        auto id = getReg(op.a.id);
+        auto val = convert<JSValue>(ctx, getReg(op.b.id));
+        auto obj = convert<JSValue>(ctx, getReg(op.res.id));
+        JS_DupValue(ctx, val);
+
+        auto res = std::visit(detail::SetMbrVisitor{ ctx, obj, val }, id);
+        if (res < 0) {
+            JS_FreeValue(ctx, val);
+            throw std::runtime_error("Failed to set member");
+        }
     }
 
     void evalBoolNot(JSContext* ctx, const Operation& op) {
@@ -428,11 +425,12 @@ public:
             case Opcode::UnMinus: evalUnop<detail::unminus>(ctx, op); break;
             case Opcode::UnPlus: evalUnop<detail::unplus>(ctx, op); break;
             case Opcode::GetMember: evalGetMember(ctx, op); break;
+            case Opcode::SetMember: evalSetMember(ctx, op); break;
             case Opcode::BoolNot: evalBoolNot(ctx, op); break;
             case Opcode::Pow:
             case Opcode::BitNot:
                 throw std::runtime_error("Not implemented (operation) " + std::to_string(static_cast<int>(op.op)));
-        }
+            }
     }
 
     void constInit(JSContext*, const ConstInit& init) {

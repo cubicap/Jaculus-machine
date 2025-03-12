@@ -15,7 +15,7 @@ inline std::map<TmpId, int> allocateStackSlots(jac::cfg::Function& cfg) {
 
     for (auto& block : cfg.blocks) {
         for (auto& stmt : block->statements) {
-            RValue res = stmt.res();
+            Temp res = stmt.res();
             if (res.type == ValueType::Any) {
                 stackSlots.emplace(res.id, stackOffset);
                 stackOffset++;

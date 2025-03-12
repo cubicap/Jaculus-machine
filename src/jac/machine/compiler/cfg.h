@@ -21,12 +21,21 @@ namespace jac::cfg {
 
 
 using TmpId = int;
-TmpId getTmpId();
+TmpId newTmpId();
 
 
 using Identifier = std::string;
 using MemberIdentifier = std::variant<Identifier, int32_t>;
 
+
+struct Temp {
+    ValueType type;
+    TmpId id;
+
+    static Temp create(ValueType type_) {
+        return { type_, newTmpId() };
+    }
+};
 
 /*
 possible source:
@@ -35,8 +44,19 @@ possible source:
     - conversion from LVRef
 */
 struct RValue {
-    ValueType type;
-    TmpId id;
+    Temp tmp;
+
+    ValueType type() const {
+        return tmp.type;
+    }
+
+    TmpId id() const {
+        return tmp.id;
+    }
+
+    operator Temp() const {
+        return tmp;
+    }
 };
 
 /*
@@ -44,33 +64,38 @@ possible source:
     - variable
     - member access
 */
-struct LVRef {  // FIXME: refactor
-    ValueType type;  // type of the value itself
-    TmpId id;        // id of target/parent
-    std::optional<RValue> member;  // for member access
-    ValueType parentType = ValueType::Void;
+struct LVRef {
+    Temp self;
+    std::optional<Temp> memberIdent;  // for member access
     bool _const = false;
 
     bool isMember() const {
-        return member.has_value();
+        return memberIdent.has_value();
     }
 
     bool isConst() const {
         return _const;
     }
 
-    static LVRef direct(ValueType type_, TmpId id_, bool isConst) {
-        return { type_, id_, std::nullopt, ValueType::Void, isConst };
+    ValueType type() const {
+        if (isMember()) {
+            return ValueType::Any;
+        }
+        return self.type;
     }
 
-    static LVRef mbr(ValueType type_, TmpId id_, RValue member_, ValueType parentType_, bool isConst) {
-        return { type_, id_, member_, parentType_, isConst };
+    static LVRef direct(Temp self_, bool isConst) {
+        return { self_, std::nullopt, isConst };
     }
 
-    LVRef(): type(ValueType::Void), id(0) {}
+    static LVRef mbr(Temp self_, Temp member_, bool isConst) {
+        return { self_, member_, isConst };
+    }
+
+    LVRef(): self({ ValueType::Void, 0 }) {}
 private:
-    LVRef(ValueType type_, TmpId id_, std::optional<RValue> member_, ValueType parentType_, bool isConst):
-        type(type_), id(id_), member(member_), parentType(parentType_), _const(isConst)
+    LVRef(Temp self_, std::optional<Temp> memberIdent_, bool isConst):
+        self(self_), memberIdent(memberIdent_), _const(isConst)
     {}
 };
 
@@ -92,9 +117,9 @@ struct Value {
 struct Operation {  // FIXME: refactor
     Opcode op;
 
-    RValue a;
-    RValue b = { ValueType::Void, 0 };
-    LVRef res;
+    Temp a;
+    Temp b = { ValueType::Void, 0 };
+    Temp res;
 };
 
 struct ConstInit {
@@ -119,9 +144,9 @@ struct ConstInit {
 };
 
 struct Call {
-    std::variant<Identifier, RValue> obj;  // native/object
-    std::list<RValue> args;
-    RValue res;
+    std::variant<Identifier, Temp> obj;  // native/object
+    std::vector<Temp> args;
+    Temp res;
 
     bool isNative() const {
         return std::holds_alternative<Identifier>(obj);
@@ -143,7 +168,7 @@ struct Statement {  // FIXME: rename, unify
         return std::get<Call>(op);
     }
 
-    RValue res() {
+    Temp res() {
         if (auto op_ = std::get_if<Operation>(&op)) {
             return { op_->res.type, op_->res.id };
         }
@@ -171,7 +196,7 @@ struct Terminal {
     };
 
     Type type;
-    std::optional<RValue> value;
+    std::optional<Temp> value;
     BasicBlockPtr target;
     BasicBlockPtr other;
 
@@ -180,7 +205,7 @@ struct Terminal {
     }
 
     static Terminal branch(RValue condition, BasicBlockPtr target, BasicBlockPtr other) {
-        return { Branch, condition, target, other };
+        return { Branch, condition.tmp, target, other };
     }
 
     static Terminal ret() {
@@ -188,11 +213,11 @@ struct Terminal {
     }
 
     static Terminal retVal(RValue retValue) {
-        return { ReturnValue, retValue, nullptr, nullptr };
+        return { ReturnValue, retValue.tmp, nullptr, nullptr };
     }
 
     static Terminal throw_(RValue exception) {
-        return { Throw, exception, nullptr, nullptr };
+        return { Throw, exception.tmp, nullptr, nullptr };
     }
 
     static Terminal none() {
@@ -207,24 +232,24 @@ struct BasicBlock {
 
 
 struct Scope {
-    std::map<Identifier, std::tuple<TmpId, ValueType, bool>> locals;
+    std::map<Identifier, std::tuple<Temp, bool>> locals;
 
     LVRef addLocal(Identifier name, ValueType type, bool isConst) {
-        auto id = getTmpId();
-        locals.emplace(name, std::forward_as_tuple(id, type, isConst));
-        return LVRef::direct(type, id, isConst);
+        auto tmp = Temp::create(type);
+        locals.emplace(name, std::forward_as_tuple(tmp, isConst));
+        return LVRef::direct(tmp, isConst);
     }
     std::optional<LVRef> getLocal(Identifier name) {
         auto it = locals.find(name);
         if (it == locals.end()) {
             return std::nullopt;
         }
-        auto& [ id, type, isConst ] = it->second;
-        return LVRef::direct(type, id, isConst);
+        auto& [ self, isConst ] = it->second;
+        return LVRef::direct(self, isConst);
     }
-    void insertLocal(Identifier name, LVRef ref) {
-        assert(!ref.isMember());
-        locals.emplace(name, std::forward_as_tuple(ref.id, ref.type, ref.isConst()));
+    LVRef insertLocal(Identifier name, Temp tmp, bool isConst) {
+        locals.emplace(name, std::forward_as_tuple(tmp, isConst));
+        return LVRef::direct(tmp, isConst);
     }
 };
 
@@ -254,7 +279,7 @@ using SignaturePtr = std::shared_ptr<Signature>;
 struct Function {
     BasicBlockPtr entry;
     std::vector<std::unique_ptr<BasicBlock>> blocks;
-    std::vector<LVRef> args;
+    std::vector<Temp> args;
     ValueType ret;
     std::string _name;
     std::set<Identifier> requiredFunctions;
@@ -263,22 +288,22 @@ struct Function {
 };
 
 struct FunctionEmitter {  // TODO: make members private, think about lists once again
-    const std::map<cfg::Identifier, cfg::SignaturePtr>& _otherSignatures;
+    const std::map<Identifier, SignaturePtr>& _otherSignatures;
 
     SignaturePtr signature;
     std::forward_list<Scope> scopes;
-    std::list<std::pair<Identifier, LVRef>> undefined;
+    std::list<std::pair<Identifier, Temp>> undefined;
     BasicBlockPtr activeBlock;
     BasicBlockPtr entry;
     std::forward_list<BasicBlockPtr> breakTargets;
     std::forward_list<BasicBlockPtr> continueTargets;
     std::list<std::unique_ptr<BasicBlock>> blocks;
     std::set<Identifier> requiredFunctions;
-    std::vector<LVRef> args;
+    std::vector<Temp> args;
 
     std::string _name;
 
-    FunctionEmitter(const std::map<cfg::Identifier, cfg::SignaturePtr>& otherSignatures):
+    FunctionEmitter(const std::map<Identifier, SignaturePtr>& otherSignatures):
         _otherSignatures(otherSignatures),
         scopes(1)
     {
@@ -305,7 +330,7 @@ struct FunctionEmitter {  // TODO: make members private, think about lists once 
         signature = sig;
         for (const auto& [name, type] : sig->args) {
             auto ref = addLexical(name, type, false);
-            args.push_back(ref);
+            args.push_back(ref.self);
         }
     }
 
@@ -315,16 +340,15 @@ struct FunctionEmitter {  // TODO: make members private, think about lists once 
         for (auto it = undefined.begin(); it != undefined.end(); ++it) {
             if (it->first == name) {
                 it = undefined.erase(it);
-                scopes.front().insertLocal(name, it->second);
-                return it->second;
+                return scopes.front().insertLocal(name, it->second, false);
             }
         }
         return scopes.front().addLocal(name, type, false);
     }
     LVRef addUndefined(Identifier name, ValueType type) {
-        auto id = getTmpId();
-        undefined.emplace_back(name, LVRef::direct(type, id, false));
-        return undefined.back().second;
+        auto tmp = Temp::create(type);
+        undefined.emplace_back(name, tmp);
+        return LVRef::direct(tmp, false);
     }
     std::optional<LVRef> getLocal(Identifier name) {  // TODO: update to allow for shadowing
         for (auto& scope : scopes) {

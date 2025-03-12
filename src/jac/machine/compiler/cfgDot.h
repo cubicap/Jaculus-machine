@@ -41,7 +41,8 @@ inline void print(std::ostream& os, Opcode op) {
         case Opcode::UnMinus: os << "UnMinus"; break;
         case Opcode::Dup: os << "Dup"; break;
         case Opcode::PushFree: os << "PushFree"; break;
-    }
+        case Opcode::SetMember: os << "SetMember"; break;
+        }
 }
 
 inline void printShort(std::ostream& os, ValueType type) {
@@ -59,14 +60,14 @@ inline void printShort(std::ostream& os, ValueType type) {
 }
 
 
-inline void print(std::ostream& os, const RValue& v) {
+inline void print(std::ostream& os, const Temp& v) {
     os << "_" << v.id << ":";
     printShort(os, v.type);
 }
 
 inline void print(std::ostream& os, const LVRef& v) {
-    os << "_" << v.id << ":";
-    printShort(os, v.type);
+    os << "_" << v.self.id << ":";
+    printShort(os, v.self.type);
 }
 
 
@@ -106,7 +107,7 @@ inline void print(std::ostream& os, const Call& call) {
         void operator()(const Identifier& id) const {
             os << id;
         }
-        void operator()(const RValue& rvalue) const {
+        void operator()(const Temp& rvalue) const {
             os << "_" << rvalue.id;
         }
     };
