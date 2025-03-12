@@ -52,6 +52,7 @@ inline void printShort(std::ostream& os, ValueType type) {
         case ValueType::Bool: os << "b"; break;
         case ValueType::Object: os << "o"; break;
         case ValueType::String: os << "s"; break;
+        case ValueType::StringConst: os << "sc"; break;
         case ValueType::Buffer: os << "buf"; break;
         case ValueType::Any: os << "a"; break;
     }

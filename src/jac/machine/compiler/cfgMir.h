@@ -1,16 +1,17 @@
 #pragma once
 
 #include "cfg.h"
-#include "stackAllocator.h"
-#include "mirUtil.h"
 #include "mirBuiltins.h"
+#include "mirUtil.h"
 #include "opcode.h"
+#include "stackAllocator.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 
 #include <jac/util.h>
+#include <memory>
 #include <mir.h>
 #include <quickjs.h>
 
@@ -28,10 +29,10 @@ inline std::pair<MIR_type_t, size_t> getMIRArgType(ValueType type) {
             return { MIR_T_I32, 0 };
         case ValueType::Object:
             return { MIR_T_P, 0 };
-        case ValueType::String:
+        case ValueType::StringConst:
             return { MIR_T_P, 0 };
         case ValueType::Any:
-            return { MIR_type_t(MIR_T_BLK + 1), sizeof(JSValue) };
+            return { static_cast<MIR_type_t>(MIR_T_BLK + 1), sizeof(JSValue) };
         default:
             throw std::runtime_error("Invalid MIR type");
     }
@@ -44,7 +45,7 @@ inline MIR_type_t getMIRRetType(ValueType type) {
 }
 
 inline MIR_type_t getMIRRegType(ValueType type) {
-    if (isIntegral(type)) {
+    if (isIntegral(type) || type == ValueType::Object || type == ValueType::StringConst) {
         return MIR_T_I64;
     }
     if (type == ValueType::Double) {
@@ -176,12 +177,12 @@ inline MIR_insn_code_t chooseComparison(Opcode op, ValueType type) {
 inline MIR_insn_code_t chooseConversion(ValueType from, ValueType to) {
     if (from == to) {
         switch (to) {
-            case ValueType::I32:  case ValueType::Bool:
-            return MIR_MOV;
+            case ValueType::I32:  case ValueType::Bool:  case ValueType::Object:
+                return MIR_MOV;
             case ValueType::Double:
-            return MIR_DMOV;
+                return MIR_DMOV;
             default:
-            throw std::runtime_error("Set type not implemented");
+                throw std::runtime_error("Set type not implemented");
         }
     }
     switch (from) {
@@ -295,6 +296,8 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
     MIR_reg_t allocaPtr = MIR_new_func_reg(ctx, func, MIR_T_I64, "allocaPtr");
     MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ALLOCA, MIR_new_reg_op(ctx, allocaPtr), MIR_new_int_op(ctx, sizeof(JSValue) * stackSlots.size())));
 
+    insertCallV_V(ctx, fun, builtins.v_vProto, builtins.rtCtx, builtins.enterStackFrame);
+
     auto label = [&](BasicBlockPtr block) {
         auto it = labels.find(block);
         if (it == labels.end()) {
@@ -377,8 +380,14 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                             regOp(op->res.id), regOp(op->a.id), regOp(op->b.id)));
                         break;
                     case Opcode::GetMember:
-                        throw std::runtime_error("GetMember is not supported");
-
+                        assert(op->res.type == ValueType::Any);
+                        if (op->a.type == ValueType::Object && op->b.type == ValueType::StringConst) {
+                            insertCallPP_J(ctx, fun, builtins.pp_jProto, builtins.rtCtx, builtins.getMemberObjCStr, regs.at(op->a.id), regs.at(op->b.id), jsValAddr(op->res.id), 0);
+                        }
+                        else {
+                            throw std::runtime_error("GetMember is not fully supported");
+                        }
+                        break;
                     // Unary
                     case Opcode::Set: {
                         if (op->a.type == ValueType::Any && op->res.type == ValueType::Any) {
@@ -424,7 +433,10 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     } break;
                     case Opcode::Dup:
                         if (op->a.type == ValueType::Any) {
-                            insertCallJV(ctx, fun, builtins.jvProto, builtins.rtCtx, builtins.dup, jsValAddr(op->a.id), 0);
+                            insertCallJ_V(ctx, fun, builtins.j_vProto, builtins.rtCtx, builtins.dupVal, jsValAddr(op->a.id), 0);
+                        }
+                        else if (op->a.type == ValueType::Object) {
+                            insertCallP_V(ctx, fun, builtins.p_vProto, builtins.rtCtx, builtins.dupObj, regs.at(op->a.id));
                         }
                         else if (!isNumeric(op->a.type)) {
                             throw std::runtime_error("Dup is not fully supported");
@@ -432,9 +444,12 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                         break;
                     case Opcode::PushFree:
                         if (op->a.type == ValueType::Any) {
-                            insertCallJV(ctx, fun, builtins.jvProto, builtins.rtCtx,builtins.free, jsValAddr(op->a.id), 0);  // FIXME: not immediately - push to stack
+                            insertCallJ_V(ctx, fun, builtins.j_vProto, builtins.rtCtx,builtins.pushFreeVal, jsValAddr(op->a.id), 0);  // FIXME: not immediately - push to stack
                         }
-                        else if (!isNumeric(op->a.type)) {
+                        else if (op->a.type == ValueType::Object) {
+                            insertCallP_V(ctx, fun, builtins.p_vProto, builtins.rtCtx, builtins.pushFreeObj, regs.at(op->a.id));
+                        }
+                        else if (!isNumeric(op->a.type) && op->a.type != ValueType::StringConst) {
                             throw std::runtime_error("PushFree is not fully supported");
                         }
                         break;
@@ -446,19 +461,24 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 auto reg = regOp(init->id, init->type());
                 std::visit([&](auto val) {
                     if constexpr (std::is_same_v<std::decay_t<decltype(val)>, int32_t>) {
-                        auto op = MIR_new_int_op(ctx, val);
-                        insert(MIR_new_insn(ctx, MIR_MOV, reg, op));
+                        auto vOp = MIR_new_int_op(ctx, val);
+                        insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
                     }
                     else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, double>) {
-                        auto op = MIR_new_double_op(ctx, val);
-                        insert(MIR_new_insn(ctx, MIR_DMOV, reg, op));
+                        auto vOp = MIR_new_double_op(ctx, val);
+                        insert(MIR_new_insn(ctx, MIR_DMOV, reg, vOp));
                     }
                     else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, bool>) {
-                        auto op = MIR_new_int_op(ctx, val);
-                        insert(MIR_new_insn(ctx, MIR_MOV, reg, op));
+                        auto vOp = MIR_new_int_op(ctx, val);
+                        insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
                     }
                     else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, std::string>) {
-                        throw std::runtime_error("std::string constants are not supported");
+                        auto strDup = std::make_unique<char[]>(val.size() + 1);
+                        std::copy(val.begin(), val.end(), strDup.get());
+                        strDup[val.size()] = '\0';
+                        auto vOp = MIR_new_int_op(ctx, reinterpret_cast<uint64_t>(strDup.get()));  // NOLINT
+                        insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
+                        builtins.rtCtx->stringConsts.emplace_back(std::move(strDup));
                     }
                 }, init->value);
             }
@@ -493,9 +513,11 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 insert(MIR_new_insn(ctx, MIR_JMP, labelOp(block->jump.target)));
             } break;
             case Terminal::Return:
+                insertCallV_V(ctx, fun, builtins.v_vProto, builtins.rtCtx, builtins.exitStackFrame);
                 insert(MIR_new_ret_insn(ctx, 0));
                 break;
             case Terminal::ReturnValue:
+                insertCallV_V(ctx, fun, builtins.v_vProto, builtins.rtCtx, builtins.exitStackFrame);
                 if (hasRetArg(cfg)) {
                     auto res = block->jump.value;
                     assert(res->type == cfg.ret);
@@ -527,18 +549,10 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
         { .type = MIR_T_P, .name = "argv" }
     };
 
-    if (hasRetArg(cfg)) {
-        args.push_back({ .type = MIR_T_P, .name = "res" });
-    }
+    args.push_back({ .type = MIR_T_P, .name = "res" });
 
     MIR_item_t caller;
-    if (cfg.ret == ValueType::Void || hasRetArg(cfg)) {
-        caller = MIR_new_func_arr(ctx, callerName.c_str(), 0, nullptr, args.size(), args.data());
-    }
-    else {
-        auto retType = getMIRRetType(cfg.ret);
-        caller = MIR_new_func_arr(ctx, callerName.c_str(), 1, &retType, args.size(), args.data());
-    }
+    caller = MIR_new_func_arr(ctx, callerName.c_str(), 0, nullptr, args.size(), args.data());
     auto callerFunc = MIR_get_item_func(ctx, caller);
 
     auto insert = [&](MIR_insn_t insn) {
@@ -570,8 +584,7 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
         static constexpr size_t argOffset = sizeof(JSValue);
 
         switch (arg.type) {
-            case ValueType::I32:
-            case ValueType::Bool: {
+            case ValueType::I32:  case ValueType::Bool:  case ValueType::Object: {
                 auto reg = MIR_new_func_reg(ctx, callerFunc, getMIRRegType(arg.type), name.c_str());
                 insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, reg), MIR_new_mem_op(ctx, getMIRRegType(arg.type), 0, argvReg, posReg, argOffset)));
                 argOps.push_back(MIR_new_reg_op(ctx, reg));
@@ -593,43 +606,63 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
         }
     }
 
+    MIR_reg_t resReg = MIR_reg(ctx, "res", callerFunc);
+    MIR_reg_t calleeRes;
+
     std::vector<MIR_op_t> callArgs;
     callArgs.push_back(MIR_new_ref_op(ctx, proto));
     callArgs.push_back(MIR_new_ref_op(ctx, fun));
-    MIR_reg_t resReg;
     if (cfg.ret != ValueType::Void && !hasRetArg(cfg)) {
-        std::string name = "res";
-        resReg = MIR_new_func_reg(ctx, callerFunc, getMIRRegType(cfg.ret), name.c_str());
-        callArgs.push_back(MIR_new_reg_op(ctx, resReg));
+        std::string name = "calleeRes";
+        calleeRes = MIR_new_func_reg(ctx, callerFunc, getMIRRegType(cfg.ret), name.c_str());
+        callArgs.push_back(MIR_new_reg_op(ctx, calleeRes));
     }
     for (auto& op : argOps) {
         callArgs.push_back(op);
     }
     if (hasRetArg(cfg)) {
-        callArgs.push_back(MIR_new_reg_op(ctx, MIR_reg(ctx, "res", callerFunc)));
+        callArgs.push_back(MIR_new_reg_op(ctx, resReg));
     }
     insert(MIR_new_insn_arr(ctx, MIR_CALL, callArgs.size(), callArgs.data()));
 
-    if (cfg.ret != ValueType::Void && !hasRetArg(cfg)) {
-        insert(MIR_new_ret_insn(ctx, 1, MIR_new_reg_op(ctx, resReg)));
-    }
+    // perform conversion from resReg to JSValue in *res
 
-    insert(fail);
+    static constexpr size_t TAG_DISP = offsetof(JSValue, tag);
+    static constexpr size_t VAL_DISP = offsetof(JSValue, u);
+    auto tagOp = MIR_new_mem_op(ctx, MIR_T_I64, TAG_DISP, resReg, 0, 0);
     switch (cfg.ret) {
         case ValueType::I32:
+            insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_INT)));
+            insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, VAL_DISP, resReg, 0, 0), MIR_new_reg_op(ctx, calleeRes)));
+            break;
         case ValueType::Bool:
-            insert(MIR_new_ret_insn(ctx, 1, MIR_new_int_op(ctx, 0)));
+            insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_BOOL)));
+            insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, VAL_DISP, resReg, 0, 0), MIR_new_reg_op(ctx, calleeRes)));
+            break;
+        case ValueType::Object:
+            insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_OBJECT)));
+            insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, VAL_DISP, resReg, 0, 0), MIR_new_reg_op(ctx, calleeRes)));
             break;
         case ValueType::Double:
-            insert(MIR_new_ret_insn(ctx, 1, MIR_new_double_op(ctx, 0)));
+            insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_FLOAT64)));
+            insert(MIR_new_insn(ctx, MIR_DMOV, MIR_new_mem_op(ctx, MIR_T_D, VAL_DISP, resReg, 0, 0), MIR_new_reg_op(ctx, calleeRes)));
             break;
         case ValueType::Void:
-        case ValueType::Any:
-            insert(MIR_new_ret_insn(ctx, 0));
+            insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_UNDEFINED)));
+            insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, VAL_DISP, resReg, 0, 0), MIR_new_int_op(ctx, 0)));
             break;
+        case ValueType::Any:
+            break;  // return is performed by callee
         default:
             throw std::runtime_error("Invalid return type");
     }
+    insert(MIR_new_ret_insn(ctx, 0));
+
+    insert(fail);
+
+    insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_UNDEFINED)));
+    insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, VAL_DISP, resReg, 0, 0), MIR_new_int_op(ctx, 0)));
+    insert(MIR_new_ret_insn(ctx, 0));
 
     MIR_finish_func(ctx);
 

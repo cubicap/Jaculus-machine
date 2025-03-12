@@ -1,7 +1,8 @@
 #pragma once
 
-#include "opcode.h"
 #include "cfg.h"
+#include "opcode.h"
+
 #include <map>
 
 

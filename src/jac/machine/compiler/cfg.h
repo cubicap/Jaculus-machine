@@ -6,6 +6,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <tuple>
@@ -111,7 +112,7 @@ struct ConstInit {
             return ValueType::Bool;
         }
         else if (std::holds_alternative<std::string>(value)) {
-            return ValueType::String;
+            return ValueType::StringConst;
         }
         abort();
     }

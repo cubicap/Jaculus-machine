@@ -48,34 +48,19 @@ struct CompFn {
 namespace detail {
 
 
-template<typename Res>
 struct CompiledCallable {
     void* callerPtr;
 
-    Res operator()(ContextRef ctx, ValueWeak, std::vector<ValueWeak> args) {
+    Value operator()(ContextRef ctx, ValueWeak /* this */, std::vector<ValueWeak> args) {
         std::vector<JSValue> jsArgs;
         for (ValueWeak& arg : args) {
             jsArgs.push_back(arg.getVal());
         }
 
-        if constexpr (std::is_same_v<Res, void>) {
-            auto fn = reinterpret_cast<void(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
-            fn(jsArgs.size(), jsArgs.data());
-        }
-        else if constexpr (std::is_same_v<Res, bool>) {
-            auto fn = reinterpret_cast<int32_t(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
-            return fn(jsArgs.size(), jsArgs.data());
-        }
-        else if constexpr (std::is_same_v<Res, Value>) {
-            auto fn = reinterpret_cast<JSValue(*)(int64_t, JSValue*, JSValue*)>(callerPtr); // NOLINT
-            JSValue res;
-            fn(jsArgs.size(), jsArgs.data(), &res);
-            return Value(ctx, res);
-        }
-        else {
-            auto fn = reinterpret_cast<Res(*)(int64_t, JSValue*)>(callerPtr); // NOLINT
-            return fn(jsArgs.size(), jsArgs.data());
-        }
+        auto fn = reinterpret_cast<JSValue(*)(int64_t, JSValue*, JSValue*)>(callerPtr); // NOLINT
+        JSValue res;
+        fn(jsArgs.size(), jsArgs.data(), &res);
+        return Value(ctx, res);
     }
 };
 
@@ -242,6 +227,8 @@ class AotEvalFeature : public EvalFeature<Next> {
         MIR_gen_init(ctx, 1);
         MIR_link(ctx, MIR_set_interp_interface, nullptr);
 
+        FunctionFactory ff(this->context());
+
         size_t i = 0;
         for (auto& [cfgFunc, code] : cfgFunctions) {
             auto aliasName = alias(cfgFunc.entry);
@@ -254,25 +241,8 @@ class AotEvalFeature : public EvalFeature<Next> {
             void* ptr = MIR_gen(ctx, 0, callers[i]);
             i++;
 
-            FunctionFactory ff(this->context());
-            Value jsFnObj = Value::undefined(this->context());
-            auto getObj = [&]<typename T>(T) {
-                auto jsFn = detail::CompiledCallable<T>{ ptr };
-                return ff.newFunctionThisVariadic(jsFn);
-            };
-            switch (cfgFunc.ret) {
-                case jac::cfg::ValueType::I32:    jsFnObj = getObj(int32_t{}); break;
-                case jac::cfg::ValueType::Bool:   jsFnObj = getObj(bool{});    break;
-                case jac::cfg::ValueType::Double: jsFnObj = getObj(double{});  break;
-                case jac::cfg::ValueType::Any:    jsFnObj = getObj(Value::undefined(this->context())); break;
-                case jac::cfg::ValueType::Void: {
-                    auto jsFn = detail::CompiledCallable<void>{ ptr };
-                    jsFnObj = ff.newFunctionThisVariadic(jsFn);
-                    break;
-                } break;
-                default:
-                    throw std::runtime_error("Unsupported return type");
-            }
+            auto jsFn = detail::CompiledCallable{ ptr };
+            Value jsFnObj = ff.newFunctionThisVariadic(jsFn);
 
             it->second.jsFn = jsFnObj.to<Function>();
 

@@ -485,4 +485,73 @@ TEST_CASE("Any", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"5678"});
     }
+
+    SECTION("Mixed") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: any): any {
+                let c: Int32 = a;
+                let d: any = b;
+
+                return d;
+            }
+
+            let o = new Object();
+            o.x = 1234;
+            let p = new Object();
+            p.x = 5678;
+            report(fun(o, p).x);
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"5678"});
+    }
+}
+
+
+TEST_CASE("Object", "[aot]") {
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::AotEvalFeature,
+        TestReportFeature
+    >;
+
+    Machine machine;
+
+    SECTION("Object") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object): Object {
+                let b: Object = a;
+                let c: Object = b;
+
+                return c;
+            }
+
+            let o = new Object();
+            o.x = 1234;
+            report(test(o).x);
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1234"});
+    }
+
+    SECTION("Get member") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object): any {
+                let c: any = a.b;
+
+                return c;
+            }
+
+            let o = new Object();
+            o.b = 42;
+            report(test(o));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
 }

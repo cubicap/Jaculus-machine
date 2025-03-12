@@ -14,6 +14,7 @@ enum class ValueType {  // XXX: replace Void with undefined?
     Bool,
     Object,
     String,
+    StringConst,
     Buffer,
     Any
 };
@@ -24,7 +25,7 @@ inline bool isNumeric(ValueType type) {
             assert(false);
         case ValueType::I32:  case ValueType::Double:  case ValueType::Bool:
             return true;
-        case ValueType::Object:  case ValueType::String:
+        case ValueType::Object:  case ValueType::String:  case ValueType::StringConst:
         case ValueType::Buffer:  case ValueType::Any:
             return false;
     }
@@ -35,11 +36,22 @@ inline bool isIntegral(ValueType type) {
     switch (type) {
         case ValueType::Void:
             assert(false);
-        case ValueType::I32:
-        case ValueType::Bool:
+        case ValueType::I32:  case ValueType::Bool:
             return true;
         case ValueType::Double:  case ValueType::Object:  case ValueType::String:
-        case ValueType::Buffer:  case ValueType::Any:
+        case ValueType::StringConst:  case ValueType::Buffer:  case ValueType::Any:
+            return false;
+    }
+    assert(false);
+}
+
+inline bool isString(ValueType type) {
+    switch (type) {
+        case ValueType::Void:
+            assert(false);
+        case ValueType::String:  case ValueType::StringConst:
+            return true;
+        default:
             return false;
     }
     assert(false);
@@ -55,8 +67,8 @@ inline ValueType toPrimitive(ValueType type) {  // XXX: not by spec
             assert(false);
         case ValueType::I32:  case ValueType::Double:  case ValueType::Bool:
             return type;
-        case ValueType::String:
-            return ValueType::String;
+        case ValueType::String:  case ValueType::StringConst:
+            return type;
         case ValueType::Object:  case ValueType::Buffer:  case ValueType::Any:
             return ValueType::Any;
     }
@@ -148,7 +160,7 @@ namespace detail {  // FIXME: check conversions
         if (aPrim == bPrim) {
             return aPrim;
         }
-        if (aPrim == ValueType::String || bPrim == ValueType::String) {
+        if (isString(aPrim) || isString(bPrim)) {
             return ValueType::String;
         }
         if (aPrim == ValueType::Any || bPrim == ValueType::Any) {

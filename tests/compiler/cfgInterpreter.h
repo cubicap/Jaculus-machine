@@ -27,7 +27,7 @@ struct ObjectPtr {
 };
 
 // FIXME: use non owning representation for string in testing
-// I32, double, bool, object, string, buffer, any
+// I32, double, bool, object, string const, buffer, any
 using RegVal = std::variant<int32_t, double, bool, ObjectPtr, std::string, uint8_t*, JSValue>;
 
 template<typename T>
@@ -99,7 +99,7 @@ struct ConvertVisitor<std::string> {
         return v;
     }
     std::string operator()(auto) {
-        throw std::runtime_error("Invalid conversion to String");
+        throw std::runtime_error("Invalid conversion to StringConst");
     }
 };
 
@@ -153,6 +153,8 @@ inline RegVal convert(JSContext* ctx, RegVal v, ValueType type) {
             throw std::runtime_error("Invalid conversion to Buffer");
         case ValueType::String:
             throw std::runtime_error("Not implemented (convert to string)");
+        case ValueType::StringConst:
+            throw std::runtime_error("Impossible conversion to StringConst");
         case ValueType::Void:
             throw std::runtime_error("Invalid type");
     }
@@ -288,7 +290,7 @@ class CFGInterpreter {
     }
 
     void evalDup(JSContext* ctx, const Operation& op) {
-        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool || op.a.type == ValueType::String) {
+        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool || op.a.type == ValueType::StringConst) {
             return;  // no op
         }
         if (op.a.type == ValueType::Any || op.a.type == ValueType::Object) {
@@ -300,7 +302,7 @@ class CFGInterpreter {
     }
 
     void evalPushFree(JSContext* ctx, const Operation& op) {
-        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool || op.a.type == ValueType::String) {
+        if (op.a.type == ValueType::Void || op.a.type == ValueType::I32 || op.a.type == ValueType::Double || op.a.type == ValueType::Bool || op.a.type == ValueType::StringConst) {
             return;  // no op
         }
         if (op.a.type == ValueType::Any || op.a.type == ValueType::Object) {
@@ -569,7 +571,9 @@ public:
                             return convert<JSValue>(ctx, getReg(activeBlock->jump.value->id));
                             break;
                         case ValueType::String:
-                            throw std::runtime_error("Not implemented (return string)");
+                            throw std::runtime_error("Not implemented (return String)");
+                        case ValueType::StringConst:
+                            throw std::runtime_error("Not implemented (return StringConst)");
                         case ValueType::Buffer:
                             throw std::runtime_error("Invalid return type");
                         case ValueType::Void:
