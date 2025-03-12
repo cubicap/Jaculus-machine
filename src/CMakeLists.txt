@@ -49,7 +49,6 @@ else()
     target_include_directories(jac-machine PUBLIC . ${mir_SOURCE_DIR})
     set_target_properties(jac-machine PROPERTIES LINKER_LANGUAGE CXX)
     target_link_libraries(jac-machine PUBLIC quickjs mir)
-    target_compile_options(jac-machine PRIVATE -Wall -Wold-style-cast -Wshadow)
-
+    target_compile_options(jac-machine PUBLIC -Wall -Wextra -Wold-style-cast -Wshadow -Wimplicit-fallthrough -Wno-unused-parameter -Wno-cast-function-type -Wno-missing-field-initializers)
 
 endif()

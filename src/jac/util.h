@@ -7,10 +7,10 @@ namespace jac {
 
 template<typename T>
 struct Defer {
-    T func;
+    T _func;
 
-    Defer(T&& func): func(std::move(func)) {}
-    ~Defer() { func(); }
+    Defer(T&& func): _func(std::move(func)) {}
+    ~Defer() { _func(); }
 };
 
 

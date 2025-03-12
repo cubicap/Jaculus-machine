@@ -1022,7 +1022,7 @@ struct LexicalDeclaration {
             return std::nullopt;
         }
 
-        return std::move(declaration);
+        return declaration;
     }
 };
 
@@ -2443,7 +2443,7 @@ std::optional<StatementList<Yield, Await, Return>> StatementList<Yield, Await, R
     if (list.items.empty()) {
         return std::nullopt;
     }
-    return std::move(list);
+    return list;
 }
 
 

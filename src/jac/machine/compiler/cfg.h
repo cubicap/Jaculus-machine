@@ -119,7 +119,7 @@ struct Operation {  // FIXME: refactor
 
     Temp a;
     Temp b = { ValueType::Void, 0 };
-    Temp res;
+    Temp res = { ValueType::Void, 0 };
 };
 
 struct ConstInit {
