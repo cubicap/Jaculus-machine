@@ -19,41 +19,6 @@
 namespace jac::cfg::mir_emit {
 
 
-inline std::pair<MIR_type_t, size_t> getMIRArgType(ValueType type) {
-    switch (type) {
-        case ValueType::I32:
-            return { MIR_T_I32, 0 };
-        case ValueType::Double:
-            return { MIR_T_D, 0 };
-        case ValueType::Bool:
-            return { MIR_T_I32, 0 };
-        case ValueType::Object:
-            return { MIR_T_P, 0 };
-        case ValueType::StringConst:
-            return { MIR_T_P, 0 };
-        case ValueType::Any:
-            return { static_cast<MIR_type_t>(MIR_T_BLK + 1), sizeof(JSValue) };
-        default:
-            throw std::runtime_error("Invalid MIR type");
-    }
-}
-
-inline MIR_type_t getMIRRetType(ValueType type) {
-    auto [mirType, size] = getMIRArgType(type);
-    assert(!MIR_all_blk_type_p(mirType));
-    return mirType;
-}
-
-inline MIR_type_t getMIRRegType(ValueType type) {
-    if (isIntegral(type) || type == ValueType::Object || type == ValueType::StringConst) {
-        return MIR_T_I64;
-    }
-    if (type == ValueType::Double) {
-        return MIR_T_D;
-    }
-    throw std::runtime_error("Invalid reg type");
-}
-
 inline std::string name(TmpId id) {
     return "_" + std::to_string(id);
 }
@@ -214,27 +179,27 @@ inline bool hasRetArg(Function& cfg) {
 
 
 // output arguments to prevent relocation of the strings
-inline void getArgs(Function& cfg, std::vector<std::string>& arg_names, std::vector<MIR_var_t>& args) {
+inline void getArgs(Function& cfg, std::vector<std::string>& argNames, std::vector<MIR_var_t>& args) {
     bool retArg = hasRetArg(cfg);
 
-    arg_names.reserve(cfg.args.size() + retArg);
+    argNames.reserve(cfg.args.size() + retArg);
     args.reserve(cfg.args.size() + retArg);
     for (const auto& arg : cfg.args) {
-        arg_names.emplace_back(name(arg.id));
+        argNames.emplace_back(name(arg.id));
         auto [type, size] = getMIRArgType(arg.type);
         MIR_var_t var = {
             .type = type,
-            .name = arg_names.back().c_str(),
+            .name = argNames.back().c_str(),
             .size = size
         };
         args.emplace_back(var);
     }
 
     if (retArg) {
-        arg_names.emplace_back("res");
+        argNames.emplace_back("res");
         MIR_var_t var = {
             .type = MIR_T_P,
-            .name = arg_names.back().c_str()
+            .name = argNames.back().c_str()
         };
         args.emplace_back(var);
     }
@@ -296,7 +261,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
     MIR_reg_t allocaPtr = MIR_new_func_reg(ctx, func, MIR_T_I64, "allocaPtr");
     MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ALLOCA, MIR_new_reg_op(ctx, allocaPtr), MIR_new_int_op(ctx, sizeof(JSValue) * stackSlots.size())));
 
-    insertCallV_V(ctx, fun, builtins.v_vProto, builtins.rtCtx, builtins.enterStackFrame);
+    insertCall(ctx, fun, builtins, "__enterStackFrame", {});
 
     auto label = [&](BasicBlockPtr block) {
         auto it = labels.find(block);
@@ -382,7 +347,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     case Opcode::GetMember:
                         assert(op->res.type == ValueType::Any);
                         if (op->a.type == ValueType::Object && op->b.type == ValueType::StringConst) {
-                            insertCallPP_J(ctx, fun, builtins.pp_jProto, builtins.rtCtx, builtins.getMemberObjCStr, regs.at(op->a.id), regs.at(op->b.id), jsValAddr(op->res.id), 0);
+                            insertCall(ctx, fun, builtins, "__getMemberObjCStr", { regs.at(op->a.id), regs.at(op->b.id), jsValAddr(op->res.id) });
                         }
                         else {
                             throw std::runtime_error("GetMember is not fully supported");
@@ -433,10 +398,10 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     } break;
                     case Opcode::Dup:
                         if (op->a.type == ValueType::Any) {
-                            insertCallJ_V(ctx, fun, builtins.j_vProto, builtins.rtCtx, builtins.dupVal, jsValAddr(op->a.id), 0);
+                            insertCall(ctx, fun, builtins, "__dupVal", { jsValAddr(op->a.id) });
                         }
                         else if (op->a.type == ValueType::Object) {
-                            insertCallP_V(ctx, fun, builtins.p_vProto, builtins.rtCtx, builtins.dupObj, regs.at(op->a.id));
+                            insertCall(ctx, fun, builtins, "__dupObj", { regs.at(op->a.id) });
                         }
                         else if (!isNumeric(op->a.type)) {
                             throw std::runtime_error("Dup is not fully supported");
@@ -444,10 +409,10 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                         break;
                     case Opcode::PushFree:
                         if (op->a.type == ValueType::Any) {
-                            insertCallJ_V(ctx, fun, builtins.j_vProto, builtins.rtCtx,builtins.pushFreeVal, jsValAddr(op->a.id), 0);  // FIXME: not immediately - push to stack
+                            insertCall(ctx, fun, builtins, "__pushFreeVal", { jsValAddr(op->a.id) });
                         }
                         else if (op->a.type == ValueType::Object) {
-                            insertCallP_V(ctx, fun, builtins.p_vProto, builtins.rtCtx, builtins.pushFreeObj, regs.at(op->a.id));
+                            insertCall(ctx, fun, builtins, "__pushFreeObj", { regs.at(op->a.id) });
                         }
                         else if (!isNumeric(op->a.type) && op->a.type != ValueType::StringConst) {
                             throw std::runtime_error("PushFree is not fully supported");
@@ -513,11 +478,11 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 insert(MIR_new_insn(ctx, MIR_JMP, labelOp(block->jump.target)));
             } break;
             case Terminal::Return:
-                insertCallV_V(ctx, fun, builtins.v_vProto, builtins.rtCtx, builtins.exitStackFrame);
+                insertCall(ctx, fun, builtins, "__exitStackFrame", {});
                 insert(MIR_new_ret_insn(ctx, 0));
                 break;
             case Terminal::ReturnValue:
-                insertCallV_V(ctx, fun, builtins.v_vProto, builtins.rtCtx, builtins.exitStackFrame);
+                insertCall(ctx, fun, builtins, "__exitStackFrame", {});
                 if (hasRetArg(cfg)) {
                     auto res = block->jump.value;
                     assert(res->type == cfg.ret);
