@@ -1236,9 +1236,12 @@ struct ForStatement {
                 state.restorePosition(start);
                 return std::nullopt;
             }
+            // semicolon as part of the declaration statement
         }
-        else if (auto expr = Expression<false, Yield, Await>::parse(state)) {
-            forStmt.init = std::move(*expr);
+        else {
+            if (auto expr = Expression<false, Yield, Await>::parse(state)) {
+                forStmt.init = std::move(*expr);
+            }
             if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
                 state.error("Expected ;");
                 state.restorePosition(start);

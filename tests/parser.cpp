@@ -1800,6 +1800,26 @@ TEST_CASE("Loop statement", "[parser]") {
         REQUIRE(result->update);
         REQUIRE(result->statement);
     }
+
+    SECTION("for (;;) { }") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "for", jac::lex::Token::Keyword),
+            jac::lex::Token(1, 5, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 6, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 7, ";", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 8, ")", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 10, "{", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 12, "}", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::ForStatement<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+    }
 }
 
 
