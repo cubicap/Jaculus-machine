@@ -9,9 +9,6 @@
 #include <vector>
 
 
-// TODO: remove explicit conversions to bool/return type...
-
-
 namespace jac::cfg {
 
 
@@ -184,6 +181,7 @@ inline RValue giveSimple(LVRef lv, FunctionEmitter&) {
     return { lv.self };
 }
 
+// FIXME: solve dup/free for cast
 inline RValue emitCast(RValue val, ValueType type, FunctionEmitter& func) {
     if (val.type() == type) {
         return val;
@@ -769,12 +767,7 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& f
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
     emitPushFree(cond, func);
-    RValue res = { Temp::create(ValueType::Bool) };
-    func.emitStatement({Operation{
-        .op = Opcode::Set,
-        .a = cond,
-        .res = res
-    }});
+    RValue res = emitCast(cond, ValueType::Bool, func);
 
     emitPushFree(res, func);
     condBlock->jump = Terminal::branch(res, ifBlock, elseBlock);
@@ -808,12 +801,7 @@ void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitt
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
     emitPushFree(cond, func);
-    RValue res = { Temp::create(ValueType::Bool) };
-    func.emitStatement({Operation{
-        .op = Opcode::Set,
-        .a = cond,
-        .res = res
-    }});
+    RValue res = emitCast(cond, ValueType::Bool, func);
 
     emitPushFree(res, func);
     condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
@@ -845,12 +833,7 @@ void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
     emitPushFree(cond, func);
-    RValue res = { Temp::create(ValueType::Bool) };
-    func.emitStatement({Operation{
-        .op = Opcode::Set,
-        .a = cond,
-        .res = res
-    }});
+    RValue res = emitCast(cond, ValueType::Bool, func);
 
     emitPushFree(res, func);
     condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
@@ -911,12 +894,7 @@ void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& 
         func.setActiveBlock(condBlock);
         RValue cond = emit(*stmt.condition, func);
         emitPushFree(cond, func);
-        RValue res = { Temp::create(ValueType::Bool) };
-        func.emitStatement({Operation{
-            .op = Opcode::Set,
-            .a = cond,
-            .res = res
-        }});
+        RValue res = emitCast(cond, ValueType::Bool, func);
 
         emitPushFree(res, func);
         condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
@@ -1062,9 +1040,9 @@ bool emit(const ast::Statement<Yield, Await, Return>& statement, FunctionEmitter
 }
 
 
+// returns true if the block contains a "terminating" statement
 template<bool Yield, bool Await, bool Return>
 bool emit(const ast::StatementList<Yield, Await, Return>& list, FunctionEmitter& func) {
-    // FIXME: ignore dead code
     struct visitor {
         FunctionEmitter& func;
         bool operator()(const ast::Statement<Yield, Await, Return>& statement) {

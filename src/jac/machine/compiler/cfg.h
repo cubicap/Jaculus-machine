@@ -350,7 +350,7 @@ struct FunctionEmitter {  // TODO: make members private, think about lists once 
         undefined.emplace_back(name, tmp);
         return LVRef::direct(tmp, false);
     }
-    std::optional<LVRef> getLocal(Identifier name) {  // TODO: update to allow for shadowing
+    std::optional<LVRef> getLocal(Identifier name) {
         for (auto& scope : scopes) {
             if (auto ref = scope.getLocal(name); ref.has_value()) {
                 return ref;

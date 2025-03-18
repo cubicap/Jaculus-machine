@@ -189,13 +189,6 @@ inline void print(std::ostream& os, const BasicBlock& block, std::set<const Basi
         case Terminal::Throw:
             break;
     }
-
-    // if (block.jump.target) {
-    //     print(os, *block.jump.target, seen);
-    // }
-    // if (block.jump.other) {
-    //     print(os, *block.jump.other, seen);
-    // }
 }
 
 inline void print(std::ostream& os, const FunctionEmitter& emitter) {

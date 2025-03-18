@@ -19,7 +19,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 
-TEST_CASE("Eval", "[aot]") {
+TEST_CASE("Basic", "[aot]") {
     using Machine = jac::ComposeMachine<
         jac::MachineBase,
         jac::AotEvalFeature,
@@ -138,6 +138,92 @@ TEST_CASE("Eval", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
     }
+
+    SECTION("Shadow") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                let c: Int32 = 0;
+                {
+                    let c: Int32 = a + b;
+                    b = c;
+                }
+                return b;
+            }
+
+            report(fun(1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
+    }
+
+    SECTION("Dead code") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(): Int32 {
+                let c: Int32 = 0;
+                return 1;
+
+                c = 2;
+                return c;
+            }
+            report(fun());
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1"});
+    }
+
+    SECTION("Dead code block") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(): Int32 {
+                let c: Int32 = 0;
+                {
+                    return 1;
+                    c = 2;
+                }
+                return c;
+            }
+            report(fun());
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1"});
+    }
+
+    SECTION("Dead code branch") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(): Int32 {
+                let c: Int32 = 0;
+                if (c == 0) {
+                    return 1;
+                    c = 2;
+                }
+                else {
+                    return 3;
+                }
+                return c;
+            }
+            report(fun());
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1"});
+    }
+}
+
+
+TEST_CASE("Control flow", "[aot]") {
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::AotEvalFeature,
+        TestReportFeature
+    >;
+
+    Machine machine;
 
     SECTION("If") {
         machine.initialize();
@@ -347,6 +433,42 @@ TEST_CASE("Eval", "[aot]") {
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"2", "4"});
+    }
+
+    SECTION("Bool conversion") {
+        machine.initialize();
+        std::string code(R"(
+            function pos(a: Int32): Int32 {
+                while (a) {
+                    if (a) {
+                        for (; a;) {
+                            return 1;
+                        }
+                        return 2;
+                    }
+                    return 3;
+                }
+                return 4;
+            }
+            function neg(a: Int32): Int32 {
+                while (a) {
+                    return 1;
+                }
+                if (a) {
+                    return 2;
+                }
+                for (;a ;) {
+                    return 3;
+                }
+                return 4;
+            }
+
+            report(pos(1));
+            report(neg(0));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1", "4"});
     }
 }
 

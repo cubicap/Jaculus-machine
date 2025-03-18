@@ -23,6 +23,74 @@ inline std::string name(TmpId id) {
     return "_" + std::to_string(id);
 }
 
+
+struct CompileContext {
+    MIR_context_t ctx;
+    MIR_module_t mod;
+    MIR_item_t fun;
+    MIR_func_t func;
+
+    std::map<TmpId, MIR_reg_t> regs;  // TODO: deduplicate information in MIR
+    std::map<BasicBlockPtr, MIR_label_t> labels;
+    std::map<TmpId, int> stackSlots;
+
+    MIR_reg_t allocaPtr;
+
+    CompileContext(MIR_context_t ctx_) : ctx(ctx_) {}
+
+    auto label(BasicBlockPtr block) {
+        auto it = labels.find(block);
+        if (it == labels.end()) {
+            it = labels.emplace(block, MIR_new_label(ctx)).first;
+        }
+        return it->second;
+    }
+
+    auto labelOp(BasicBlockPtr block) {
+        return MIR_new_label_op(ctx, label(block));
+    }
+
+    auto regOp(TmpId id, ValueType type = ValueType::I32) {  // TODO: support complex l-values
+        auto it = regs.find(id);
+        if (it == regs.end()) {
+            std::string n = name(id);
+            auto r = MIR_new_func_reg(ctx, func, getMIRRegType(type), n.c_str());
+            it = regs.emplace_hint(it, id, r);
+        }
+
+        return MIR_new_reg_op(ctx, it->second);
+    }
+
+    auto calcOff(MIR_reg_t base, int off, size_t size) {
+        auto addr = MIR_new_func_reg(ctx, func, MIR_T_I64, ("_addr" + std::to_string(getId())).c_str());
+        MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, addr), MIR_new_reg_op(ctx, base), MIR_new_int_op(ctx, off * size)));
+        return addr;
+    }
+
+    auto jsValAddr(TmpId id) -> MIR_reg_t{
+        auto it = stackSlots.find(id);
+        if (it == stackSlots.end()) {
+            return regs.at(id);
+        }
+        return calcOff(allocaPtr, it->second, sizeof(JSValue));
+    };
+
+    auto insert(MIR_insn_t insn) {
+        MIR_append_insn(ctx, fun, insn);
+    }
+
+    auto copyJSVal(MIR_reg_t srcAddr, MIR_reg_t dstAddr) {
+        static_assert(sizeof(JSValue) == 2 * sizeof(int64_t));
+
+        auto srcL = MIR_new_mem_op(ctx, MIR_T_I64, 0,               srcAddr, 0, 0);
+        auto srcH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), srcAddr, 0, 0);
+        auto dstL = MIR_new_mem_op(ctx, MIR_T_I64, 0,               dstAddr, 0, 0);
+        auto dstH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), dstAddr, 0, 0);
+        insert(MIR_new_insn(ctx, MIR_MOV, dstL, srcL));
+        insert(MIR_new_insn(ctx, MIR_MOV, dstH, srcH));
+    }
+};
+
 inline MIR_insn_code_t chooseArithmetic(Opcode op, ValueType type) {
     switch (op) {
         case Opcode::Add:  switch (type) {  // TODO: support strings
@@ -154,6 +222,7 @@ inline MIR_insn_code_t chooseConversion(ValueType from, ValueType to) {
         case ValueType::I32:
             switch (to) {
                 case ValueType::Double:    return MIR_I2D;
+                case ValueType::Bool:
                 default: throw std::runtime_error("Conversion not implemented");
             }
         case ValueType::Double:
@@ -169,6 +238,21 @@ inline MIR_insn_code_t chooseConversion(ValueType from, ValueType to) {
             }
         default:
             throw std::runtime_error("Conversion not implemented");
+    }
+}
+
+inline void createBoolConv(CompileContext cc, Temp a, Temp res, bool inverted) {
+    switch (a.type) {
+        case ValueType::I32:  case ValueType::Bool:
+            cc.insert(MIR_new_insn(cc.ctx, MIR_EQS,
+                cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, !inverted)));
+            break;
+        case ValueType::Double:
+            cc.insert(MIR_new_insn(cc.ctx, MIR_DNE,
+                cc.regOp(res.id), cc.regOp(a.id), MIR_new_double_op(cc.ctx, !inverted)));
+            break;
+        default:
+            throw std::runtime_error("BoolNot type not implemented");
     }
 }
 
@@ -227,12 +311,8 @@ inline bool isRegType(ValueType type) {
 
 
 inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_item_t, MIR_item_t>>& prototypes, Function& cfg, Builtins& builtins) {
-    std::map<TmpId, MIR_reg_t> regs;  // TODO: deduplicate information in MIR
-    std::map<BasicBlockPtr, MIR_label_t> labels;
-    std::map<TmpId, int> stackSlots = allocateStackSlots(cfg);
-
-    MIR_item_t fun;
-    MIR_func_t func;
+    CompileContext cc(ctx);
+    cc.stackSlots = allocateStackSlots(cfg);
 
     {
         std::vector<std::string> arg_names;
@@ -240,17 +320,17 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
         getArgs(cfg, arg_names, args);
 
         if (cfg.ret == ValueType::Void || hasRetArg(cfg)) {
-            fun = MIR_new_func_arr(ctx, cfg.name().c_str(), 0, nullptr, args.size(), args.data());
+            cc.fun = MIR_new_func_arr(ctx, cfg.name().c_str(), 0, nullptr, args.size(), args.data());
         }
         else {
             auto retType = getMIRRetType(cfg.ret);
-            fun = MIR_new_func_arr(ctx, cfg.name().c_str(), 1, &retType, args.size(), args.data());
+            cc.fun = MIR_new_func_arr(ctx, cfg.name().c_str(), 1, &retType, args.size(), args.data());
         }
 
-        func = MIR_get_item_func(ctx, fun);
+        cc.func = MIR_get_item_func(ctx, cc.fun);
 
         for (size_t i = 0; i < cfg.args.size(); ++i) {
-            regs.emplace(cfg.args[i].id, MIR_reg(ctx, args[i].name, func));
+            cc.regs.emplace(cfg.args[i].id, MIR_reg(ctx, args[i].name, cc.func));
         }
     }
 
@@ -258,65 +338,17 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
         MIR_finish_func(ctx);
     });
 
-    MIR_reg_t allocaPtr = MIR_new_func_reg(ctx, func, MIR_T_I64, "allocaPtr");
-    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ALLOCA, MIR_new_reg_op(ctx, allocaPtr), MIR_new_int_op(ctx, sizeof(JSValue) * stackSlots.size())));
+    cc.allocaPtr = MIR_new_func_reg(ctx, cc.func, MIR_T_I64, "allocaPtr");
+    MIR_append_insn(ctx, cc.fun, MIR_new_insn(ctx, MIR_ALLOCA, MIR_new_reg_op(ctx, cc.allocaPtr), MIR_new_int_op(ctx, sizeof(JSValue) * cc.stackSlots.size())));
 
-    insertCall(ctx, fun, builtins, "__enterStackFrame", {});
+    insertCall(ctx, cc.fun, builtins, "__enterStackFrame", {});
 
-    auto label = [&](BasicBlockPtr block) {
-        auto it = labels.find(block);
-        if (it == labels.end()) {
-            it = labels.emplace(block, MIR_new_label(ctx)).first;
-        }
-        return it->second;
-    };
-
-    auto labelOp = [&](BasicBlockPtr block) {
-        return MIR_new_label_op(ctx, label(block));
-    };
-
-    auto regOp = [&](TmpId id, ValueType type = ValueType::I32) {  // TODO: support complex l-values
-        auto it = regs.find(id);
-        if (it == regs.end()) {
-            std::string n = name(id);
-            auto r = MIR_new_func_reg(ctx, func, getMIRRegType(type), n.c_str());
-            it = regs.emplace_hint(it, id, r);
-        }
-
-        return MIR_new_reg_op(ctx, it->second);
-    };
-
-    auto calcOff = [&](MIR_reg_t base, int off, size_t size) {
-        auto addr = MIR_new_func_reg(ctx, func, MIR_T_I64, ("_addr" + std::to_string(getId())).c_str());
-        MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, addr), MIR_new_reg_op(ctx, base), MIR_new_int_op(ctx, off * size)));
-        return addr;
-    };
-
-    auto jsValAddr = [&](TmpId id) -> MIR_reg_t{
-        auto it = stackSlots.find(id);
-        if (it == stackSlots.end()) {
-            return regs.at(id);
-        }
-        return calcOff(allocaPtr, it->second, sizeof(JSValue));
-    };
-
-    auto insert = [&](MIR_insn_t insn) {
-        MIR_append_insn(ctx, fun, insn);
-    };
-
-    auto copyJSVal = [&](MIR_reg_t srcAddr, MIR_reg_t dstAddr) {
-        static_assert(sizeof(JSValue) == 2 * sizeof(int64_t));
-
-        auto srcL = MIR_new_mem_op(ctx, MIR_T_I64, 0,               srcAddr, 0, 0);
-        auto srcH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), srcAddr, 0, 0);
-        auto dstL = MIR_new_mem_op(ctx, MIR_T_I64, 0,               dstAddr, 0, 0);
-        auto dstH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), dstAddr, 0, 0);
-        insert(MIR_new_insn(ctx, MIR_MOV, dstL, srcL));
-        insert(MIR_new_insn(ctx, MIR_MOV, dstH, srcH));
+    auto regOp = [&cc](TmpId id, ValueType type = ValueType::I32) {
+        return cc.regOp(id, type);
     };
 
     for (auto& block : cfg.blocks) {
-        MIR_append_insn(ctx, fun, label(block.get()));
+        MIR_append_insn(ctx, cc.fun, cc.label(block.get()));
 
         for (auto statement : block->statements) {
             if (auto op = std::get_if<Operation>(&statement.op)) {
@@ -328,26 +360,26 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     case Opcode::Add:  case Opcode::Sub:  case Opcode::Mul:
                     case Opcode::Div:  case Opcode::Rem:  case Opcode::Pow:
                         assert(op->a.type == op->b.type && op->res.type == op->a.type);
-                        insert(MIR_new_insn(ctx, chooseArithmetic(op->op, op->a.type),
+                        cc.insert(MIR_new_insn(ctx, chooseArithmetic(op->op, op->a.type),
                             regOp(op->res.id), regOp(op->a.id), regOp(op->b.id)));
                         break;
                     case Opcode::LShift:  case Opcode::RShift:  case Opcode::URShift:
                     case Opcode::BitAnd:  case Opcode::BitOr:   case Opcode::BitXor:
                         assert(isIntegral(op->b.type) && op->res.type == op->a.type);
-                        insert(MIR_new_insn(ctx, chooseBitwise(op->op, op->a.type),
+                        cc.insert(MIR_new_insn(ctx, chooseBitwise(op->op, op->a.type),
                             regOp(op->res.id), regOp(op->a.id), regOp(op->b.id)));
                         break;
                     case Opcode::Eq:  case Opcode::Neq:
                     case Opcode::Gt:  case Opcode::Gte:
                     case Opcode::Lt:  case Opcode::Lte:
                         assert(op->a.type == op->b.type && op->res.type == ValueType::Bool);
-                        insert(MIR_new_insn(ctx, chooseComparison(op->op, op->a.type),
+                        cc.insert(MIR_new_insn(ctx, chooseComparison(op->op, op->a.type),
                             regOp(op->res.id), regOp(op->a.id), regOp(op->b.id)));
                         break;
                     case Opcode::GetMember:
                         assert(op->res.type == ValueType::Any);
                         if (op->a.type == ValueType::Object && op->b.type == ValueType::StringConst) {
-                            insertCall(ctx, fun, builtins, "__getMemberObjCStr", { regs.at(op->a.id), regs.at(op->b.id), jsValAddr(op->res.id) });
+                            insertCall(ctx, cc.fun, builtins, "__getMemberObjCStr", { cc.regs.at(op->a.id), cc.regs.at(op->b.id), cc.jsValAddr(op->res.id) });
                         }
                         else {
                             throw std::runtime_error("GetMember is not fully supported");
@@ -356,9 +388,9 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     // Unary
                     case Opcode::Set: {
                         if (op->a.type == ValueType::Any && op->res.type == ValueType::Any) {
-                            auto baseSrc = jsValAddr(op->a.id);
-                            auto baseDst = jsValAddr(op->res.id);
-                            copyJSVal(baseSrc, baseDst);
+                            auto baseSrc = cc.jsValAddr(op->a.id);
+                            auto baseDst = cc.jsValAddr(op->res.id);
+                            cc.copyJSVal(baseSrc, baseDst);
                             break;
                         }
                         else if (op->a.type == ValueType::Any) {
@@ -367,41 +399,34 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                         else if (op->res.type == ValueType::Any) {
                             throw std::runtime_error("Set non-Any to Any is not supported");
                         }
-                        insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
+                        else if (op->res.type == ValueType::Bool) {
+                            createBoolConv(cc, op->a, op->res, false);
+                            break;
+                        }
+                        cc.insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
                     } break;
                     case Opcode::UnPlus:
-                        insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
+                        cc.insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
                         break;
-                    case Opcode::BoolNot: {
-                        switch (op->a.type) {
-                            case ValueType::I32:  case ValueType::Bool:
-                                insert(MIR_new_insn(ctx, MIR_EQS,
-                                    regOp(op->res.id), regOp(op->a.id), MIR_new_int_op(ctx, 0)));
-                                break;
-                            case ValueType::Double:
-                                insert(MIR_new_insn(ctx, MIR_DNE,
-                                    regOp(op->res.id), regOp(op->a.id), MIR_new_double_op(ctx, 0)));
-                                break;
-                            default:
-                                throw std::runtime_error("BoolNot type not implemented");
-                        }
-                    } break;
+                    case Opcode::BoolNot:
+                        createBoolConv(cc, op->a, op->res, true);
+                        break;
                     case Opcode::BitNot: {
                         assert(op->a.type == op->res.type && op->a.type == ValueType::I32);
-                        insert(MIR_new_insn(ctx, MIR_XORS,
+                        cc.insert(MIR_new_insn(ctx, MIR_XORS,
                             regOp(op->res.id), regOp(op->a.id), MIR_new_int_op(ctx, -1)));
                     } break;
                     case Opcode::UnMinus: {
                         assert(op->a.type == op->res.type);
-                        insert(MIR_new_insn(ctx, chooseArithmetic(op->op, op->a.type),
+                        cc.insert(MIR_new_insn(ctx, chooseArithmetic(op->op, op->a.type),
                             regOp(op->res.id), regOp(op->a.id)));
                     } break;
                     case Opcode::Dup:
                         if (op->a.type == ValueType::Any) {
-                            insertCall(ctx, fun, builtins, "__dupVal", { jsValAddr(op->a.id) });
+                            insertCall(ctx, cc.fun, builtins, "__dupVal", { cc.jsValAddr(op->a.id) });
                         }
                         else if (op->a.type == ValueType::Object) {
-                            insertCall(ctx, fun, builtins, "__dupObj", { regs.at(op->a.id) });
+                            insertCall(ctx, cc.fun, builtins, "__dupObj", { cc.regs.at(op->a.id) });
                         }
                         else if (!isNumeric(op->a.type)) {
                             throw std::runtime_error("Dup is not fully supported");
@@ -409,10 +434,10 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                         break;
                     case Opcode::PushFree:
                         if (op->a.type == ValueType::Any) {
-                            insertCall(ctx, fun, builtins, "__pushFreeVal", { jsValAddr(op->a.id) });
+                            insertCall(ctx, cc.fun, builtins, "__pushFreeVal", { cc.jsValAddr(op->a.id) });
                         }
                         else if (op->a.type == ValueType::Object) {
-                            insertCall(ctx, fun, builtins, "__pushFreeObj", { regs.at(op->a.id) });
+                            insertCall(ctx, cc.fun, builtins, "__pushFreeObj", { cc.regs.at(op->a.id) });
                         }
                         else if (!isNumeric(op->a.type) && op->a.type != ValueType::StringConst) {
                             throw std::runtime_error("PushFree is not fully supported");
@@ -427,22 +452,22 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 std::visit([&](auto val) {
                     if constexpr (std::is_same_v<std::decay_t<decltype(val)>, int32_t>) {
                         auto vOp = MIR_new_int_op(ctx, val);
-                        insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
+                        cc.insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
                     }
                     else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, double>) {
                         auto vOp = MIR_new_double_op(ctx, val);
-                        insert(MIR_new_insn(ctx, MIR_DMOV, reg, vOp));
+                        cc.insert(MIR_new_insn(ctx, MIR_DMOV, reg, vOp));
                     }
                     else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, bool>) {
                         auto vOp = MIR_new_int_op(ctx, val);
-                        insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
+                        cc.insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
                     }
                     else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, std::string>) {
                         auto strDup = std::make_unique<char[]>(val.size() + 1);
                         std::copy(val.begin(), val.end(), strDup.get());
                         strDup[val.size()] = '\0';
                         auto vOp = MIR_new_int_op(ctx, reinterpret_cast<uint64_t>(strDup.get()));  // NOLINT
-                        insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
+                        cc.insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
                         builtins.rtCtx->stringConsts.emplace_back(std::move(strDup));
                     }
                 }, init->value);
@@ -461,7 +486,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 for (auto& arg : call->args) {
                     args.push_back(regOp(arg.id));
                 }
-                insert(MIR_new_insn_arr(ctx, MIR_CALL, args.size(), args.data()));
+                cc.insert(MIR_new_insn_arr(ctx, MIR_CALL, args.size(), args.data()));
             }
         }
 
@@ -471,28 +496,28 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
             case Terminal::Branch: {
                 auto cond = block->jump.value;
                 assert(cond->type == ValueType::Bool);
-                insert(MIR_new_insn(ctx, MIR_BTS, labelOp(block->jump.target), regOp(cond->id)));
-                insert(MIR_new_insn(ctx, MIR_JMP, labelOp(block->jump.other)));
+                cc.insert(MIR_new_insn(ctx, MIR_BTS, cc.labelOp(block->jump.target), regOp(cond->id)));
+                cc.insert(MIR_new_insn(ctx, MIR_JMP, cc.labelOp(block->jump.other)));
             } break;
             case Terminal::Jump: {
-                insert(MIR_new_insn(ctx, MIR_JMP, labelOp(block->jump.target)));
+                cc.insert(MIR_new_insn(ctx, MIR_JMP, cc.labelOp(block->jump.target)));
             } break;
             case Terminal::Return:
-                insertCall(ctx, fun, builtins, "__exitStackFrame", {});
-                insert(MIR_new_ret_insn(ctx, 0));
+                insertCall(ctx, cc.fun, builtins, "__exitStackFrame", {});
+                cc.insert(MIR_new_ret_insn(ctx, 0));
                 break;
             case Terminal::ReturnValue:
-                insertCall(ctx, fun, builtins, "__exitStackFrame", {});
+                insertCall(ctx, cc.fun, builtins, "__exitStackFrame", {});
                 if (hasRetArg(cfg)) {
                     auto res = block->jump.value;
                     assert(res->type == cfg.ret);
-                    auto addr = jsValAddr(res->id);
-                    auto resReg = MIR_reg(ctx, "res", func);
-                    copyJSVal(addr, resReg);
-                    insert(MIR_new_ret_insn(ctx, 0));
+                    auto addr = cc.jsValAddr(res->id);
+                    auto resReg = MIR_reg(ctx, "res", cc.func);
+                    cc.copyJSVal(addr, resReg);
+                    cc.insert(MIR_new_ret_insn(ctx, 0));
                 }
                 else {
-                    insert(MIR_new_ret_insn(ctx, 1, regOp(block->jump.value->id)));
+                    cc.insert(MIR_new_ret_insn(ctx, 1, regOp(block->jump.value->id)));
                 }
                 break;
             case Terminal::Throw:
@@ -502,7 +527,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
         }
     }
 
-    return fun;
+    return cc.fun;
 }
 
 

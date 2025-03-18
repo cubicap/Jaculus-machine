@@ -62,19 +62,6 @@ namespace detail {
 
 
 inline void removeEmptyBlocks(FunctionEmitter& emitter) {
-    {
-        auto reachable = detail::findReachable(emitter.getEntry());
-        for (auto it = emitter.blocks.begin(); it != emitter.blocks.end();) {
-            if (!reachable.contains(it->get())) {
-                assert(it->get()->statements.empty());
-                it = emitter.blocks.erase(it);
-            }
-            else {
-                ++it;
-            }
-        }
-    }
-
     Replacements replacements;
 
     for (auto& block : emitter.blocks) {
@@ -117,6 +104,18 @@ inline void removeEmptyBlocks(FunctionEmitter& emitter) {
     for (auto it = emitter.blocks.begin(); it != emitter.blocks.end(); ++it) {
         if (remap.contains(it->get())) {
             it = emitter.blocks.erase(it);
+        }
+    }
+
+    {
+        auto reachable = detail::findReachable(emitter.getEntry());
+        for (auto it = emitter.blocks.begin(); it != emitter.blocks.end();) {
+            if (!reachable.contains(it->get())) {
+                it = emitter.blocks.erase(it);
+            }
+            else {
+                ++it;
+            }
         }
     }
 }
