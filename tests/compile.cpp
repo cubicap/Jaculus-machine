@@ -470,6 +470,56 @@ TEST_CASE("Control flow", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"1", "4"});
     }
+
+    SECTION("Break") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32): Int32 {
+                let c: Int32 = 0;
+                for (let i: Int32 = 0; i < a; i = i + 1) {
+                    let j: Int32 = 0;
+                    while (j < a) {
+                        c = c + 1;
+                        if (j == i) {
+                            break;
+                        }
+                        j = j + 1;
+                    }
+                }
+                return c;
+            }
+
+            report(fun(4));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"10"});
+    }
+
+    SECTION("Continue") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32): Int32 {
+                let c: Int32 = 0;
+                for (let i: Int32 = 0; i < a; i = i + 1) {
+                    let j: Int32 = 0;
+                    while (j < a) {
+                        j = j + 1;
+                        if (j == i) {
+                            continue;
+                        }
+                        c = c + 1;
+                    }
+                }
+                return c;
+            }
+
+            report(fun(4));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"13"});
+    }
 }
 
 
@@ -627,6 +677,33 @@ TEST_CASE("Any", "[aot]") {
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"5678"});
+    }
+
+    SECTION("Wrap-unwrap") {
+        machine.initialize();
+        std::string code(R"(
+            function toInt32(a: any): Int32 { return a; }
+            function toFloat(a: any): Float { return a; }
+            function toBool(a: any): Bool { return a; }
+
+            function _fromInt32(a: Int32): Int32 { return a; }
+            function _fromFloat(a: Float): Float { return a; }
+            function _fromBool(a: Bool): Bool { return a; }
+
+            report(toInt32(1234));
+            report(toFloat(5678.9));
+            report(toBool(true));
+
+            report(_fromInt32(1234));
+            report(_fromFloat(5678.9));
+            report(_fromBool(false));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{
+            "1234", "5678.9", "true",
+            "1234", "5678.9", "false"
+        });
     }
 }
 

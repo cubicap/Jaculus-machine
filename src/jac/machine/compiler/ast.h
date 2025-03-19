@@ -1361,11 +1361,49 @@ struct BreakableStatement {
 template<bool Yield, bool Await>
 struct ContinueStatement {
     std::optional<LabelIdentifier<Yield, Await>> label;
+
+    static std::optional<ContinueStatement<Yield, Await>> parse(ParserState& state) {
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "continue") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        ContinueStatement<Yield, Await> statement;
+
+        if (auto ident = LabelIdentifier<Yield, Await>::parse(state)) {
+            statement.label = std::move(*ident);
+        }
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+            state.error("Expected ;");
+            return std::nullopt;
+        }
+        state.advance();
+        return statement;
+    }
 };
 
 template<bool Yield, bool Await>
 struct BreakStatement {
     std::optional<LabelIdentifier<Yield, Await>> label;
+
+    static std::optional<BreakStatement<Yield, Await>> parse(ParserState& state) {
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "break") {
+            return std::nullopt;
+        }
+        state.advance();
+
+        BreakStatement<Yield, Await> statement;
+
+        if (auto ident = LabelIdentifier<Yield, Await>::parse(state)) {
+            statement.label = std::move(*ident);
+        }
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+            state.error("Expected ;");
+            return std::nullopt;
+        }
+        state.advance();
+        return statement;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -1551,6 +1589,12 @@ struct Statement {
         }
         if (auto breakable = BreakableStatement<Yield, Await, Return>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*breakable)};
+        }
+        if (auto continue_ = ContinueStatement<Yield, Await>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*continue_)};
+        }
+        if (auto break_ = BreakStatement<Yield, Await>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*break_)};
         }
         if constexpr (Return) {
             auto ret = ReturnStatement<Yield, Await>::parse(state);

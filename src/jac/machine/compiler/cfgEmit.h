@@ -978,6 +978,32 @@ void emit(const ast::ReturnStatement<Yield, Await>& stmt, FunctionEmitter& func)
     func.getActiveBlock()->jump = Terminal::retVal(conv);
 }
 
+template<bool Yield, bool Await>
+void emit(const ast::ContinueStatement<Yield, Await>& stmt, FunctionEmitter& func) {
+    if (stmt.label) {
+        throw std::runtime_error("Labeled continue statements are not supported");
+    }
+    if (auto target = func.getContinueTarget()) {
+        func.getActiveBlock()->jump = Terminal::jump(target);
+    }
+    else {
+        throw std::runtime_error("Continue statement without target");
+    }
+}
+
+template<bool Yield, bool Await>
+void emit(const ast::BreakStatement<Yield, Await>& stmt, FunctionEmitter& func) {
+    if (stmt.label) {
+        throw std::runtime_error("Labeled break statements are not supported");
+    }
+    if (auto target = func.getBreakTarget()) {
+        func.getActiveBlock()->jump = Terminal::jump(target);
+    }
+    else {
+        throw std::runtime_error("Break statement without target");
+    }
+}
+
 
 template<bool Yield, bool Await, bool Return>
 bool emit(const ast::Block<Yield, Await, Return>& block, FunctionEmitter& func);
@@ -1010,11 +1036,13 @@ bool emit(const ast::Statement<Yield, Await, Return>& statement, FunctionEmitter
             emit(stmt, func);
             return false;
         }
-        bool operator()(const ast::ContinueStatement<Yield, Await>&) {
-            throw std::runtime_error("Continue statements are not supported");
+        bool operator()(const ast::ContinueStatement<Yield, Await>& stmt) {
+            emit(stmt, func);
+            return false;
         }
-        bool operator()(const ast::BreakStatement<Yield, Await>&) {
-            throw std::runtime_error("Break statements are not supported");
+        bool operator()(const ast::BreakStatement<Yield, Await>& stmt) {
+            emit(stmt, func);
+            return true;
         }
         bool operator()(const ast::ReturnStatement<Yield, Await>& stmt) {
             emit(stmt, func);
