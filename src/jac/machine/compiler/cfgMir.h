@@ -50,7 +50,7 @@ struct CompileContext {
         return MIR_new_label_op(ctx, label(block));
     }
 
-    auto regOp(TmpId id, ValueType type = ValueType::I32) {  // TODO: support complex l-values
+    auto reg(TmpId id, ValueType type) {
         auto it = regs.find(id);
         if (it == regs.end()) {
             std::string n = name(id);
@@ -58,7 +58,11 @@ struct CompileContext {
             it = regs.emplace_hint(it, id, r);
         }
 
-        return MIR_new_reg_op(ctx, it->second);
+        return it->second;
+    }
+
+    auto regOp(TmpId id) {
+        return MIR_new_reg_op(ctx, regs.at(id));
     }
 
     auto calcOff(MIR_reg_t base, int off, size_t size) {
@@ -343,8 +347,8 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
 
     insertCall(ctx, cc.fun, builtins, "__enterStackFrame", {});
 
-    auto regOp = [&cc](TmpId id, ValueType type = ValueType::I32) {
-        return cc.regOp(id, type);
+    auto regOp = [&cc](TmpId id) {
+        return cc.regOp(id);
     };
 
     for (auto& block : cfg.blocks) {
@@ -353,7 +357,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
         for (auto statement : block->statements) {
             if (auto op = std::get_if<Operation>(&statement.op)) {
                 if (isRegType(op->res.type)) {
-                    regOp(op->res.id, op->res.type);
+                    cc.reg(op->res.id, op->res.type);
                 }
                 switch (op->op) {
                     // Binary
@@ -448,7 +452,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 }
             }
             else if (auto init = std::get_if<ConstInit>(&statement.op)) {
-                auto reg = regOp(init->id, init->type());
+                auto reg = MIR_new_reg_op(ctx, cc.reg(init->id, init->type()));
                 std::visit([&](auto val) {
                     if constexpr (std::is_same_v<std::decay_t<decltype(val)>, int32_t>) {
                         auto vOp = MIR_new_int_op(ctx, val);
@@ -473,6 +477,9 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 }, init->value);
             }
             else if (auto call = std::get_if<Call>(&statement.op)) {
+                if (call->res.type != ValueType::Void) {
+                    cc.reg(call->res.id, call->res.type);
+                }
                 std::vector<MIR_op_t> args;
                 if (!call->isNative()) {
                     throw std::runtime_error("Object calls are not supported");
