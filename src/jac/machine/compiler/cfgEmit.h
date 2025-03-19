@@ -973,8 +973,9 @@ void emit(const ast::ReturnStatement<Yield, Await>& stmt, FunctionEmitter& func)
 
     Value arg = { emit(*stmt.expression, func) };
     RValue argR = materialize(arg, func);
+    RValue conv = emitCast(argR, func.signature->ret, func);
 
-    func.getActiveBlock()->jump = Terminal::retVal(argR);
+    func.getActiveBlock()->jump = Terminal::retVal(conv);
 }
 
 

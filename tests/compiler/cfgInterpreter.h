@@ -59,6 +59,17 @@ struct ConvertVisitor<double> {
     double operator()(DoubleAble auto v) {
         return static_cast<double>(v);
     }
+    double operator()(JSValue v) {
+        switch (JS_VALUE_GET_TAG(v)) {
+            case JS_TAG_INT:  case JS_TAG_BOOL:
+                return static_cast<double>(JS_VALUE_GET_INT(v));
+            case JS_TAG_FLOAT64:
+                return JS_VALUE_GET_FLOAT64(v);
+            default:
+                break;
+        }
+        throw std::runtime_error("Invalid conversion to Double");
+    }
     double operator()(auto) {
         throw std::runtime_error("Invalid conversion to Double");
     }
@@ -73,6 +84,13 @@ struct ConvertVisitor<bool> {
     }
     bool operator()(DoubleAble auto v) {
         return v != 0;
+    }
+    bool operator()(JSValue v) {
+        int32_t res = JS_ToBool(ctx, v);
+        if (res < 0) {
+            throw std::runtime_error("Invalid conversion to Bool");
+        }
+        return res != 0;
     }
     bool operator()(auto) {
         throw std::runtime_error("Invalid conversion to Bool");
@@ -111,12 +129,7 @@ struct ConvertVisitor<JSValue> {
         return v;
     }
     JSValue operator()(ObjectPtr v) {
-        return (JSValue) {
-            .u = {
-                .ptr = v.ptr
-            },
-            .tag = JS_TAG_OBJECT
-        };
+        return JS_MKPTR(JS_TAG_OBJECT, v.ptr);
     }
     JSValue operator()(int32_t v) {
         return JS_NewInt32(ctx, v);
