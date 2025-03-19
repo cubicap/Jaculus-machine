@@ -34,8 +34,6 @@ add_test_executable(plugins)
 add_test_executable(scanner)
 add_test_executable(parser)
 
-add_test_executable(asScanner)
-
 add_executable(compileCfg compile.cpp)
 target_compile_definitions(compileCfg PRIVATE COMPILE_CFG_ONLY)
 target_link_libraries(compileCfg PUBLIC jac-machine Catch2::Catch2WithMain)
