@@ -690,7 +690,7 @@ struct BindingPattern {
     > value;
 
     static std::optional<BindingPattern<Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 
@@ -779,7 +779,7 @@ struct BindingRestElement {
     > value;
 
     static std::optional<BindingRestElement<Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -1044,6 +1044,11 @@ struct VariableDeclarationList {
 template<bool Yield, bool Await>
 struct VariableStatement {
     VariableDeclarationList<true, Yield, Await> declarationList;
+
+    static std::optional<VariableStatement<Yield, Await>> parse(ParserState&) {
+        // XXX: ignore for now
+        return std::nullopt;
+    }
 };
 
 struct EmptyStatement {
@@ -1289,6 +1294,10 @@ struct ForStatement {
 template<bool Yield, bool Await, bool Return>
 struct ForInOfStatement {
     // XXX: ignore for now
+
+    static std::optional<ForInOfStatement<Yield, Await, Return>> parse(ParserState&) {
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Return>
@@ -1310,7 +1319,9 @@ struct IterationStatement {
         if (auto forStmt = ForStatement<Yield, Await, Return>::parse(state)) {
             return IterationStatement<Yield, Await, Return>{std::move(*forStmt)};
         }
-        // TODO: rest
+        if (auto forInOf = ForInOfStatement<Yield, Await, Return>::parse(state)) {
+            return IterationStatement<Yield, Await, Return>{std::move(*forInOf)};
+        }
 
         return std::nullopt;
     }
@@ -1334,7 +1345,7 @@ struct SwitchStatement {
     std::optional<DefaultClause<Yield, Await, Return>> defaultClause;
 
     static std::optional<SwitchStatement<Yield, Await, Return>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -1437,6 +1448,10 @@ struct ReturnStatement {
 template<bool Yield, bool Await, bool Return>
 struct WithStatement {
     // XXX: ignore for now
+
+    static std::optional<WithStatement<Yield, Await, Return>> parse(ParserState&) {
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Default>
@@ -1525,11 +1540,21 @@ struct LabeledStatement {
         StatementPtr<Yield, Await, Return>,
         FunctionDeclaration<Yield, Await, false>
     > statement;
+
+    static std::optional<LabeledStatement<Yield, Await, Return>> parse(ParserState&) {
+        // XXX: ignore for now
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
 struct ThrowStatement {
     Expression<true, Yield, Await> expression;
+
+    static std::optional<ThrowStatement<Yield, Await>> parse(ParserState&) {
+        // XXX: ignore for now
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await>
@@ -1551,9 +1576,27 @@ struct TryStatement {
     Block<Yield, Await, Return> block;
     std::optional<Catch<Yield, Await, Return>> catchClause;
     std::optional<Block<Yield, Await, Return>> finallyClause;
+
+    static std::optional<TryStatement<Yield, Await, Return>> parse(ParserState&) {
+        // XXX: ignore for now
+        return std::nullopt;
+    }
 };
 
-struct DebuggerStatement {};
+struct DebuggerStatement {
+    static std::optional<DebuggerStatement> parse(ParserState& state) {
+        if (state.current().kind != lex::Token::Keyword || state.current().text != "debugger") {
+            return std::nullopt;
+        }
+        state.advance();
+        if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+            state.error("Expected ;");
+            return std::nullopt;
+        }
+        state.advance();
+        return DebuggerStatement{};
+    }
+};
 
 template<bool Yield, bool Await, bool Return>
 struct Statement {
@@ -1577,6 +1620,9 @@ struct Statement {
     static std::optional<Statement<Yield, Await, Return>> parse(ParserState& state) {
         if (auto block = BlockStatement<Yield, Await, Return>::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*block)};
+        }
+        if (auto variable = VariableStatement<Yield, Await>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*variable)};
         }
         if (auto empty = EmptyStatement::parse(state)) {
             return Statement<Yield, Await, Return>{std::move(*empty)};
@@ -1602,8 +1648,22 @@ struct Statement {
                 return Statement<Yield, Await, Return>{std::move(*ret)};
             }
         }
+        if (auto with = WithStatement<Yield, Await, Return>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*with)};
+        }
+        if (auto labeled = LabeledStatement<Yield, Await, Return>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*labeled)};
+        }
+        if (auto throw_ = ThrowStatement<Yield, Await>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*throw_)};
+        }
+        if (auto try_ = TryStatement<Yield, Await, Return>::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*try_)};
+        }
+        if (auto debugger = DebuggerStatement::parse(state)) {
+            return Statement<Yield, Await, Return>{std::move(*debugger)};
+        }
 
-        // TODO: rest
         return std::nullopt;
     }
 };
@@ -1613,6 +1673,11 @@ struct GeneratorDeclaration {
     std::optional<BindingIdentifier<Yield, Await>> name;  // optional only when [+Default]
     FormalParameters<false, false> parameters;
     GeneratorBody body;
+
+    static std::optional<GeneratorDeclaration<Yield, Await, Default>> parse(ParserState&) {
+        // XXX: ignore for now
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Default>
@@ -1620,6 +1685,11 @@ struct AsyncFunctionDeclaration {
     std::optional<BindingIdentifier<Yield, Await>> name;  // optional only when [+Default]
     FormalParameters<false, false> parameters;
     AsyncFunctionBody body;
+
+    static std::optional<AsyncFunctionDeclaration<Yield, Await, Default>> parse(ParserState&) {
+        // XXX: ignore for now
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Default>
@@ -1627,6 +1697,11 @@ struct AsyncGeneratorDeclaration {
     std::optional<BindingIdentifier<Yield, Await>> name;  // optional only when [+Default]
     FormalParameters<false, false> parameters;
     AsyncGeneratorBody body;
+
+    static std::optional<AsyncGeneratorDeclaration<Yield, Await, Default>> parse(ParserState&) {
+        // XXX: ignore for now
+        return std::nullopt;
+    }
 };
 
 template<bool Yield, bool Await, bool Default>
@@ -1642,9 +1717,15 @@ struct HoistableDeclaration {
         if (auto function = FunctionDeclaration<Yield, Await, Default>::parse(state)) {
             return HoistableDeclaration<Yield, Await, Default>{std::move(*function)};
         }
-
-        // TODO: rest
-
+        if (auto generator = GeneratorDeclaration<Yield, Await, Default>::parse(state)) {
+            return HoistableDeclaration<Yield, Await, Default>{std::move(*generator)};
+        }
+        if (auto asyncFunction = AsyncFunctionDeclaration<Yield, Await, Default>::parse(state)) {
+            return HoistableDeclaration<Yield, Await, Default>{std::move(*asyncFunction)};
+        }
+        if (auto asyncGenerator = AsyncGeneratorDeclaration<Yield, Await, Default>::parse(state)) {
+            return HoistableDeclaration<Yield, Await, Default>{std::move(*asyncGenerator)};
+        }
         return std::nullopt;
     }
 };
@@ -1701,7 +1782,7 @@ struct ClassDeclaration {
     ClassBody<Yield, Await> body;
 
     static std::optional<ClassDeclaration<Yield, Await, Default>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -1948,7 +2029,7 @@ struct SuperProperty {
     > value;
 
     static std::optional<SuperProperty<Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -1962,7 +2043,7 @@ struct MetaProperty {
     Kind kind;
 
     static std::optional<MetaProperty> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -2148,7 +2229,7 @@ struct SuperCall {
     Arguments<Yield, Await> arguments;
 
     static std::optional<SuperCall<Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -2158,7 +2239,7 @@ struct ImportCall {
     Expression<true, Yield, Await> expression;
 
     static std::optional<ImportCall<Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -2319,7 +2400,7 @@ struct YieldExpression {
     std::optional<AssignmentExpressionPtr<In, Yield, Await>> expression;
 
     static std::optional<YieldExpression<In, Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -2346,7 +2427,7 @@ struct ArrowFunction {
     ConciseBody<In> body;
 
     static std::optional<ArrowFunction<In, Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
@@ -2368,7 +2449,7 @@ struct AsyncArrowFunction {
     AsyncConciseBody<In> body;
 
     static std::optional<AsyncArrowFunction<In, Yield, Await>> parse(ParserState&) {
-        // TODO
+        // XXX: ignore for now
         return std::nullopt;
     }
 };
