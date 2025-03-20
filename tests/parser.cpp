@@ -22,12 +22,12 @@ bool floatEq(auto a, auto b) {
 
 
 template<bool Yield, bool Await>
-jac::ast::PrimaryExpression<Yield, Await>& unaryExpPrimary(jac::ast::UnaryExpression<Yield, Await>& expr) {
+jac::ast::PrimaryExpression<Yield, Await>& unaryExpPrimary(jac::ast::UnaryExpressionPtr<Yield, Await>& expr) {
     return std::get<jac::ast::PrimaryExpression<Yield, Await>>(
       std::get<jac::ast::MemberExpression<Yield, Await>>(
         std::get<jac::ast::NewExpression<Yield, Await>>(
           std::get<jac::ast::LeftHandSideExpressionPtr<Yield, Await>>(
-            std::get<jac::ast::UpdateExpression<Yield, Await>>(expr.value)
+            std::get<jac::ast::UpdateExpression<Yield, Await>>(expr->value)
           .value)
         ->value)
       .value)
@@ -35,7 +35,7 @@ jac::ast::PrimaryExpression<Yield, Await>& unaryExpPrimary(jac::ast::UnaryExpres
 }
 
 template<bool Yield, bool Await>
-jac::ast::Literal& unaryExpLiteral(jac::ast::UnaryExpression<Yield, Await>& expr) {
+jac::ast::Literal& unaryExpLiteral(jac::ast::UnaryExpressionPtr<Yield, Await>& expr) {
     return std::get<jac::ast::Literal>(
         unaryExpPrimary(expr)
     .value);
@@ -49,18 +49,18 @@ std::int32_t literalI32(jac::ast::Literal& lit) {
 }
 
 template<bool Yield, bool Await>
-std::int32_t unaryExpI32(jac::ast::UnaryExpression<Yield, Await>& expr) {
+std::int32_t unaryExpI32(jac::ast::UnaryExpressionPtr<Yield, Await>& expr) {
     return literalI32(unaryExpLiteral(expr));
 }
 
 template<bool Yield, bool Await>
-std::string_view unaryExpIdentifier(jac::ast::UnaryExpression<Yield, Await>& expr) {
+std::string_view unaryExpIdentifier(jac::ast::UnaryExpressionPtr<Yield, Await>& expr) {
     return std::get<jac::ast::IdentifierReference<Yield, Await>>(
       std::get<jac::ast::PrimaryExpression<Yield, Await>>(
         std::get<jac::ast::MemberExpression<Yield, Await>>(
           std::get<jac::ast::NewExpression<Yield, Await>>(
             std::get<jac::ast::LeftHandSideExpressionPtr<Yield, Await>>(
-              std::get<jac::ast::UpdateExpression<Yield, Await>>(expr.value)
+              std::get<jac::ast::UpdateExpression<Yield, Await>>(expr->value)
             .value)
           ->value)
         .value)
@@ -76,8 +76,8 @@ jac::ast::BinaryExpression<In, Yield, Await>& assignExpBinary(jac::ast::Assignme
 }
 
 template<bool In, bool Yield, bool Await>
-jac::ast::UnaryExpression<Yield, Await>& assignExpUnary(jac::ast::AssignmentExpression<In, Yield, Await>& expr) {
-    return std::get<jac::ast::UnaryExpression<Yield, Await>>(assignExpBinary(expr).value);
+jac::ast::UnaryExpressionPtr<Yield, Await>& assignExpUnary(jac::ast::AssignmentExpression<In, Yield, Await>& expr) {
+    return std::get<jac::ast::UnaryExpressionPtr<Yield, Await>>(assignExpBinary(expr).value);
 }
 
 template<bool Yield, bool Await>
@@ -783,12 +783,12 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
                       std::get<jac::ast::NewExpression<true, true>>(
                         std::get<jac::ast::LeftHandSideExpressionPtr<true, true>>(
                           std::get<jac::ast::UpdateExpression<true, true>>(
-                            std::get<jac::ast::UnaryExpression<true, true>>(
+                            std::get<jac::ast::UnaryExpressionPtr<true, true>>(
                               std::get<jac::ast::BinaryExpression<true, true, true>>(
                                 std::get<jac::ast::ConditionalExpression<true, true, true>>(pair.second->value)
                               .value)
                             .value)
-                          .value)
+                          ->value)
                         .value)
                       ->value)
                     .value)
@@ -830,7 +830,7 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
             .value)
         .value);
 
-        REQUIRE((std::get<2>(exp) == "+"));
+        REQUIRE(std::get<2>(exp) == "+");
         REQUIRE(
             std::get<jac::ast::IdentifierReference<true, true>>(
               std::get<jac::ast::PrimaryExpression<true, true>>(
@@ -838,10 +838,10 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
                   std::get<jac::ast::NewExpression<true, true>>(
                     std::get<jac::ast::LeftHandSideExpressionPtr<true, true>>(
                         std::get<jac::ast::UpdateExpression<true, true>>(
-                        std::get<jac::ast::UnaryExpression<true, true>>(
+                        std::get<jac::ast::UnaryExpressionPtr<true, true>>(
                           std::get<0>(exp)
                         ->value)
-                      .value)
+                      ->value)
                     .value)
                   ->value)
                 .value)
@@ -855,10 +855,10 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
                   std::get<jac::ast::NewExpression<true, true>>(
                     std::get<jac::ast::LeftHandSideExpressionPtr<true, true>>(
                       std::get<jac::ast::UpdateExpression<true, true>>(
-                        std::get<jac::ast::UnaryExpression<true, true>>(
+                        std::get<jac::ast::UnaryExpressionPtr<true, true>>(
                           std::get<1>(exp)
                         ->value)
-                      .value)
+                      ->value)
                     .value)
                   ->value)
                 .value)
@@ -888,12 +888,12 @@ TEST_CASE("UnaryExpression", "[parser]") {
 
 
         auto& un1 = std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(result->value);
-        REQUIRE((un1.second == "+"));
+        REQUIRE(un1.second == "+");
 
         auto& inner = std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(un1.first->value);
-        REQUIRE((inner.second == "-"));
+        REQUIRE(inner.second == "-");
 
-        REQUIRE(literalI32(unaryExpLiteral(*inner.first)) == 123);
+        REQUIRE(literalI32(unaryExpLiteral(inner.first)) == 123);
     }
 
     SECTION("- a++") {
@@ -912,11 +912,11 @@ TEST_CASE("UnaryExpression", "[parser]") {
         REQUIRE(result);
 
         auto& un = std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(result->value);
-        REQUIRE((un.second == "-"));
+        REQUIRE(un.second == "-");
 
-        REQUIRE((std::get<jac::ast::UpdateExpression<true, true>>(un.first->value).op == "x++"));
+        REQUIRE(std::get<jac::ast::UpdateExpression<true, true>>(un.first->value).kind == jac::ast::UpdateKind::PostInc);
 
-        REQUIRE((unaryExpIdentifier(*un.first) == "a"));
+        REQUIRE(unaryExpIdentifier(un.first) == "a");
     }
 }
 
@@ -938,12 +938,12 @@ TEST_CASE("BinaryExpression", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
         auto& exp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(result->value);
-        REQUIRE((std::get<2>(exp) == "+"));
+        REQUIRE(std::get<2>(exp) == "+");
         auto& lhs = std::get<0>(exp);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(lhs->value)) == 1);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(lhs->value)) == 1);
 
         auto& rhs = std::get<1>(exp);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(rhs->value)) == 2);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(rhs->value)) == 2);
     }
 
     SECTION("1 + 2 * 3") {
@@ -963,15 +963,15 @@ TEST_CASE("BinaryExpression", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
         auto& addExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(result->value);
-        REQUIRE((std::get<2>(addExp) == "+"));
+        REQUIRE(std::get<2>(addExp) == "+");
         auto& addLhs = std::get<0>(addExp);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(addLhs->value)) == 1);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(addLhs->value)) == 1);
 
         auto& addRhs = std::get<1>(addExp);
         auto& mulExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(addRhs->value);
-        REQUIRE((std::get<2>(mulExp) == "*"));
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<0>(mulExp)->value)) == 2);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(mulExp)->value)) == 3);
+        REQUIRE(std::get<2>(mulExp) == "*");
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<0>(mulExp)->value)) == 2);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<1>(mulExp)->value)) == 3);
     }
 
     SECTION("1 + 2 * 3 * 4 - 5") {
@@ -994,29 +994,30 @@ TEST_CASE("BinaryExpression", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        auto& addExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(result->value);
-        REQUIRE((std::get<2>(addExp) == "+"));
+        auto& minExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(result->value);
+        REQUIRE(std::get<2>(minExp) == "-");
+        auto& minLhs = std::get<0>(minExp);
+        auto& minRhs = std::get<1>(minExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(minRhs->value)) == 5);
+
+        auto& addExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(minLhs->value);
+        REQUIRE(std::get<2>(addExp) == "+");
         auto& addLhs = std::get<0>(addExp);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(addLhs->value)) == 1);
-
         auto& addRhs = std::get<1>(addExp);
-        auto& subExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(addRhs->value);
-        REQUIRE((std::get<2>(subExp) == "-"));
-        auto& subRhs = std::get<1>(subExp);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(subRhs->value)) == 5);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(addLhs->value)) == 1);
 
-        auto& subLhs = std::get<0>(subExp);
-        auto& mulExp1 = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(subLhs->value);
-        REQUIRE((std::get<2>(mulExp1) == "*"));
+        auto& mulExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(addRhs->value);
+        REQUIRE(std::get<2>(mulExp) == "*");
+        auto& mulLhs = std::get<0>(mulExp);
+        auto& mulRhs = std::get<1>(mulExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(mulRhs->value)) == 4);
 
-        auto& mulExp1Lhs = std::get<0>(mulExp1);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(mulExp1Lhs->value)) == 2);
-
-        auto& mulExp1Rhs = std::get<1>(mulExp1);
-        auto& mulExp2 = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(mulExp1Rhs->value);
-        REQUIRE((std::get<2>(mulExp2) == "*"));
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<0>(mulExp2)->value)) == 3);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(mulExp2)->value)) == 4);
+        auto& mulExp2 = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(mulLhs->value);
+        REQUIRE(std::get<2>(mulExp2) == "*");
+        auto& mulLhs2 = std::get<0>(mulExp2);
+        auto& mulRhs2 = std::get<1>(mulExp2);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(mulLhs2->value)) == 2);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(mulRhs2->value)) == 3);
     }
 
     SECTION("1 + (2 * 3)") {
@@ -1038,21 +1039,148 @@ TEST_CASE("BinaryExpression", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
         auto& addExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(result->value);
-        REQUIRE((std::get<2>(addExp) == "+"));
+        REQUIRE(std::get<2>(addExp) == "+");
         auto& addLhs = std::get<0>(addExp);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(addLhs->value)) == 1);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(addLhs->value)) == 1);
 
         auto& addRhs = std::get<1>(addExp);
-        auto& primary = unaryExpPrimary(std::get<jac::ast::UnaryExpression<true, true>>(addRhs->value));
+        auto& primary = unaryExpPrimary(std::get<jac::ast::UnaryExpressionPtr<true, true>>(addRhs->value));
         auto& parExp = std::get<jac::ast::ParenthesizedExpression<true, true>>(primary.value).expression;
         REQUIRE(parExp.items.size() == 1);
         auto& mulExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(
             std::get<jac::ast::BinaryExpression<true, true, true>>(
             std::get<jac::ast::ConditionalExpression<true, true, true>>(parExp.items[0]->value).value
         ).value);
-        REQUIRE((std::get<2>(mulExp) == "*"));
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<0>(mulExp)->value)) == 2);
-        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(mulExp)->value)) == 3);
+        REQUIRE(std::get<2>(mulExp) == "*");
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<0>(mulExp)->value)) == 2);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<1>(mulExp)->value)) == 3);
+    }
+
+    SECTION("2 * 4 / 2 % 3") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "*", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "4", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 7, "/", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 9, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 11, "%", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 13, "3", jac::lex::Token::NumericLiteral)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::BinaryExpression<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        auto& modExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(result->value);
+        REQUIRE(std::get<2>(modExp) == "%");
+
+        auto& modLhs = std::get<0>(modExp);
+        auto& modRhs = std::get<1>(modExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(modRhs->value)) == 3);
+
+        auto& divExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(modLhs->value);
+        REQUIRE(std::get<2>(divExp) == "/");
+
+        auto& divLhs = std::get<0>(divExp);
+        auto& divRhs = std::get<1>(divExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(divRhs->value)) == 2);
+
+        auto& mulExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(divLhs->value);
+        REQUIRE(std::get<2>(mulExp) == "*");
+
+        auto& mulLhs = std::get<0>(mulExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(mulLhs->value)) == 2);
+        auto& mulRhs = std::get<1>(mulExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(mulRhs->value)) == 4);
+    }
+
+    SECTION("1 + + 2 - 3") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 7, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 9, "-", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 11, "3", jac::lex::Token::NumericLiteral)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::BinaryExpression<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        auto& subExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(result->value);
+        REQUIRE(std::get<2>(subExp) == "-");
+
+        auto& subLhs = std::get<0>(subExp);
+        auto& subRhs = std::get<1>(subExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(subRhs->value)) == 3);
+
+        auto& addExp = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(subLhs->value);
+        REQUIRE(std::get<2>(addExp) == "+");
+
+        auto& addLhs = std::get<0>(addExp);
+        auto& addRhs = std::get<1>(addExp);
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(addLhs->value)) == 1);
+
+        auto& unaryExp = std::get<jac::ast::UnaryExpressionPtr<true, true>>(addRhs->value);
+        REQUIRE(std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(unaryExp->value).second == "+");
+        auto& inner = std::get<std::pair<jac::ast::UnaryExpressionPtr<true, true>, std::string_view>>(unaryExp->value);
+        REQUIRE(unaryExpI32(inner.first) == 2);
+    }
+
+    SECTION("1 +") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "+", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::BinaryExpression<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(!result);
+    }
+
+    SECTION("1 * 2 +") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "*", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 7, "+", jac::lex::Token::Punctuator)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::BinaryExpression<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(!result);
+    }
+
+    SECTION("1 + 2 (3)") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 1, "1", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 3, "+", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 5, "2", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 7, "(", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 8, "3", jac::lex::Token::NumericLiteral),
+            jac::lex::Token(1, 10, ")", jac::lex::Token::Punctuator)
+        };
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::BinaryExpression<true, true, true>::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(result);
     }
 }
 
@@ -1087,19 +1215,19 @@ TEST_CASE("ConditionalExpression", "[parser]") {
         >>(result->value);
 
         auto& andTup = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(std::get<0>(condTup).value);
-        REQUIRE((std::get<2>(andTup) == "&&"));
+        REQUIRE(std::get<2>(andTup) == "&&");
 
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<true, true>>(std::get<0>(andTup)->value)) == "a"));
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(andTup)->value)) == "b"));
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<0>(andTup)->value)) == "a");
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<1>(andTup)->value)) == "b");
 
         auto& consequent = assignExpUnary(*std::get<1>(condTup));
-        REQUIRE((unaryExpIdentifier(consequent) == "c"));
+        REQUIRE(unaryExpIdentifier(consequent) == "c");
 
         auto& alternate = assignExpBinary(*std::get<2>(condTup));
         auto& addTuple = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(alternate.value);
-        REQUIRE((std::get<2>(addTuple) == "+"));
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<true, true>>(std::get<0>(addTuple)->value)) == "d"));
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(addTuple)->value)) == "e"));
+        REQUIRE(std::get<2>(addTuple) == "+");
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<0>(addTuple)->value)) == "d");
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<1>(addTuple)->value)) == "e");
     }
 }
 
@@ -1123,7 +1251,7 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE((result->name->identifier.name.name == "f"));
+        REQUIRE(result->name->identifier.name.name == "f");
         REQUIRE(result->parameters.parameterList.empty());
         REQUIRE_FALSE(result->parameters.restParameter);
         REQUIRE(!result->body);
@@ -1164,33 +1292,33 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE((result->name->identifier.name.name == "fun"));
+        REQUIRE(result->name->identifier.name.name == "fun");
         REQUIRE(result->parameters.parameterList.size() == 2);
         REQUIRE_FALSE(result->parameters.restParameter);
         REQUIRE(result->body);
 
         auto& argIdentA = std::get<jac::ast::BindingIdentifier<false, false>>(result->parameters.parameterList[0].value);
-        REQUIRE((argIdentA.identifier.name.name == "a"));
+        REQUIRE(argIdentA.identifier.name.name == "a");
         auto& argIdentB = std::get<jac::ast::BindingIdentifier<false, false>>(result->parameters.parameterList[1].value);
-        REQUIRE((argIdentB.identifier.name.name == "b"));
+        REQUIRE(argIdentB.identifier.name.name == "b");
 
 
         auto& body = *(result->body);
-        REQUIRE((body.items.size() == 3));
+        REQUIRE(body.items.size() == 3);
 
         auto& declXStat = std::get<jac::ast::Declaration<false, false, true>>(body.items[0].value);
         auto& declX = std::get<jac::ast::LexicalDeclaration<true, false,  false>>(declXStat.value);
-        REQUIRE((declX.isConst == true));
-        REQUIRE((declX.bindings.size() == 1));
+        REQUIRE(declX.isConst == true);
+        REQUIRE(declX.bindings.size() == 1);
         auto& bindingX = std::get<std::pair<jac::ast::BindingIdentifier<false, false>, jac::ast::InitializerPtr<true, false, false>>>(declX.bindings[0].value);
-        REQUIRE((std::get<0>(bindingX).identifier.name.name == "x"));
+        REQUIRE(std::get<0>(bindingX).identifier.name.name == "x");
 
         auto& declYStat = std::get<jac::ast::Declaration<false, false, true>>(body.items[1].value);
         auto& declY = std::get<jac::ast::LexicalDeclaration<true, false,  false>>(declYStat.value);
-        REQUIRE((declY.isConst == false));
-        REQUIRE((declY.bindings.size() == 1));
+        REQUIRE(declY.isConst == false);
+        REQUIRE(declY.bindings.size() == 1);
         auto& bindingY = std::get<std::pair<jac::ast::BindingIdentifier<false, false>, jac::ast::InitializerPtr<true, false, false>>>(declY.bindings[0].value);
-        REQUIRE((std::get<0>(bindingY).identifier.name.name == "y"));
+        REQUIRE(std::get<0>(bindingY).identifier.name.name == "y");
 
         auto& retStat = std::get<jac::ast::Statement<false, false, true>>(body.items[2].value);
         auto& ret = std::get<jac::ast::ReturnStatement<false, false>>(retStat.value);
@@ -1199,9 +1327,9 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
 
         auto& addExp = assignExpBinary(*ret.expression->items[0]);
         auto& addVar = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, false, false>, jac::ast::BinaryExpressionPtr<true, false, false>, std::string_view>>(addExp.value);
-        REQUIRE((std::get<2>(addVar) == "+"));
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<false, false>>(std::get<0>(addVar)->value)) == "x"));
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<false, false>>(std::get<1>(addVar)->value)) == "y"));
+        REQUIRE(std::get<2>(addVar) == "+");
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<false, false>>(std::get<0>(addVar)->value)) == "x");
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<false, false>>(std::get<1>(addVar)->value)) == "y");
     }
 
     SECTION("function fun(a, b=3) {}") {
@@ -1226,16 +1354,16 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE((result->name->identifier.name.name == "fun"));
+        REQUIRE(result->name->identifier.name.name == "fun");
         REQUIRE(result->parameters.parameterList.size() == 2);
         REQUIRE_FALSE(result->parameters.restParameter);
         REQUIRE(!result->body);
 
         auto& argIdentA = std::get<jac::ast::BindingIdentifier<false, false>>(result->parameters.parameterList[0].value);
-        REQUIRE((argIdentA.identifier.name.name == "a"));
+        REQUIRE(argIdentA.identifier.name.name == "a");
 
         auto& argB = std::get<std::pair<jac::ast::BindingIdentifier<false, false>, jac::ast::InitializerPtr<true, false, false>>>(result->parameters.parameterList[1].value);
-        REQUIRE((argB.first.identifier.name.name == "b"));
+        REQUIRE(argB.first.identifier.name.name == "b");
         REQUIRE(unaryExpI32(assignExpUnary(*argB.second)) == 3);
     }
 }
@@ -1258,7 +1386,7 @@ TEST_CASE("Assignment", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
 
-        REQUIRE((result->op == "="));
+        REQUIRE(result->op == "=");
         REQUIRE(lhsExpIdentifier(result->lhs) == "x");
         REQUIRE(unaryExpI32(assignExpUnary(*result->rhs)) == 4);
     }
@@ -1280,14 +1408,14 @@ TEST_CASE("Assignment", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
 
-        REQUIRE((result->op == "="));
+        REQUIRE(result->op == "=");
         REQUIRE(lhsExpIdentifier(result->lhs) == "x");
 
         auto& divExp = assignExpBinary(*result->rhs);
         auto& divExpTup = std::get<std::tuple<jac::ast::BinaryExpressionPtr<true, true, true>, jac::ast::BinaryExpressionPtr<true, true, true>, std::string_view>>(divExp.value);
-        REQUIRE((std::get<2>(divExpTup) == "/"));
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<true, true>>(std::get<0>(divExpTup)->value)) == "x"));
-        REQUIRE((unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(divExpTup)->value)) == 4));
+        REQUIRE(std::get<2>(divExpTup) == "/");
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<0>(divExpTup)->value)) == "x");
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<1>(divExpTup)->value)) == 4);
     }
 
     SECTION("x += y -= 4") {
@@ -1307,11 +1435,11 @@ TEST_CASE("Assignment", "[parser]") {
         REQUIRE(state.isEnd());
         REQUIRE(result);
 
-        REQUIRE((result->op == "+="));
+        REQUIRE(result->op == "+=");
         REQUIRE(lhsExpIdentifier(result->lhs) == "x");
 
         auto& inner = std::get<jac::ast::Assignment<true, true, true>>(result->rhs->value);
-        REQUIRE((inner.op == "-="));
+        REQUIRE(inner.op == "-=");
         REQUIRE(lhsExpIdentifier(inner.lhs) == "y");
         REQUIRE(unaryExpI32(assignExpUnary(*inner.rhs)) == 4);
     }
@@ -1448,14 +1576,14 @@ TEST_CASE("BlockStatement", "[parser]") {
         REQUIRE(assignExpStat.items.size() == 1);
         auto& assignment = std::get<jac::ast::Assignment<false, true, true>>(assignExpStat.items[0]->value);
 
-        REQUIRE((assignment.op == "<<="));
+        REQUIRE(assignment.op == "<<=");
         REQUIRE(lhsExpIdentifier(assignment.lhs) == "x");
         auto& modExp = assignExpBinary(*assignment.rhs);
 
         auto& modExpTup = std::get<std::tuple<jac::ast::BinaryExpressionPtr<false, true, true>, jac::ast::BinaryExpressionPtr<false, true, true>, std::string_view>>(modExp.value);
-        REQUIRE((std::get<2>(modExpTup) == "%"));
-        REQUIRE((unaryExpIdentifier(std::get<jac::ast::UnaryExpression<true, true>>(std::get<0>(modExpTup)->value)) == "x"));
-        REQUIRE((unaryExpI32(std::get<jac::ast::UnaryExpression<true, true>>(std::get<1>(modExpTup)->value)) == 4));
+        REQUIRE(std::get<2>(modExpTup) == "%");
+        REQUIRE(unaryExpIdentifier(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<0>(modExpTup)->value)) == "x");
+        REQUIRE(unaryExpI32(std::get<jac::ast::UnaryExpressionPtr<true, true>>(std::get<1>(modExpTup)->value)) == 4);
     }
 }
 
@@ -1507,7 +1635,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression<false, false>, jac::ast::Arguments<false, false>>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression<false, false>>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference<false, false>>(primary.value);
-        REQUIRE((ident.identifier.name.name == "f"));
+        REQUIRE(ident.identifier.name.name == "f");
 
         REQUIRE(args.arguments.empty());
     }
@@ -1535,7 +1663,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression<false, false>, jac::ast::Arguments<false, false>>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression<false, false>>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference<false, false>>(primary.value);
-        REQUIRE((ident.identifier.name.name == "func"));
+        REQUIRE(ident.identifier.name.name == "func");
 
         REQUIRE(args.arguments.size() == 3);
     }
@@ -1559,7 +1687,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression<false, false>, jac::ast::Arguments<false, false>>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression<false, false>>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference<false, false>>(primary.value);
-        REQUIRE((ident.identifier.name.name == "call"));
+        REQUIRE(ident.identifier.name.name == "call");
 
         REQUIRE(args.arguments.size() == 1);
     }
@@ -1586,7 +1714,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression<false, false>, jac::ast::Arguments<false, false>>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression<false, false>>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference<false, false>>(primary.value);
-        REQUIRE((ident.identifier.name.name == "call"));
+        REQUIRE(ident.identifier.name.name == "call");
 
         REQUIRE(args.arguments.size() == 1);
     }

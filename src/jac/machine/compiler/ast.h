@@ -558,37 +558,96 @@ struct BinaryExpression {
 
     std::variant<
         std::tuple<BinaryExpressionPtr, BinaryExpressionPtr, std::string_view>,
-        UnaryExpression<Yield, Await>
+        UnaryExpressionPtr<Yield, Await>
     > value;
 
-    static std::optional<BinaryExpression> parse(ParserState& state, int minPrecedence = 0) {
-        // TODO: handle ??, ** operators correctly
-        if (minPrecedence > binaryPrecedenceMax) {
-            if (auto unary = UnaryExpression<Yield, Await>::parse(state)) {
-                return BinaryExpression<In, Yield, Await>{std::move(*unary)};
+    // TODO: handle ??, ** operators correctly
+    static std::optional<BinaryExpression> parse(ParserState& state) {
+        // Shunting Yard algorithm
+        using Element = std::variant<
+            UnaryExpressionPtr<Yield, Await>,
+            std::string_view
+        >;
+
+        std::vector<Element> output;
+        std::vector<std::string_view> operators;
+
+        auto start = state.getPosition();
+        while (true) {
+            auto unary = UnaryExpression<Yield, Await>::parse(state);
+            if (!unary) {
+                return std::nullopt;
             }
+            output.push_back(std::make_unique<UnaryExpression<Yield, Await>>(std::move(*unary)));
+            auto next = state.current();
+            if (next.kind != lex::Token::Punctuator) {
+                break;
+            }
+            auto precedence = binaryPrecedence.find(next.text);
+            if (precedence == binaryPrecedence.end()) {
+                break;
+            }
+            while (!operators.empty()) {
+                auto top = operators.back();
+                auto topPrecedence = binaryPrecedence.at(top);
+                if (topPrecedence < precedence->second) {  // TODO: handle right-associative operators
+                    break;
+                }
+                operators.pop_back();
+                output.push_back(top);
+            }
+            operators.push_back(next.text);
+            state.advance();
+        }
+        while (!operators.empty()) {
+            output.push_back(operators.back());
+            operators.pop_back();
+        }
+
+        struct Popper {
+            std::vector<Element>& output;
+            ParserState& state;
+            std::span<lex::Token>::iterator start;
+
+            std::optional<BinaryExpression> pop() {
+                if (output.empty()) {
+                    state.restorePosition(start);
+                    return std::nullopt;
+                }
+                auto elem = std::move(output.back());
+                output.pop_back();
+                if (auto unary = std::get_if<UnaryExpressionPtr<Yield, Await>>(&elem)) {
+                    return BinaryExpression{std::move(*unary)};
+                }
+                if (auto op = std::get_if<std::string_view>(&elem)) {
+                    auto rhs = pop();
+                    if (!rhs) {
+                        state.restorePosition(start);
+                        return std::nullopt;
+                    }
+                    auto lhs = pop();
+                    if (!lhs) {
+                        state.restorePosition(start);
+                        return std::nullopt;
+                    }
+                    return BinaryExpression{std::make_tuple(
+                        std::make_unique<BinaryExpression>(std::move(*lhs)),
+                        std::make_unique<BinaryExpression>(std::move(*rhs)),
+                        *op
+                    )};
+                }
+
+                return std::nullopt;
+            }
+        };
+
+        Popper popper{output, state, start};
+        auto res = popper.pop();
+        if (!res) {
+            state.restorePosition(start);
             return std::nullopt;
         }
-
-        if (auto lhs = BinaryExpression::parse(state, minPrecedence + 1)) {
-            auto start = state.getPosition();
-            if (state.current().kind == lex::Token::Punctuator) {
-                std::string_view op = state.current().text;
-                auto precedence = binaryPrecedence.find(op);
-                if (precedence != binaryPrecedence.end() && precedence->second >= minPrecedence) {
-                    state.advance();
-                    if (auto rhs = BinaryExpression::parse(state, precedence->second)) {
-                        auto lhsPtr = std::make_unique<BinaryExpression<In, Yield, Await>>(std::move(*lhs));
-                        auto rhsPtr = std::make_unique<BinaryExpression<In, Yield, Await>>(std::move(*rhs));
-                        return BinaryExpression<In, Yield, Await>{std::tuple{std::move(lhsPtr), std::move(rhsPtr), op}};
-                    }
-                }
-            }
-            state.restorePosition(start);
-            return std::move(*lhs);
-        }
-
-        return std::nullopt;
+        return BinaryExpression<In, Yield, Await>{std::move(*res)};
     }
 };
 

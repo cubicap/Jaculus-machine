@@ -571,8 +571,8 @@ template<bool In, bool Yield, bool Await>
             }});
             return { res };
         }
-        Value operator()(const ast::UnaryExpression<Yield, Await>& unary) {
-            return emit(unary, func);
+        Value operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
+            return emit(*unary, func);
         }
     };
 
