@@ -47,6 +47,25 @@ const std::unordered_map<std::string_view, Opcode> binaryOps = {
     { "**", Opcode::Pow }
 };
 
+const std::unordered_map<std::string_view, ShortCircuitKind> shortCircuitAssignmentOps = {
+    { "&&=", ShortCircuitKind::And },
+    { "||=", ShortCircuitKind::Or }
+};
+
+const std::unordered_map<std::string_view, Opcode> arithAssignmentOps = {
+    { "+=", Opcode::Add },
+    { "-=", Opcode::Sub },
+    { "*=", Opcode::Mul },
+    { "/=", Opcode::Div },
+    { "%=", Opcode::Rem },
+    { "&=", Opcode::BitAnd },
+    { "|=", Opcode::BitOr },
+    { "^=", Opcode::BitXor },
+    { "<<=", Opcode::LShift },
+    { ">>=", Opcode::RShift },
+    { ">>>=", Opcode::URShift }
+};
+
 const std::unordered_map<std::string_view, Opcode> unaryOps = {
     { "!", Opcode::BoolNot },
     { "~", Opcode::BitNot },
@@ -219,6 +238,55 @@ inline RValue materialize(Value val, FunctionEmitter& func) {
         return val.asRValue();
     }
     return materialize(val.asLVRef(), func);
+}
+
+
+inline void emitAssign(LVRef target, RValue value, FunctionEmitter& func) {
+    if (target.isMember()) {
+        RValue parent = { target.self };
+        RValue ident = { *target.memberIdent };
+
+        func.emitStatement({Operation{
+            .op = Opcode::SetMember,
+            .a = ident,
+            .b = value,
+            .res = parent
+        }});
+    }
+    else {
+        func.emitStatement({Operation{
+            .op = Opcode::Set,
+            .a = value,
+            .res = giveSimple(target, func)
+        }});
+    }
+}
+
+
+inline RValue emitBinaryArithmetic(RValue lhs, RValue rhs, Opcode op, FunctionEmitter& func) {
+    ValueType resType = resultType(op, lhs.type(), rhs.type());
+    RValue res = { Temp::create(resType) };
+
+    RValue lopRType;
+    RValue ropRType;
+
+    if (isArithmetic(op) || isBitwise(op)) {
+        lopRType = emitCast(lhs, resType, func);
+        ropRType = emitCast(rhs, resType, func);
+    }
+    else {
+        ValueType commonType = commonUpcast(lhs.type(), rhs.type());
+        lopRType = emitCast(lhs, commonType, func);
+        ropRType = emitCast(rhs, commonType, func);
+    }
+
+    func.emitStatement({Operation{
+        .op = op,
+        .a = lopRType,
+        .b = ropRType,
+        .res = res
+    }});
+    return res;
 }
 
 
@@ -464,12 +532,16 @@ template<bool Yield, bool Await>
 
 
 template<bool Yield, bool Await>
+[[nodiscard]] Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func);
+
+
+template<bool Yield, bool Await>
 [[nodiscard]] Value emit(const ast::UpdateExpression<Yield, Await>& expr, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::UnaryExpressionPtr<Yield, Await>&) {
-            throw std::runtime_error("Update unary expressions are not supported");
+        Value operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
+            return emit(*unary, func);
         }
 
         Value operator()(const ast::LeftHandSideExpressionPtr<Yield, Await>& lhs) {
@@ -477,12 +549,67 @@ template<bool Yield, bool Await>
         }
     };
 
-    return std::visit(visitor{func}, expr.value);
+    auto val = std::visit(visitor{func}, expr.value);
+
+    if (expr.kind == ast::UpdateKind::None) {
+        return val;
+    }
+    if (val.isRValue()) {
+        throw std::runtime_error("The operand of an update expression must be a left-hand side expression");
+    }
+
+    RValue lop = materialize(val, func);
+    if (lop.type() != ValueType::I32 && lop.type() != ValueType::Double) {
+        throw std::runtime_error("Unsupported type for update expression");
+    }
+    RValue rop = emitConst(static_cast<int32_t>(1), func);
+
+    RValue valPre;
+    if (expr.kind == ast::UpdateKind::PostInc || expr.kind == ast::UpdateKind::PostDec) {
+        valPre = { Temp::create(lop.type()) };
+        func.emitStatement({Operation{
+            .op = Opcode::Set,
+            .a = lop,
+            .res = valPre
+        }});
+    }
+
+    RValue valPost = { Temp::create(lop.type()) };
+
+    switch (expr.kind) {
+        case ast::UpdateKind::PreInc:
+        case ast::UpdateKind::PostInc:
+            func.emitStatement({Operation{
+                .op = Opcode::Add,
+                .a = lop,
+                .b = rop,
+                .res = valPost
+            }});
+            break;
+        case ast::UpdateKind::PreDec:
+        case ast::UpdateKind::PostDec:
+            func.emitStatement({Operation{
+                .op = Opcode::Sub,
+                .a = lop,
+                .b = rop,
+                .res = valPost
+            }});
+            break;
+        default:
+            assert(false);
+    }
+
+    emitAssign(val.asLVRef(), valPost, func);
+
+    if (expr.kind == ast::UpdateKind::PostInc || expr.kind == ast::UpdateKind::PostDec) {
+        return { valPre };
+    }
+    return { valPost };
 }
 
 
 template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func) {
+Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func) {
     if (std::holds_alternative<ast::UpdateExpression<Yield, Await>>(expr.value)) {
         return emit(std::get<ast::UpdateExpression<Yield, Await>>(expr.value), func);
     }
@@ -547,29 +674,7 @@ template<bool In, bool Yield, bool Await>
             RValue ropR = materialize(rop, func);
             emitPushFree(ropR, func);
 
-            ValueType resType = resultType(op, lopR.type(), ropR.type());
-            RValue res = { Temp::create(resType) };
-
-            RValue lopRType;
-            RValue ropRType;
-
-            if (isArithmetic(op) || isBitwise(op)) {
-                lopRType = emitCast(lopR, resType, func);
-                ropRType = emitCast(ropR, resType, func);
-            }
-            else {
-                ValueType commonType = commonUpcast(lopR.type(), ropR.type());
-                lopRType = emitCast(lopR, commonType, func);
-                ropRType = emitCast(ropR, commonType, func);
-            }
-
-            func.emitStatement({Operation{
-                .op = op,
-                .a = lopRType,
-                .b = ropRType,
-                .res = res
-            }});
-            return { res };
+            return { emitBinaryArithmetic(lopR, ropR, op, func) };
         }
         Value operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
             return emit(*unary, func);
@@ -643,9 +748,6 @@ template<bool In, bool Yield, bool Await>
             throw std::runtime_error("Assignment patterns are not supported");
         }
     };
-    if (assign.op != "=") {
-        throw std::runtime_error("Only simple assignments are supported");
-    }
 
     if (!std::holds_alternative<ast::NewExpression<Yield, Await>>(assign.lhs.value)) {
         throw std::runtime_error("Only new expressions are supported in assignments");
@@ -658,28 +760,25 @@ template<bool In, bool Yield, bool Await>
     Value rhs = emit(*assign.rhs, func);
     RValue rhsR = materialize(rhs, func);
 
-    auto targetLV = target.asLVRef();
+    if (assign.op == "=") {
+        auto targetLV = target.asLVRef();
+        emitAssign(targetLV, rhsR, func);
 
-    if (targetLV.isMember()) {
-        RValue parent = { targetLV.self };
-        RValue ident = { *targetLV.memberIdent };
-
-        func.emitStatement({Operation{
-            .op = Opcode::SetMember,
-            .a = ident,
-            .b = rhsR,
-            .res = parent
-        }});
+        return rhsR;
     }
-    else {
-        func.emitStatement({Operation{
-            .op = Opcode::Set,
-            .a = rhsR,
-            .res = giveSimple(targetLV, func)
-        }});
+    auto it = arithAssignmentOps.find(assign.op);
+    if (it == arithAssignmentOps.end()) {
+        throw std::runtime_error("Unsupported assignment operator");
     }
+    Opcode op = it->second;
+    RValue targetR = materialize(target, func);
+    emitPushFree(targetR, func);
+    emitPushFree(rhsR, func);
 
-    return rhsR;
+    RValue res = emitBinaryArithmetic(targetR, rhsR, op, func);
+    emitAssign(target.asLVRef(), res, func);
+
+    return res;
 }
 
 

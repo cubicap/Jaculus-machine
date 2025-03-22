@@ -312,7 +312,7 @@ TEST_CASE("Control flow", "[aot]") {
                 let c: Int32 = 1;
                 while (b > 0) {
                     c = c * a;
-                    b = b - 1;
+                    b -= 1;
                 }
 
                 return c;
@@ -329,8 +329,7 @@ TEST_CASE("Control flow", "[aot]") {
         machine.initialize();
         std::string code(R"(
             function pow(a: Int32, b: Int32): Int32 {
-                while (b == 0) {
-                }
+                while (b == 0) {}
 
                 return a;
             }
@@ -348,7 +347,7 @@ TEST_CASE("Control flow", "[aot]") {
             function add(a: Int32, b: Int32): Int32 {
                 let c: Int32 = 0;
                 do {
-                    c = c + a;
+                    c += a;
                     b = b - 1;
                 } while (b > 0);
 
@@ -368,7 +367,7 @@ TEST_CASE("Control flow", "[aot]") {
         std::string code(R"(
             function mul(a: Int32, b: Int32): Int32 {
                 let c: Int32 = 0;
-                for (let i: Int32 = 0; i < b; i = i + 1) {
+                for (let i: Int32 = 0; i < b; i += 1) {
                     c = c + a;
                 }
 
@@ -390,7 +389,7 @@ TEST_CASE("Control flow", "[aot]") {
                 let a: Int32 = 0;
                 let b: Int32 = 1;
                 let c: Int32 = 0;
-                for (let i: Int32 = 0; i < n; i = i + 1) {
+                for (let i: Int32 = 0; i < n; i++) {
                     c = a + b;
                     a = b;
                     b = c;
@@ -476,14 +475,14 @@ TEST_CASE("Control flow", "[aot]") {
         std::string code(R"(
             function fun(a: Int32): Int32 {
                 let c: Int32 = 0;
-                for (let i: Int32 = 0; i < a; i = i + 1) {
+                for (let i: Int32 = 0; i < a; ++i) {
                     let j: Int32 = 0;
                     while (j < a) {
-                        c = c + 1;
+                        c++;
                         if (j == i) {
                             break;
                         }
-                        j = j + 1;
+                        j += 1;
                     }
                 }
                 return c;
@@ -501,14 +500,13 @@ TEST_CASE("Control flow", "[aot]") {
         std::string code(R"(
             function fun(a: Int32): Int32 {
                 let c: Int32 = 0;
-                for (let i: Int32 = 0; i < a; i = i + 1) {
+                for (let i: Int32 = 0; i < a; i++) {
                     let j: Int32 = 0;
                     while (j < a) {
-                        j = j + 1;
-                        if (j == i) {
+                        if (++j == i) {
                             continue;
                         }
-                        c = c + 1;
+                        c++;
                     }
                 }
                 return c;
@@ -752,5 +750,114 @@ TEST_CASE("Object", "[aot]") {
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
+}
+
+
+TEST_CASE("Operators", "[aot]") {
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::AotEvalFeature,
+        TestReportFeature
+    >;
+
+    Machine machine;
+
+    SECTION("Arithmetic") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                return a + b - 2 * 4 / 2 % 3;
+            }
+
+            report(fun(1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2"});
+    }
+
+    SECTION("Unary") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32): Int32 {
+                return -a + +a;
+            }
+
+            report(fun(1));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"0"});
+    }
+
+    SECTION("Bitwise") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                return a & b | a ^ b;
+            }
+
+            report(fun(1, 3));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
+    }
+
+    SECTION("Shift") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                return (a << b) >> 1;
+            }
+
+            report(fun(1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2"});
+    }
+
+    SECTION("Assignment") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32, c: Int32): Int32 {
+                a += b;
+                a -= c;
+                a *= b;
+                a /= c;
+                a %= b;
+                a &= b;
+                a |= c;
+                a ^= b;
+                a <<= c;
+                a >>= b;
+                return a;
+            }
+
+            report(fun(1, 2, 3));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2"});
+    }
+
+    SECTION("Update") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                a++;
+                --b;
+                let c: Int32 = --a + b++;
+                return c;
+            }
+
+            report(fun(1, 2));
+            report(fun(3, 4));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2", "6"});
     }
 }
