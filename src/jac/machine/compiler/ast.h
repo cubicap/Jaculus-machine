@@ -512,6 +512,15 @@ struct UnaryExpression;
 template<bool Yield, bool Await>
 using UnaryExpressionPtr = std::unique_ptr<UnaryExpression<Yield, Await>>;
 
+
+enum class UpdateKind {
+    None,
+    PreInc,
+    PreDec,
+    PostInc,
+    PostDec
+};
+
 template<bool Yield, bool Await>
 struct UpdateExpression {
     std::variant<
@@ -519,7 +528,7 @@ struct UpdateExpression {
         LeftHandSideExpressionPtr<Yield, Await>
     > value;
 
-    std::string_view op;
+    UpdateKind kind;
 
     static std::optional<UpdateExpression> parse(ParserState& state);
 };
@@ -1798,10 +1807,11 @@ struct ClassStaticBlock {
     std::optional<StatementList<false, false, false>> statementList;
 };
 
+struct GetFunctionBody : public FunctionBody<false, false> {};
+struct SetFunctionBody : public FunctionBody<false, false> {};
+
 template<bool Yield, bool Await>
 struct MethodDefinition {
-    struct GetFunctionBody : public FunctionBody<false, false> {};
-    struct SetFunctionBody : public FunctionBody<false, false> {};
 
     std::variant<
         std::tuple<ClassElementName<Yield, Await>, UniqueFormalParameters<false, false>, FunctionBody<false, false>>,
@@ -2644,7 +2654,7 @@ std::optional<UpdateExpression<Yield, Await>> UpdateExpression<Yield, Await>::pa
             state.advance();
             if (auto expr = UnaryExpression<Yield, Await>::parse(state)) {
                 auto ptr = std::make_unique<UnaryExpression<Yield, Await>>(std::move(*expr));
-                return UpdateExpression{std::move(ptr), (op == "++" ? "++x" : "--x")};
+                return UpdateExpression{std::move(ptr), (op == "++" ? UpdateKind::PreInc : UpdateKind::PreDec)};
             }
             state.backtrack();
         }
@@ -2657,10 +2667,10 @@ std::optional<UpdateExpression<Yield, Await>> UpdateExpression<Yield, Await>::pa
             std::string_view op = state.current().text;
             if (op == "++" || op == "--") {
                 state.advance();
-                return UpdateExpression{std::move(ptr), (op == "++" ? "x++" : "x--")};
+                return UpdateExpression{std::move(ptr), (op == "++" ? UpdateKind::PostInc : UpdateKind::PostDec)};
             }
         }
-        return UpdateExpression{std::move(ptr), ""};
+        return UpdateExpression{std::move(ptr), UpdateKind::None};
     }
 
     return std::nullopt;
