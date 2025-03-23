@@ -277,11 +277,8 @@ TEST_CASE("Control flow", "[aot]") {
         machine.initialize();
         std::string code(R"(
             function fib(n: Int32): Int32 {
-                if (n == 0) {
-                    return 0;
-                }
-                else if (n == 1) {
-                    return 1;
+                if (n == 0 || n == 1) {
+                    return n;
                 }
 
                 let first: Int32 = fib(n - 1);
@@ -859,5 +856,39 @@ TEST_CASE("Operators", "[aot]") {
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"2", "6"});
+    }
+
+    SECTION("Short-circuit") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Bool, b: Bool, c: Bool): Bool {
+                return a && b || c;
+            }
+
+            report(fun(true, false, true));
+            report(fun(false, false, false));
+            report(fun(false, true, false));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"true", "false", "false"});
+    }
+
+    SECTION("Assignment short-circuit") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Bool, b: Bool, c: Bool): Bool {
+                a &&= b;
+                c ||= a;
+                return c;
+            }
+
+            report(fun(true, false, true));
+            report(fun(false, false, false));
+            report(fun(false, true, false));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"true", "false", "false"});
     }
 }

@@ -47,6 +47,13 @@ const std::unordered_map<std::string_view, int> binaryPrecedence = {
 };
 const int binaryPrecedenceMax = 11;
 
+const std::unordered_set<std::string_view> rightAssociative = {
+    "||",
+    "&&",
+    "**",
+    "??",
+};
+
 const std::unordered_set<std::string_view> unaryOperator = {
     "!",      "~",    "+",      "-",
     "typeof", "void", "delete", "await"

@@ -4,6 +4,7 @@
 #include "cfg.h"
 #include "opcode.h"
 
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -193,7 +194,7 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
     return std::visit(visitor{func}, lit.value);
 }
 
-inline RValue giveSimple(LVRef lv, FunctionEmitter&) {
+[[nodiscard]] inline RValue giveSimple(LVRef lv, FunctionEmitter&) {
     if (lv.isMember()) {
         throw std::runtime_error("Cannot move member");
     }
@@ -201,7 +202,7 @@ inline RValue giveSimple(LVRef lv, FunctionEmitter&) {
 }
 
 // FIXME: solve dup/free for cast
-inline RValue emitCast(RValue val, ValueType type, FunctionEmitter& func) {
+[[nodiscard]] inline RValue emitCast(RValue val, ValueType type, FunctionEmitter& func) {
     if (val.type() == type) {
         return val;
     }
@@ -214,7 +215,7 @@ inline RValue emitCast(RValue val, ValueType type, FunctionEmitter& func) {
     return res;
 }
 
-inline RValue materialize(LVRef lv, FunctionEmitter& func) {
+[[nodiscard]] inline RValue materialize(LVRef lv, FunctionEmitter& func) {
     if (!lv.isMember()) {
         RValue v = { lv.self };
         emitDup(v, func);
@@ -233,7 +234,7 @@ inline RValue materialize(LVRef lv, FunctionEmitter& func) {
     return res;
 }
 
-inline RValue materialize(Value val, FunctionEmitter& func) {
+[[nodiscard]] inline RValue materialize(Value val, FunctionEmitter& func) {
     if (val.isRValue()) {
         return val.asRValue();
     }
@@ -263,7 +264,7 @@ inline void emitAssign(LVRef target, RValue value, FunctionEmitter& func) {
 }
 
 
-inline RValue emitBinaryArithmetic(RValue lhs, RValue rhs, Opcode op, FunctionEmitter& func) {
+[[nodiscard]] inline RValue emitBinaryArithmetic(RValue lhs, RValue rhs, Opcode op, FunctionEmitter& func) {
     ValueType resType = resultType(op, lhs.type(), rhs.type());
     RValue res = { Temp::create(resType) };
 
@@ -287,6 +288,50 @@ inline RValue emitBinaryArithmetic(RValue lhs, RValue rhs, Opcode op, FunctionEm
         .res = res
     }});
     return res;
+}
+
+
+
+// evalRhs(void) emits evaluation of the right-hand side expression and returns the resulting RValue.
+// setRes(res, skipped) is a function that processes the result of the evaluation; skipped is true if the expression short-circuited.
+template<typename F, typename G>
+inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind kind, FunctionEmitter& func) {
+    static_assert(std::is_same_v<decltype(evalRhs()), RValue>, "evalRhs must return RValue");
+    static_assert(std::is_invocable_v<G, RValue, bool>);
+
+    if (lhs.type() != ValueType::Bool) {
+        throw std::runtime_error("Short circuit expressions support only boolean operands");
+    }
+
+    auto preBlock = func.getActiveBlock();
+    auto skipBlock = func.createBlock();  // target when expression short circuits
+    auto elseBlock = func.createBlock();  // target otherwise
+    auto postBlock = func.createBlock();
+
+    postBlock->jump = preBlock->jump;
+    skipBlock->jump = Terminal::jump(postBlock);
+    elseBlock->jump = Terminal::jump(postBlock);
+
+    // evaluate lhs
+    RValue lhsBool = lhs;
+
+    if (kind == ShortCircuitKind::Or) {
+        preBlock->jump = Terminal::branch(lhsBool, skipBlock, elseBlock);
+    }
+    else if (kind == ShortCircuitKind::And) {
+        preBlock->jump = Terminal::branch(lhsBool, elseBlock, skipBlock);
+    }
+    func.setActiveBlock(skipBlock);
+    processRes(lhsBool, true);
+
+    func.setActiveBlock(elseBlock);
+    RValue rhs = evalRhs();
+    emitDup(rhs, func);
+    processRes(rhs, false);
+
+    func.setActiveBlock(postBlock);
+
+    return rhs;
 }
 
 
@@ -637,15 +682,6 @@ Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func
 
 
 template<bool In, bool Yield, bool Await>
-[[nodiscard]] Value emitShortCircuit(const ast::BinaryExpression<In, Yield, Await>& lhs, const ast::BinaryExpression<In, Yield, Await>& rhs, ShortCircuitKind kind) {
-    (void)lhs;
-    (void)rhs;
-    (void)kind;
-    throw std::runtime_error("Short circuit expressions are not supported");
-}
-
-
-template<bool In, bool Yield, bool Await>
 [[nodiscard]] Value emit(const ast::BinaryExpression<In, Yield, Await>& expr, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
@@ -657,7 +693,27 @@ template<bool In, bool Yield, bool Await>
                             >& binExpr) {
             if (auto it = shortCircuitOps.find(std::get<2>(binExpr)); it != shortCircuitOps.end()) {
                 auto& [lhs, rhs, _] = binExpr;
-                return emitShortCircuit(*lhs, *rhs, it->second);
+
+                auto lhsRes = emit(*lhs, func);
+                RValue lhsR = materialize(lhsRes, func);
+                emitPushFree(lhsR, func);
+
+                RValue res = { Temp::create(ValueType::Bool) };
+                emitShortCircuit(lhsR, [&]() {
+                    auto rhsVal = emit(*rhs, func);
+                    RValue rhsR = materialize(rhsVal, func);
+                    emitPushFree(rhsR, func);
+                    return rhsR;
+                },
+                [&](RValue val, bool) {
+                    func.emitStatement({Operation{
+                        .op = Opcode::Set,
+                        .a = val,
+                        .res = res
+                    }});
+                },
+                it->second, func);
+                return { res };
             }
 
             auto it = binaryOps.find(std::get<2>(binExpr));
@@ -757,28 +813,53 @@ template<bool In, bool Yield, bool Await>
         throw std::runtime_error("Invalid assignment target");
     }
 
-    Value rhs = emit(*assign.rhs, func);
-    RValue rhsR = materialize(rhs, func);
-
     if (assign.op == "=") {
+        Value rhs = emit(*assign.rhs, func);
+        RValue rhsR = materialize(rhs, func);
+
         auto targetLV = target.asLVRef();
         emitAssign(targetLV, rhsR, func);
 
         return rhsR;
     }
-    auto it = arithAssignmentOps.find(assign.op);
-    if (it == arithAssignmentOps.end()) {
-        throw std::runtime_error("Unsupported assignment operator");
+    if (auto it = arithAssignmentOps.find(assign.op); it != arithAssignmentOps.end()) {
+        Value rhs = emit(*assign.rhs, func);
+        RValue rhsR = materialize(rhs, func);
+
+        Opcode op = it->second;
+        RValue targetR = materialize(target, func);
+        emitPushFree(targetR, func);
+        emitPushFree(rhsR, func);
+
+        RValue res = emitBinaryArithmetic(targetR, rhsR, op, func);
+        emitAssign(target.asLVRef(), res, func);
+
+        return res;
     }
-    Opcode op = it->second;
-    RValue targetR = materialize(target, func);
-    emitPushFree(targetR, func);
-    emitPushFree(rhsR, func);
+    if (auto it = shortCircuitAssignmentOps.find(assign.op); it != shortCircuitAssignmentOps.end()) {
+        RValue targetR = materialize(target, func);
+        emitPushFree(targetR, func);
 
-    RValue res = emitBinaryArithmetic(targetR, rhsR, op, func);
-    emitAssign(target.asLVRef(), res, func);
+        RValue res;
 
-    return res;
+        emitShortCircuit(targetR, [&]() {
+            Value rhs = emit(*assign.rhs, func);
+            RValue rhsR = materialize(rhs, func);
+            emitPushFree(rhsR, func);
+            return rhsR;
+        },
+        [&](RValue val, bool skipped) {
+            res = val;
+            if (skipped) {
+                return;
+            }
+            emitAssign(target.asLVRef(), val, func);
+        },
+        it->second, func);
+
+        return res;
+    }
+    throw std::runtime_error("Unsupported assignment operator");
 }
 
 
@@ -869,7 +950,7 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& f
     RValue res = emitCast(cond, ValueType::Bool, func);
 
     emitPushFree(res, func);
-    condBlock->jump = Terminal::branch(res, ifBlock, elseBlock);
+    func.getActiveBlock()->jump = Terminal::branch(res, ifBlock, elseBlock);
 
     // if block
     func.setActiveBlock(ifBlock);
@@ -903,7 +984,7 @@ void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitt
     RValue res = emitCast(cond, ValueType::Bool, func);
 
     emitPushFree(res, func);
-    condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
+    func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -935,7 +1016,7 @@ void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter
     RValue res = emitCast(cond, ValueType::Bool, func);
 
     emitPushFree(res, func);
-    condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
+    func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -996,10 +1077,10 @@ void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& 
         RValue res = emitCast(cond, ValueType::Bool, func);
 
         emitPushFree(res, func);
-        condBlock->jump = Terminal::branch(res, loopBlock, postBlock);
+        func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
     }
     else {
-        condBlock->jump = Terminal::jump(loopBlock);
+        func.getActiveBlock()->jump = Terminal::jump(loopBlock);
     }
 
     // update block

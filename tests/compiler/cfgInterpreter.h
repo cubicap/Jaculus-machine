@@ -531,7 +531,11 @@ public:
                     setReg(func.args[i].id, value);
                 } break;
                 case ValueType::Bool: {
-                    setReg(func.args[i].id, JS_ToBool(ctx, argv[i]));
+                    auto val = JS_ToBool(ctx, argv[i]);
+                    if (val < 0) {
+                        throw std::runtime_error("Invalid conversion to Bool");
+                    }
+                    setReg(func.args[i].id, val != 0);
                 } break;
                 case ValueType::Object: {
                     setReg(func.args[i].id, ObjectPtr{ JS_VALUE_GET_PTR(argv[i]) });

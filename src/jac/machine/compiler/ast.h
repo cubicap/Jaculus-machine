@@ -570,7 +570,6 @@ struct BinaryExpression {
         UnaryExpressionPtr<Yield, Await>
     > value;
 
-    // TODO: handle ??, ** operators correctly
     static std::optional<BinaryExpression> parse(ParserState& state) {
         // Shunting Yard algorithm
         using Element = std::variant<
@@ -599,7 +598,8 @@ struct BinaryExpression {
             while (!operators.empty()) {
                 auto top = operators.back();
                 auto topPrecedence = binaryPrecedence.at(top);
-                if (topPrecedence < precedence->second) {  // TODO: handle right-associative operators
+                if (topPrecedence < precedence->second
+                  || (rightAssociative.contains(top) && precedence->second == topPrecedence)) {
                     break;
                 }
                 operators.pop_back();
