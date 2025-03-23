@@ -753,8 +753,56 @@ template<bool In, bool Yield, bool Await>
                                 ast::BinaryExpression<In, Yield, Await>,
                                 ast::AssignmentExpressionPtr<In, Yield, Await>,
                                 ast::AssignmentExpressionPtr<In, Yield, Await>
-                            >&) {
-            throw std::runtime_error("Ternary conditional operator is not supported");
+                            >&xpr) {
+            const auto& [cond, trueExpr, falseExpr] = xpr;
+
+            auto condVal = emit(cond, func);
+            RValue condR = materialize(condVal, func);
+            emitPushFree(condR, func);
+
+            auto preBlock = func.getActiveBlock();
+            auto trueBlock = func.createBlock();
+            auto falseBlock = func.createBlock();
+            auto postBlock = func.createBlock();
+
+            postBlock->jump = preBlock->jump;
+            trueBlock->jump = Terminal::jump(postBlock);
+            falseBlock->jump = Terminal::jump(postBlock);
+            preBlock->jump = Terminal::branch(condR, trueBlock, falseBlock);
+
+            auto emitBranch = [&](BasicBlockPtr block, const auto& expr) -> std::pair<BasicBlockPtr, RValue> {
+                func.setActiveBlock(block);
+                Value branchRes = emit(expr, func);
+                RValue resR = materialize(branchRes, func);
+
+                return { func.getActiveBlock(), resR };
+            };
+
+            auto [ trueCont, trueRes ] = emitBranch(trueBlock, *trueExpr);
+            auto [ falseCont, falseRes ] = emitBranch(falseBlock, *falseExpr);
+
+            RValue res;
+            if (trueRes.type() == falseRes.type()) {
+                res = RValue{ Temp::create(trueRes.type()) };
+            }
+            else {
+                res = RValue{ Temp::create(ValueType::Any) };
+            }
+
+            auto emitSet = [&](BasicBlockPtr block, RValue resR) {
+                func.setActiveBlock(block);
+                func.emitStatement({Operation{
+                    .op = Opcode::Set,
+                    .a = resR,
+                    .res = res
+                }});
+            };
+
+            emitSet(trueCont, trueRes);
+            emitSet(falseCont, falseRes);
+
+            func.setActiveBlock(postBlock);
+            return { res };
         }
     };
 

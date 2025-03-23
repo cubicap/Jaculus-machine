@@ -891,4 +891,36 @@ TEST_CASE("Operators", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"true", "false", "false"});
     }
+
+    SECTION("Conditional") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Bool, b: Int32, c: Int32): Int32 {
+                return a ? b : c;
+            }
+
+            report(fun(true, 1, 2));
+            report(fun(false, 1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1", "2"});
+    }
+
+    SECTION("Complex conditional") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Bool, b: Bool, c: Int32, d: Int32, e: Int32): Int32 {
+                return a && b ? c : a || b ? d : e;
+            }
+
+            report(fun(true, true, 1, 2, 3));
+            report(fun(true, false, 1, 2, 3));
+            report(fun(false, true, 1, 2, 3));
+            report(fun(false, false, 1, 2, 3));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1", "2", "2", "3"});
+    }
 }
