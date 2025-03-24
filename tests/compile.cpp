@@ -748,6 +748,88 @@ TEST_CASE("Object", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
     }
+
+    SECTION("Get member brackets") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object, b: any): any {
+                let c: any = a["b"];
+                return c;
+            }
+
+            let o = new Object();
+            o["b"] = 42;
+            report(test(o, 42));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
+
+    SECTION("Set member") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object, b: any): Void {
+                a.b = b;
+            }
+
+            let o = new Object();
+            test(o, 42);
+            report(o.b);
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
+
+    SECTION("Set member brackets") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object, b: any): Void {
+                a["b"] = b;
+            }
+
+            let o = new Object();
+            test(o, 42);
+            report(o.b);
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
+
+    SECTION("Get member int") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object): any {
+                let c: any = a[0];
+                return c;
+            }
+
+            let o = new Object();
+            o[0] = 42;
+            report(test(o));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
+
+    SECTION("Set member int") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object, b: any): Void {
+                a[0] = b;
+            }
+
+            let o = new Object();
+            test(o, 42);
+            report(o[0]);
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
 }
 
 

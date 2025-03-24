@@ -156,8 +156,7 @@ inline std::string encodeSignature(const std::vector<ValueType>& args, ValueType
         signature += getMIRTypeId(type, size);
     }
     if (hasRetArg(res)) {
-        auto [type, size] = getMIRArgType(res);
-        signature += getMIRTypeId(type, size);
+        signature += getMIRTypeId(MIR_T_P, 0);
     }
     return signature;
 }
@@ -298,6 +297,18 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         +[](RuntimeContext* ctx_, JSObject* obj, const char* name, JSValue val) {
             JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
             JS_SetPropertyStr(ctx_->ctx, objVal, name, val);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__getMemberObjI32", { ValueType::Object, ValueType::I32 }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSObject* obj, int32_t index, JSValue* res) {
+            JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
+            *res = JS_GetPropertyUint32(ctx_->ctx, val, index);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__setMemberObjI32", { ValueType::Object, ValueType::I32, ValueType::Any }, ValueType::Void,
+        +[](RuntimeContext* ctx_, JSObject* obj, int32_t index, JSValue val) {
+            JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
+            JS_SetPropertyUint32(ctx_->ctx, objVal, index, val);
         }
     );
 

@@ -420,8 +420,22 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                         if (op->a.type == ValueType::Object && op->b.type == ValueType::StringConst) {
                             insertCall(ctx, cc.fun, builtins, "__getMemberObjCStr", { cc.regs.at(op->a.id), cc.regs.at(op->b.id), cc.jsValAddr(op->res.id) });
                         }
+                        else if (op->a.type == ValueType::Object && op->b.type == ValueType::I32) {
+                            insertCall(ctx, cc.fun, builtins, "__getMemberObjI32", { cc.regs.at(op->a.id), cc.regs.at(op->b.id), cc.jsValAddr(op->res.id) });
+                        }
                         else {
                             throw std::runtime_error("GetMember is not fully supported");
+                        }
+                        break;
+                    case Opcode::SetMember:
+                        if (op->a.type == ValueType::StringConst && op->b.type == ValueType::Any && op->res.type == ValueType::Object) {
+                            insertCall(ctx, cc.fun, builtins, "__setMemberObjCStr", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), cc.jsValAddr(op->b.id) });
+                        }
+                        else if (op->a.type == ValueType::I32 && op->b.type == ValueType::Any && op->res.type == ValueType::Object) {
+                            insertCall(ctx, cc.fun, builtins, "__setMemberObjI32", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), cc.jsValAddr(op->b.id) });
+                        }
+                        else {
+                            throw std::runtime_error("SetMember is not fully supported");
                         }
                         break;
                     // Unary

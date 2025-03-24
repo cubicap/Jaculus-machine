@@ -186,8 +186,8 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
         RValue operator()(const ast::NumericLiteral& lit) {
             return emit(lit, func);
         }
-        RValue operator()(const ast::StringLiteral&) {
-            throw std::runtime_error("String literals are not supported");
+        RValue operator()(const ast::StringLiteral& lit) {
+            return emitConst(lit.value, func);
         }
     };
 
@@ -500,6 +500,21 @@ template<bool Yield, bool Await>
     return { res };
 }
 
+
+template<bool Yield, bool Await>
+[[nodiscard]] Value emit(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::Expression<true, Yield, Await>>& memBracket, FunctionEmitter& func) {
+    const auto& [mem, acc] = memBracket;
+    Value obj = emit(*mem, func);
+    RValue objR = materialize(obj, func);
+    emitPushFree(objR, func);
+
+    RValue accR = emit(acc, func);
+
+    LVRef res = LVRef::mbr(objR, accR, false);
+
+    return { res };
+}
+
 template<bool Yield, bool Await>
 [[nodiscard]] Value emit(const ast::MemberExpression<Yield, Await>& member, FunctionEmitter& func) {
     struct visitor {
@@ -517,8 +532,8 @@ template<bool Yield, bool Await>
             return emit(primary, func);
         }
 
-        Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::Expression<true, Yield, Await>>&) { // brackets
-            throw std::runtime_error("Member -> brackets are not supported");
+        Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::Expression<true, Yield, Await>>& memBracket) { // brackets
+            return emit(memBracket, func);
         }
 
         Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::IdentifierName>& memDot) { // .
