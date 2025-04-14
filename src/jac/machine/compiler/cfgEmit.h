@@ -163,7 +163,6 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
     };
     func.emitStatement(init);
     RValue initR = { init.type(), init.id };
-    emitPushFree(initR, func);
     return initR;
 }
 
@@ -201,8 +200,7 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
     return { lv.self };
 }
 
-// FIXME: solve dup/free for cast
-[[nodiscard]] inline RValue emitCast(RValue val, ValueType type, FunctionEmitter& func) {
+[[nodiscard]] inline RValue emitCastAndFree(RValue val, ValueType type, FunctionEmitter& func) {
     if (val.type() == type) {
         return val;
     }
@@ -212,6 +210,7 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
         .a = val,
         .res = res
     }});
+    emitPushFree(val, func);
     return res;
 }
 
@@ -222,11 +221,13 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
         return v;
     }
 
+    emitPushFree({ *lv.memberIdent }, func);  // XXX: broken if lv is materialized multiple times
+
     // TODO: solve conversion of parent/accessor types
     RValue res = { Temp::create(lv.type()) };
     func.emitStatement({Operation{
         .op = Opcode::GetMember,
-        .a = { lv.self.type, lv.self.id },
+        .a = lv.self,
         .b = *lv.memberIdent,
         .res = res
     }});
@@ -242,24 +243,37 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
 }
 
 
-inline void emitAssign(LVRef target, RValue value, FunctionEmitter& func) {
+// TODO: think about conversion set once more
+[[nodiscard]] inline RValue emitAssign(LVRef target, RValue value, FunctionEmitter& func) {
     if (target.isMember()) {
+        // TODO: allow direct assignment of different types in member case
         RValue parent = { target.self };
         RValue ident = { *target.memberIdent };
+
+        RValue converted = emitCastAndFree(value, target.type(), func);
+
+        emitPushFree(ident, func);  // XXX: broken if target is used multiple times
 
         func.emitStatement({Operation{
             .op = Opcode::SetMember,
             .a = ident,
-            .b = value,
+            .b = converted,
             .res = parent
         }});
+        return converted;
     }
     else {
+        if (target.type() != value.type()) {
+            emitPushFree(value, func);
+        }
+
+        RValue targetR = giveSimple(target, func);
         func.emitStatement({Operation{
             .op = Opcode::Set,
             .a = value,
-            .res = giveSimple(target, func)
+            .res = targetR
         }});
+        return targetR;
     }
 }
 
@@ -272,14 +286,17 @@ inline void emitAssign(LVRef target, RValue value, FunctionEmitter& func) {
     RValue ropRType;
 
     if (isArithmetic(op) || isBitwise(op)) {
-        lopRType = emitCast(lhs, resType, func);
-        ropRType = emitCast(rhs, resType, func);
+        lopRType = emitCastAndFree(lhs, resType, func);
+        ropRType = emitCastAndFree(rhs, resType, func);
     }
     else {
         ValueType commonType = commonUpcast(lhs.type(), rhs.type());
-        lopRType = emitCast(lhs, commonType, func);
-        ropRType = emitCast(rhs, commonType, func);
+        lopRType = emitCastAndFree(lhs, commonType, func);
+        ropRType = emitCastAndFree(rhs, commonType, func);
     }
+
+    emitPushFree(lopRType, func);
+    emitPushFree(ropRType, func);
 
     func.emitStatement({Operation{
         .op = op,
@@ -325,8 +342,8 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
     processRes(lhsBool, true);
 
     func.setActiveBlock(elseBlock);
+    emitPushFree(lhsBool, func);
     RValue rhs = evalRhs();
-    emitDup(rhs, func);
     processRes(rhs, false);
 
     func.setActiveBlock(postBlock);
@@ -405,8 +422,10 @@ template<bool Yield, bool Await>
             throw std::runtime_error("Spread arguments are not supported");
         }
         Value arg = emit(*expr, func);
-        args.push_back(materialize(arg, func));
-        emitPushFree(arg, func);
+        auto argR = materialize(arg, func);
+        emitPushFree(argR, func);
+
+        args.push_back(argR);
     }
 
     func.emitStatement({Call{
@@ -449,8 +468,10 @@ template<bool Yield, bool Await>
                     throw std::runtime_error("Spread arguments are not supported");
                 }
                 Value arg = emit(*expr, func);
-                args.push_back(materialize(arg, func));
-                emitPushFree(arg, func);
+                auto argR = materialize(arg, func);
+                emitPushFree(argR, func);
+
+                args.push_back(argR);
             }
 
             func.emitStatement({Call{
@@ -623,6 +644,7 @@ template<bool Yield, bool Await>
         throw std::runtime_error("Unsupported type for update expression");
     }
     RValue rop = emitConst(static_cast<int32_t>(1), func);
+    emitPushFree(rop, func);
 
     RValue valPre;
     if (expr.kind == ast::UpdateKind::PostInc || expr.kind == ast::UpdateKind::PostDec) {
@@ -632,6 +654,9 @@ template<bool Yield, bool Await>
             .a = lop,
             .res = valPre
         }});
+    }
+    else {
+        emitPushFree(lop, func);
     }
 
     RValue valPost = { Temp::create(lop.type()) };
@@ -659,9 +684,10 @@ template<bool Yield, bool Await>
             assert(false);
     }
 
-    emitAssign(val.asLVRef(), valPost, func);
+    (void) emitAssign(val.asLVRef(), valPost, func);
 
     if (expr.kind == ast::UpdateKind::PostInc || expr.kind == ast::UpdateKind::PostDec) {
+        emitPushFree(valPost, func);
         return { valPre };
     }
     return { valPost };
@@ -684,6 +710,7 @@ Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func
     Opcode op = it->second;
 
     RValue argR = materialize(arg, func);
+    emitPushFree(argR, func);
     RValue res = { Temp::create(argR.type()) };
 
     func.emitStatement({Operation{
@@ -711,14 +738,11 @@ template<bool In, bool Yield, bool Await>
 
                 auto lhsRes = emit(*lhs, func);
                 RValue lhsR = materialize(lhsRes, func);
-                emitPushFree(lhsR, func);
 
                 RValue res = { Temp::create(ValueType::Bool) };
                 emitShortCircuit(lhsR, [&]() {
                     auto rhsVal = emit(*rhs, func);
-                    RValue rhsR = materialize(rhsVal, func);
-                    emitPushFree(rhsR, func);
-                    return rhsR;
+                    return materialize(rhsVal, func);
                 },
                 [&](RValue val, bool) {
                     func.emitStatement({Operation{
@@ -741,9 +765,7 @@ template<bool In, bool Yield, bool Await>
             Opcode op = it->second;
 
             RValue lopR = materialize(lop, func);
-            emitPushFree(lopR, func);
             RValue ropR = materialize(rop, func);
-            emitPushFree(ropR, func);
 
             return { emitBinaryArithmetic(lopR, ropR, op, func) };
         }
@@ -881,9 +903,7 @@ template<bool In, bool Yield, bool Await>
         RValue rhsR = materialize(rhs, func);
 
         auto targetLV = target.asLVRef();
-        emitAssign(targetLV, rhsR, func);
-
-        return rhsR;
+        return emitAssign(targetLV, rhsR, func);
     }
     if (auto it = arithAssignmentOps.find(assign.op); it != arithAssignmentOps.end()) {
         Value rhs = emit(*assign.rhs, func);
@@ -891,36 +911,33 @@ template<bool In, bool Yield, bool Await>
 
         Opcode op = it->second;
         RValue targetR = materialize(target, func);
-        emitPushFree(targetR, func);
-        emitPushFree(rhsR, func);
 
         RValue res = emitBinaryArithmetic(targetR, rhsR, op, func);
-        emitAssign(target.asLVRef(), res, func);
-
-        return res;
+        return emitAssign(target.asLVRef(), res, func);
     }
     if (auto it = shortCircuitAssignmentOps.find(assign.op); it != shortCircuitAssignmentOps.end()) {
         RValue targetR = materialize(target, func);
-        emitPushFree(targetR, func);
-
-        RValue res;
 
         emitShortCircuit(targetR, [&]() {
             Value rhs = emit(*assign.rhs, func);
-            RValue rhsR = materialize(rhs, func);
-            emitPushFree(rhsR, func);
-            return rhsR;
+            return materialize(rhs, func);
         },
         [&](RValue val, bool skipped) {
-            res = val;
             if (skipped) {
                 return;
             }
-            emitAssign(target.asLVRef(), val, func);
+            (void) emitAssign(target.asLVRef(), val, func);
+            if (target.asLVRef().isMember()) {
+                func.emitStatement({Operation{
+                    .op = Opcode::Set,
+                    .a = val,
+                    .res = targetR
+                }});
+            }
         },
         it->second, func);
 
-        return res;
+        return targetR;
     }
     throw std::runtime_error("Unsupported assignment operator");
 }
@@ -943,13 +960,18 @@ void emit(const ast::LexicalDeclaration<In, Yield, Await>& lexical, FunctionEmit
             LVRef target = func.addLexical(binding.identifier.name.name, type, false);
 
             RValue rhsR = materialize(rhs, func);
-            emitPushFree(rhsR, func);
+
+            if (target.type() != rhsR.type()) {
+                emitPushFree(rhsR, func);
+            }
 
             func.emitStatement({Operation{
                 .op = Opcode::Set,
                 .a = rhsR,
                 .res = giveSimple(target, func)
             }});
+
+            emitPushFree(giveSimple(target, func), func);
         }
         void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<In, Yield, Await>>&) {
             throw std::runtime_error("Binding patterns are not supported");
@@ -1009,10 +1031,9 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& f
     // condition block
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
-    emitPushFree(cond, func);
-    RValue res = emitCast(cond, ValueType::Bool, func);
-
+    RValue res = emitCastAndFree(cond, ValueType::Bool, func);
     emitPushFree(res, func);
+
     func.getActiveBlock()->jump = Terminal::branch(res, ifBlock, elseBlock);
 
     // if block
@@ -1043,10 +1064,9 @@ void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitt
     // condition block
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
-    emitPushFree(cond, func);
-    RValue res = emitCast(cond, ValueType::Bool, func);
-
+    RValue res = emitCastAndFree(cond, ValueType::Bool, func);
     emitPushFree(res, func);
+
     func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
 
     // loop block
@@ -1075,10 +1095,9 @@ void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter
     // condition block
     func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
-    emitPushFree(cond, func);
-    RValue res = emitCast(cond, ValueType::Bool, func);
-
+    RValue res = emitCastAndFree(cond, ValueType::Bool, func);
     emitPushFree(res, func);
+
     func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
 
     // loop block
@@ -1136,10 +1155,9 @@ void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& 
     if (stmt.condition) {
         func.setActiveBlock(condBlock);
         RValue cond = emit(*stmt.condition, func);
-        emitPushFree(cond, func);
-        RValue res = emitCast(cond, ValueType::Bool, func);
-
+        RValue res = emitCastAndFree(cond, ValueType::Bool, func);
         emitPushFree(res, func);
+
         func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
     }
     else {
@@ -1216,7 +1234,7 @@ void emit(const ast::ReturnStatement<Yield, Await>& stmt, FunctionEmitter& func)
 
     Value arg = { emit(*stmt.expression, func) };
     RValue argR = materialize(arg, func);
-    RValue conv = emitCast(argR, func.signature->ret, func);
+    RValue conv = emitCastAndFree(argR, func.signature->ret, func);
 
     func.getActiveBlock()->jump = Terminal::retVal(conv);
 }

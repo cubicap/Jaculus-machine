@@ -42,6 +42,20 @@ TEST_CASE("Basic", "[aot]") {
         REQUIRE(machine.getReports() == std::vector<std::string>{"1234"});
     }
 
+    SECTION("Simpler") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: Int32, b: Int32): Int32 {
+                return a + b + 1;
+            }
+
+            report(fun(1, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"4"});
+    }
+
     SECTION("Simple") {
         machine.initialize();
         std::string code(R"(

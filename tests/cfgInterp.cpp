@@ -164,6 +164,26 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
         REQUIRE(resObj.get("c").to<int>() == 1);
     }
 
+    SECTION("Assign cast") {
+        auto code = R"(
+            function test(a: Int32): Float {
+                let b: Float = 1.1;
+                b = a;
+                return b;
+            }
+        )";
+        auto func = compile(code);
+        std::map<std::string, jac::CompFn> em;
+        jac::cfg::interp::CFGInterpreter interp(em);
+        std::array<JSValue, 1> args = {
+            JS_NewInt32(machine.context(), 42)
+        };
+        auto result = interp.run(func, machine.context(), JS_UNDEFINED, args.size(), args.data());
+        double value;
+        JS_ToFloat64(machine.context(), &value, result);
+        REQUIRE(value == 42.0);
+    }
+
     SECTION("Member get") {
         auto code = R"(
             function test(a: Object, num: Int32): Int32 {
