@@ -34,7 +34,7 @@ jac::cfg::Function compile(const std::string& code) {
 
     jac::ast::ParserState state(tokens);
 
-    auto fun = jac::ast::FunctionDeclaration<false, false, false>::parse(state);
+    auto fun = jac::ast::FunctionDeclaration::parse(state, false);
     if (!fun || !state.isEnd()) {
         jac::lex::Token errorToken = state.getErrorToken();
         std::cerr << "Parse error: " << state.getErrorMessage()

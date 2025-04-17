@@ -96,13 +96,12 @@ inline ValueType getType(std::string_view name) {
 }
 
 
-template<bool Yield, bool Await>
-const ast::PrimaryExpression<Yield, Await>& newExpGetPrimary(const ast::NewExpression<Yield, Await>& newExp) {
-    const auto member = std::get_if<ast::MemberExpression<Yield, Await>>(&(newExp.value));
+inline const ast::PrimaryExpression& newExpGetPrimary(const ast::NewExpression& newExp) {
+    const auto member = std::get_if<ast::MemberExpression>(&(newExp.value));
     if (!member) {
         throw std::runtime_error("Only member expressions are supported");
     }
-    const auto primary = std::get_if<ast::PrimaryExpression<Yield, Await>>(&(member->value));
+    const auto primary = std::get_if<ast::PrimaryExpression>(&(member->value));
     if (!primary) {
         throw std::runtime_error("Only primary expressions are supported");
     }
@@ -111,9 +110,8 @@ const ast::PrimaryExpression<Yield, Await>& newExpGetPrimary(const ast::NewExpre
 }
 
 
-template<bool Yield, bool Await>
-const ast::PrimaryExpression<Yield, Await>& lhsGetPrimary(const ast::LeftHandSideExpression<Yield, Await>& lhs) {
-    const auto newExp = std::get_if<ast::NewExpression<Yield, Await>>(&(lhs.value));
+inline const ast::PrimaryExpression& lhsGetPrimary(const ast::LeftHandSideExpression& lhs) {
+    const auto newExp = std::get_if<ast::NewExpression>(&(lhs.value));
     if (newExp) {
         return newExpGetPrimary(*newExp);
     }
@@ -121,13 +119,12 @@ const ast::PrimaryExpression<Yield, Await>& lhsGetPrimary(const ast::LeftHandSid
     throw std::runtime_error("Only new expressions are supported");
 }
 
-template<bool Yield, bool Await>
-const std::optional<Identifier> memberGetIdentifier(const ast::MemberExpression<Yield, Await>& member) {
-    auto primary = std::get_if<ast::PrimaryExpression<Yield, Await>>(&(member.value));
+inline const std::optional<Identifier> memberGetIdentifier(const ast::MemberExpression& member) {
+    auto primary = std::get_if<ast::PrimaryExpression>(&(member.value));
     if (!primary) {
         return std::nullopt;
     }
-    auto identifier = std::get_if<ast::IdentifierReference<Yield, Await>>(&(primary->value));
+    auto identifier = std::get_if<ast::IdentifierReference>(&(primary->value));
     if (!identifier) {
         return std::nullopt;
     }
@@ -352,15 +349,19 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
 }
 
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::PrimaryExpression<Yield, Await>& primary, FunctionEmitter& func) {
+[[nodiscard]] inline RValue emit(const ast::Expression& expr, FunctionEmitter& func);
+[[nodiscard]] inline Value emit(const ast::AssignmentExpression& expr, FunctionEmitter& func);
+[[nodiscard]] inline Value emit(const ast::MemberExpression& member, FunctionEmitter& func);
+
+
+[[nodiscard]] inline Value emit(const ast::PrimaryExpression& primary, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
         Value operator()(const ast::ThisExpr&) {
             throw std::runtime_error("This expressions are not supported");
         }
-        Value operator()(const ast::IdentifierReference<Yield, Await>& identifier) {
+        Value operator()(const ast::IdentifierReference& identifier) {
             Identifier ident = identifier.identifier.name.name;
             auto local = func.getLocal(ident);
             if (!local) {
@@ -371,16 +372,16 @@ template<bool Yield, bool Await>
         Value operator()(const ast::Literal& literal) {
             return { emit(literal, func) };
         }
-        Value operator()(const ast::ArrayLiteral<Yield, Await>&) {
+        Value operator()(const ast::ArrayLiteral&) {
             throw std::runtime_error("Array literals are not supported");
         }
-        Value operator()(const ast::ObjectLiteral<Yield, Await>&) {
+        Value operator()(const ast::ObjectLiteral&) {
             throw std::runtime_error("Object literals are not supported");
         }
         Value operator()(const ast::FunctionExpression&) {
             throw std::runtime_error("Function expressions are not supported");
         }
-        Value operator()(const ast::ClassExpression<Yield, Await>&) {
+        Value operator()(const ast::ClassExpression&) {
             throw std::runtime_error("Class expressions are not supported");
         }
         Value operator()(const ast::GeneratorExpression&) {
@@ -395,10 +396,10 @@ template<bool Yield, bool Await>
         Value operator()(const ast::RegularExpressionLiteral&) {
             throw std::runtime_error("Regular expression literals are not supported");
         }
-        Value operator()(const ast::TemplateLiteral<Yield, Await, false>&) {
+        Value operator()(const ast::TemplateLiteral&) {
             throw std::runtime_error("Template literals are not supported");
         }
-        Value operator()(const ast::ParenthesizedExpression<Yield, Await>& expr) {
+        Value operator()(const ast::ParenthesizedExpression& expr) {
             return { emit(expr.expression, func) };
         }
     };
@@ -406,8 +407,7 @@ template<bool Yield, bool Await>
     return std::visit(visitor{func}, primary.value);
 }
 
-template<bool Yield, bool Await>
-[[nodiscard]] RValue emitCallNative(Identifier ident, const ast::Arguments<Yield, Await>& args_, FunctionEmitter& func) {
+[[nodiscard]] inline RValue emitCallNative(Identifier ident, const ast::Arguments& args_, FunctionEmitter& func) {
     auto sig = func.getSignature(ident);
     if (!sig) {
         throw std::runtime_error("Function not found: " + ident);
@@ -438,18 +438,17 @@ template<bool Yield, bool Await>
     return res;
 }
 
-template<bool Yield, bool Await>
-[[nodiscard]] RValue emit(const ast::CallExpression<Yield, Await>& call, FunctionEmitter& func) {
+[[nodiscard]] inline RValue emit(const ast::CallExpression& call, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        RValue operator()(const ast::SuperCall<Yield, Await>&) {
+        RValue operator()(const ast::SuperCall&) {
             throw std::runtime_error("Super calls are not supported");
         }
-        RValue operator()(const ast::ImportCall<Yield, Await>&) {
+        RValue operator()(const ast::ImportCall&) {
             throw std::runtime_error("Import calls are not supported");
         }
-        RValue operator()(const std::pair<ast::MemberExpression<Yield, Await>, ast::Arguments<Yield, Await>>& call) {
+        RValue operator()(const std::pair<ast::MemberExpression, ast::Arguments>& call) {
             if (auto ident = memberGetIdentifier(call.first); ident) {
                 if (!func.getLocal(*ident)) {
                     return emitCallNative(*ident, call.second, func);
@@ -482,19 +481,19 @@ template<bool Yield, bool Await>
 
             return res;
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::Arguments<Yield, Await>>&) { // call
+        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::Arguments>&) { // call
             throw std::runtime_error("Call -> args are not supported");
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::Expression<true, Yield, Await>>&) { // brackets
+        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::Expression>&) { // brackets
             throw std::runtime_error("Call -> brackets are not supported");
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::IdentifierName>&) { // .
+        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::IdentifierName>&) { // .
             throw std::runtime_error("Call -> dots are not supported");
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::PrivateIdentifier>&) { // .private
+        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::PrivateIdentifier>&) { // .private
             throw std::runtime_error("Call -> .private are not supported");
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr<Yield, Await>, ast::TemplateLiteral<Yield, Await, true>>&) { // template
+        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::TemplateLiteral>&) { // template
             throw std::runtime_error("Call -> template literals are not supported");
         }
     };
@@ -503,12 +502,7 @@ template<bool Yield, bool Await>
 }
 
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::MemberExpression<Yield, Await>& member, FunctionEmitter& func);
-
-
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::IdentifierName>& memDot, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const std::pair<ast::MemberExpressionPtr, ast::IdentifierName>& memDot, FunctionEmitter& func) {
     const auto& [mem, ident] = memDot;
     Value obj = emit(*mem, func);
     RValue objR = materialize(obj, func);
@@ -522,8 +516,7 @@ template<bool Yield, bool Await>
 }
 
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::Expression<true, Yield, Await>>& memBracket, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const std::pair<ast::MemberExpressionPtr, ast::Expression>& memBracket, FunctionEmitter& func) {
     const auto& [mem, acc] = memBracket;
     Value obj = emit(*mem, func);
     RValue objR = materialize(obj, func);
@@ -536,12 +529,11 @@ template<bool Yield, bool Await>
     return { res };
 }
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::MemberExpression<Yield, Await>& member, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const ast::MemberExpression& member, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::SuperProperty<Yield, Await>&) {
+        Value operator()(const ast::SuperProperty&) {
             throw std::runtime_error("Super properties are not supported");
         }
 
@@ -549,27 +541,27 @@ template<bool Yield, bool Await>
             throw std::runtime_error("Meta properties are not supported");
         }
 
-        Value operator()(const ast::PrimaryExpression<Yield, Await>& primary) {
+        Value operator()(const ast::PrimaryExpression& primary) {
             return emit(primary, func);
         }
 
-        Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::Expression<true, Yield, Await>>& memBracket) { // brackets
+        Value operator()(const std::pair<ast::MemberExpressionPtr, ast::Expression>& memBracket) { // brackets
             return emit(memBracket, func);
         }
 
-        Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::IdentifierName>& memDot) { // .
+        Value operator()(const std::pair<ast::MemberExpressionPtr, ast::IdentifierName>& memDot) { // .
             return emit(memDot, func);
         }
 
-        Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::PrivateIdentifier>&) { // .private
+        Value operator()(const std::pair<ast::MemberExpressionPtr, ast::PrivateIdentifier>&) { // .private
             throw std::runtime_error("Member -> .private are not supported");
         }
 
-        Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::TemplateLiteral<Yield, Await, true>>&) { // template
+        Value operator()(const std::pair<ast::MemberExpressionPtr, ast::TemplateLiteral>&) { // template
             throw std::runtime_error("Member -> template literals are not supported");
         }
 
-        Value operator()(const std::pair<ast::MemberExpressionPtr<Yield, Await>, ast::Arguments<Yield, Await>>&) { // new
+        Value operator()(const std::pair<ast::MemberExpressionPtr, ast::Arguments>&) { // new
             throw std::runtime_error("New expressions are not supported");
         }
     };
@@ -578,15 +570,14 @@ template<bool Yield, bool Await>
 }
 
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::NewExpression<Yield, Await>& newExp, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const ast::NewExpression& newExp, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::MemberExpression<Yield, Await>& member) {
+        Value operator()(const ast::MemberExpression& member) {
             return emit(member, func);
         }
-        Value operator()(const ast::NewExpressionPtr<Yield, Await>&) {
+        Value operator()(const ast::NewExpressionPtr&) {
             throw std::runtime_error("New expressions are not supported");
         }
     };
@@ -595,15 +586,14 @@ template<bool Yield, bool Await>
 }
 
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::LeftHandSideExpression<Yield, Await>& lhs, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const ast::LeftHandSideExpression& lhs, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::CallExpression<Yield, Await>& call) {
+        Value operator()(const ast::CallExpression& call) {
             return { emit(call, func) };
         }
-        Value operator()(const ast::NewExpression<Yield, Await>& newExp) {
+        Value operator()(const ast::NewExpression& newExp) {
             return emit(newExp, func);
         }
     };
@@ -612,20 +602,18 @@ template<bool Yield, bool Await>
 }
 
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func);
+[[nodiscard]] inline Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func);
 
 
-template<bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::UpdateExpression<Yield, Await>& expr, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const ast::UpdateExpression& expr, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
+        Value operator()(const ast::UnaryExpressionPtr& unary) {
             return emit(*unary, func);
         }
 
-        Value operator()(const ast::LeftHandSideExpressionPtr<Yield, Await>& lhs) {
+        Value operator()(const ast::LeftHandSideExpressionPtr& lhs) {
             return emit(*lhs, func);
         }
     };
@@ -694,13 +682,12 @@ template<bool Yield, bool Await>
 }
 
 
-template<bool Yield, bool Await>
-Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func) {
-    if (std::holds_alternative<ast::UpdateExpression<Yield, Await>>(expr.value)) {
-        return emit(std::get<ast::UpdateExpression<Yield, Await>>(expr.value), func);
+inline Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
+    if (std::holds_alternative<ast::UpdateExpression>(expr.value)) {
+        return emit(std::get<ast::UpdateExpression>(expr.value), func);
     }
 
-    const auto& un = std::get<std::pair<ast::UnaryExpressionPtr<Yield, Await>, std::string_view>>(expr.value);
+    const auto& un = std::get<std::pair<ast::UnaryExpressionPtr, std::string_view>>(expr.value);
     Value arg = emit(*(un.first), func);
 
     auto it = unaryOps.find(un.second);
@@ -723,14 +710,13 @@ Value emit(const ast::UnaryExpression<Yield, Await>& expr, FunctionEmitter& func
 }
 
 
-template<bool In, bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::BinaryExpression<In, Yield, Await>& expr, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const ast::BinaryExpression& expr, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
         Value operator()(const std::tuple<
-                                ast::BinaryExpressionPtr<In, Yield, Await>,
-                                ast::BinaryExpressionPtr<In, Yield, Await>,
+                                ast::BinaryExpressionPtr,
+                                ast::BinaryExpressionPtr,
                                 std::string_view
                             >& binExpr) {
             if (auto it = shortCircuitOps.find(std::get<2>(binExpr)); it != shortCircuitOps.end()) {
@@ -769,7 +755,7 @@ template<bool In, bool Yield, bool Await>
 
             return { emitBinaryArithmetic(lopR, ropR, op, func) };
         }
-        Value operator()(const ast::UnaryExpressionPtr<Yield, Await>& unary) {
+        Value operator()(const ast::UnaryExpressionPtr& unary) {
             return emit(*unary, func);
         }
     };
@@ -778,18 +764,17 @@ template<bool In, bool Yield, bool Await>
 }
 
 
-template<bool In, bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::ConditionalExpression<In, Yield, Await>& expr, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const ast::ConditionalExpression& expr, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::BinaryExpression<In, Yield, Await>& xpr) {
+        Value operator()(const ast::BinaryExpression& xpr) {
             return emit(xpr, func);
         }
         Value operator()(const std::tuple<  // ternary conditional operator
-                                ast::BinaryExpression<In, Yield, Await>,
-                                ast::AssignmentExpressionPtr<In, Yield, Await>,
-                                ast::AssignmentExpressionPtr<In, Yield, Await>
+                                ast::BinaryExpression,
+                                ast::AssignmentExpressionPtr,
+                                ast::AssignmentExpressionPtr
                             >&xpr) {
             const auto& [cond, trueExpr, falseExpr] = xpr;
 
@@ -847,28 +832,26 @@ template<bool In, bool Yield, bool Await>
 }
 
 
-template<bool In, bool Yield, bool Await>
-[[nodiscard]] RValue emit(const ast::Assignment<In, Yield, Await>& assign, FunctionEmitter& func);
+[[nodiscard]] inline RValue emit(const ast::Assignment& assign, FunctionEmitter& func);
 
 
-template<bool In, bool Yield, bool Await>
-[[nodiscard]] Value emit(const ast::AssignmentExpression<In, Yield, Await>& expr, FunctionEmitter& func) {
+[[nodiscard]] inline Value emit(const ast::AssignmentExpression& expr, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::ConditionalExpression<In, Yield, Await>& cond) {
+        Value operator()(const ast::ConditionalExpression& cond) {
             return emit(cond, func);
         }
-        Value operator()(const ast::YieldExpression<In, Yield, Await>&) {
+        Value operator()(const ast::YieldExpression&) {
             throw std::runtime_error("Yield expressions are not supported");
         }
-        Value operator()(const ast::ArrowFunction<In, Yield, Await>&) {
+        Value operator()(const ast::ArrowFunction&) {
             throw std::runtime_error("Arrow functions are not supported");
         }
-        Value operator()(const ast::AsyncArrowFunction<In, Yield, Await>&) {
+        Value operator()(const ast::AsyncArrowFunction&) {
             throw std::runtime_error("Async arrow functions are not supported");
         }
-        Value operator()(const ast::Assignment<In, Yield, Await>& assign) {
+        Value operator()(const ast::Assignment& assign) {
             return { emit(assign, func) };
         }
     };
@@ -877,23 +860,22 @@ template<bool In, bool Yield, bool Await>
 }
 
 
-template<bool In, bool Yield, bool Await>
-[[nodiscard]] RValue emit(const ast::Assignment<In, Yield, Await>& assign, FunctionEmitter& func) {
+[[nodiscard]] inline RValue emit(const ast::Assignment& assign, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        Value operator()(const ast::MemberExpression<Yield, Await>& expr) {
+        Value operator()(const ast::MemberExpression& expr) {
             return emit(expr, func);
         }
-        Value operator()(const ast::NewExpressionPtr<Yield, Await>&) {
+        Value operator()(const ast::NewExpressionPtr&) {
             throw std::runtime_error("Assignment patterns are not supported");
         }
     };
 
-    if (!std::holds_alternative<ast::NewExpression<Yield, Await>>(assign.lhs.value)) {
+    if (!std::holds_alternative<ast::NewExpression>(assign.lhs.value)) {
         throw std::runtime_error("Only new expressions are supported in assignments");
     }
-    Value target = std::visit(visitor{func}, std::get<ast::NewExpression<Yield, Await>>(assign.lhs.value).value);
+    Value target = std::visit(visitor{func}, std::get<ast::NewExpression>(assign.lhs.value).value);
     if (target.isRValue()) {
         throw std::runtime_error("Invalid assignment target");
     }
@@ -943,17 +925,16 @@ template<bool In, bool Yield, bool Await>
 }
 
 
-template<bool In, bool Yield, bool Await>
-void emit(const ast::LexicalDeclaration<In, Yield, Await>& lexical, FunctionEmitter& func) {
+inline void emit(const ast::LexicalDeclaration& lexical, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
         ValueType type;
 
-        void operator()(const ast::BindingIdentifier<Yield, Await>& decl) {
+        void operator()(const ast::BindingIdentifier& decl) {
             func.addLexical(decl.identifier.name.name, type, false);
             // do nothing
         }
-        void operator()(const std::pair<ast::BindingIdentifier<Yield, Await>, ast::InitializerPtr<In, Yield, Await>>& assign) {
+        void operator()(const std::pair<ast::BindingIdentifier, ast::InitializerPtr>& assign) {
             const auto& [binding, initializer] = assign;
 
             Value rhs = emit(*initializer, func);
@@ -973,12 +954,12 @@ void emit(const ast::LexicalDeclaration<In, Yield, Await>& lexical, FunctionEmit
 
             emitPushFree(giveSimple(target, func), func);
         }
-        void operator()(const std::pair<ast::BindingPattern<Yield, Await>, ast::InitializerPtr<In, Yield, Await>>&) {
+        void operator()(const std::pair<ast::BindingPattern, ast::InitializerPtr>&) {
             throw std::runtime_error("Binding patterns are not supported");
         }
     };
 
-    for (const ast::LexicalBinding<In, Yield, Await>& binding : lexical.bindings) {
+    for (const ast::LexicalBinding& binding : lexical.bindings) {
         if (!binding.type) {
             throw std::runtime_error("Lexical bindings must have a type");
         }
@@ -987,18 +968,16 @@ void emit(const ast::LexicalDeclaration<In, Yield, Await>& lexical, FunctionEmit
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::Declaration<Yield, Await, Return>& declaration, FunctionEmitter& func) {
-    if (!std::holds_alternative<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value)) {
+inline void emit(const ast::Declaration& declaration, FunctionEmitter& func) {
+    if (!std::holds_alternative<ast::LexicalDeclaration>(declaration.value)) {
         throw std::runtime_error("Only lexical declarations are supported");
     }
 
-    emit(std::get<ast::LexicalDeclaration<true, Yield, Await>>(declaration.value), func);
+    emit(std::get<ast::LexicalDeclaration>(declaration.value), func);
 }
 
 
-template<bool In, bool Yield, bool Await>
-[[nodiscard]] RValue emit(const ast::Expression<In, Yield, Await>& expr, FunctionEmitter& func) {
+[[nodiscard]] RValue emit(const ast::Expression& expr, FunctionEmitter& func) {
     for (size_t i = 0; i + 1 < expr.items.size(); i++) {
         Value v = emit(*expr.items[i], func);
         emitPushFree(v, func);
@@ -1011,12 +990,10 @@ template<bool In, bool Yield, bool Await>
 }
 
 
-template<bool Yield, bool Await, bool Return>
-bool emit(const ast::Statement<Yield, Await, Return>& statement, FunctionEmitter& func);
+inline bool emit(const ast::Statement& statement, FunctionEmitter& func);
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::IfStatement& stmt, FunctionEmitter& func) {
     auto preBlock = func.getActiveBlock();
     auto condBlock = func.createBlock();
     auto ifBlock = func.createBlock();
@@ -1050,8 +1027,7 @@ void emit(const ast::IfStatement<Yield, Await, Return>& stmt, FunctionEmitter& f
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::DoWhileStatement& stmt, FunctionEmitter& func) {
     auto preBlock = func.getActiveBlock();
     auto condBlock = func.createBlock();
     auto loopBlock = func.createBlock();
@@ -1081,8 +1057,7 @@ void emit(const ast::DoWhileStatement<Yield, Await, Return>& stmt, FunctionEmitt
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::WhileStatement& stmt, FunctionEmitter& func) {
     auto preBlock = func.getActiveBlock();
     auto condBlock = func.createBlock();
     auto loopBlock = func.createBlock();
@@ -1112,22 +1087,21 @@ void emit(const ast::WhileStatement<Yield, Await, Return>& stmt, FunctionEmitter
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::ForStatement& stmt, FunctionEmitter& func) {
     struct InitVisitor {
         FunctionEmitter& func;
 
         void operator()(std::monostate) {
             // do nothing
         }
-        void operator()(const ast::Expression<false, Yield, Await>& expr) {
+        void operator()(const ast::Expression& expr) {
             RValue v = emit(expr, func);
             emitPushFree(v, func);
         }
-        void operator()(const ast::VariableDeclarationList<false, Yield, Await>&) {
+        void operator()(const ast::VariableDeclarationList&) {
             throw std::runtime_error("Variable declarations are not supported");
         }
-        void operator()(const ast::LexicalDeclaration<false, Yield, Await>& decl) {
+        void operator()(const ast::LexicalDeclaration& decl) {
             emit(decl, func);
         }
     };
@@ -1183,21 +1157,20 @@ void emit(const ast::ForStatement<Yield, Await, Return>& stmt, FunctionEmitter& 
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::IterationStatement<Yield, Await, Return>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::IterationStatement& stmt, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        void operator()(const ast::DoWhileStatement<Yield, Await, Return>& stmt) {
+        void operator()(const ast::DoWhileStatement& stmt) {
             emit(stmt, func);
         }
-        void operator()(const ast::WhileStatement<Yield, Await, Return>& stmt) {
+        void operator()(const ast::WhileStatement& stmt) {
             emit(stmt, func);
         }
-        void operator()(const ast::ForStatement<Yield, Await, Return>& stmt) {
+        void operator()(const ast::ForStatement& stmt) {
             emit(stmt, func);
         }
-        void operator()(const ast::ForInOfStatement<Yield, Await, Return>&) {
+        void operator()(const ast::ForInOfStatement&) {
             throw std::runtime_error("For-in/of statements are not supported");
         }
     };
@@ -1207,15 +1180,14 @@ void emit(const ast::IterationStatement<Yield, Await, Return>& stmt, FunctionEmi
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void emit(const ast::BreakableStatement<Yield, Await, Return>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::BreakableStatement& stmt, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        void operator()(const ast::IterationStatement<Yield, Await, Return>& stmt) {
+        void operator()(const ast::IterationStatement& stmt) {
             emit(stmt, func);
         }
-        void operator()(const ast::SwitchStatement<Yield, Await, Return>&) {
+        void operator()(const ast::SwitchStatement&) {
             throw std::runtime_error("Switch statements are not supported");
         }
     };
@@ -1225,8 +1197,7 @@ void emit(const ast::BreakableStatement<Yield, Await, Return>& stmt, FunctionEmi
 }
 
 
-template<bool Yield, bool Await>
-void emit(const ast::ReturnStatement<Yield, Await>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::ReturnStatement& stmt, FunctionEmitter& func) {
     if (!stmt.expression) {
         func.getActiveBlock()->jump = Terminal::ret();
         return;
@@ -1239,8 +1210,7 @@ void emit(const ast::ReturnStatement<Yield, Await>& stmt, FunctionEmitter& func)
     func.getActiveBlock()->jump = Terminal::retVal(conv);
 }
 
-template<bool Yield, bool Await>
-void emit(const ast::ContinueStatement<Yield, Await>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::ContinueStatement& stmt, FunctionEmitter& func) {
     if (stmt.label) {
         throw std::runtime_error("Labeled continue statements are not supported");
     }
@@ -1252,8 +1222,7 @@ void emit(const ast::ContinueStatement<Yield, Await>& stmt, FunctionEmitter& fun
     }
 }
 
-template<bool Yield, bool Await>
-void emit(const ast::BreakStatement<Yield, Await>& stmt, FunctionEmitter& func) {
+inline void emit(const ast::BreakStatement& stmt, FunctionEmitter& func) {
     if (stmt.label) {
         throw std::runtime_error("Labeled break statements are not supported");
     }
@@ -1266,59 +1235,57 @@ void emit(const ast::BreakStatement<Yield, Await>& stmt, FunctionEmitter& func) 
 }
 
 
-template<bool Yield, bool Await, bool Return>
-bool emit(const ast::Block<Yield, Await, Return>& block, FunctionEmitter& func);
+inline bool emit(const ast::Block& block, FunctionEmitter& func);
 
 
-template<bool Yield, bool Await, bool Return>
-bool emit(const ast::Statement<Yield, Await, Return>& statement, FunctionEmitter& func) {
+inline bool emit(const ast::Statement& statement, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        bool operator()(const ast::BlockStatement<Yield, Await, Return>& stmt) {
+        bool operator()(const ast::BlockStatement& stmt) {
             return emit(stmt, func);
         }
-        bool operator()(const ast::VariableStatement<Yield, Await>&) {
+        bool operator()(const ast::VariableStatement&) {
             throw std::runtime_error("Variable statements are not supported");
         }
         bool operator()(const ast::EmptyStatement&) {
             throw std::runtime_error("Empty statements are not supported");
         }
-        bool operator()(const ast::ExpressionStatement<Yield, Await>& stmt) {
+        bool operator()(const ast::ExpressionStatement& stmt) {
             RValue v = emit(stmt.expression, func);
             emitPushFree(v, func);
             return false;
         }
-        bool operator()(const ast::IfStatement<Yield, Await, Return>& stmt) {
+        bool operator()(const ast::IfStatement& stmt) {
             emit(stmt, func);
             return false;
         }
-        bool operator()(const ast::BreakableStatement<Yield, Await, Return>& stmt) {
+        bool operator()(const ast::BreakableStatement& stmt) {
             emit(stmt, func);
             return false;
         }
-        bool operator()(const ast::ContinueStatement<Yield, Await>& stmt) {
+        bool operator()(const ast::ContinueStatement& stmt) {
             emit(stmt, func);
             return false;
         }
-        bool operator()(const ast::BreakStatement<Yield, Await>& stmt) {
+        bool operator()(const ast::BreakStatement& stmt) {
             emit(stmt, func);
             return true;
         }
-        bool operator()(const ast::ReturnStatement<Yield, Await>& stmt) {
+        bool operator()(const ast::ReturnStatement& stmt) {
             emit(stmt, func);
             return true;
         }
-        bool operator()(const ast::WithStatement<Yield, Await, Return>&) {
+        bool operator()(const ast::WithStatement&) {
             throw std::runtime_error("With statements are not supported");
         }
-        bool operator()(const ast::LabeledStatement<Yield, Await, Return>&) {
+        bool operator()(const ast::LabeledStatement&) {
             throw std::runtime_error("Labeled statements are not supported");
         }
-        bool operator()(const ast::ThrowStatement<Yield, Await>&) {
+        bool operator()(const ast::ThrowStatement&) {
             throw std::runtime_error("Throw statements are not supported");
         }
-        bool operator()(const ast::TryStatement<Yield, Await, Return>&) {
+        bool operator()(const ast::TryStatement&) {
             throw std::runtime_error("Try statements are not supported");
         }
         bool operator()(const ast::DebuggerStatement&) {
@@ -1331,20 +1298,19 @@ bool emit(const ast::Statement<Yield, Await, Return>& statement, FunctionEmitter
 
 
 // returns true if the block contains a "terminating" statement
-template<bool Yield, bool Await, bool Return>
-bool emit(const ast::StatementList<Yield, Await, Return>& list, FunctionEmitter& func) {
+inline bool emit(const ast::StatementList& list, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
-        bool operator()(const ast::Statement<Yield, Await, Return>& statement) {
+        bool operator()(const ast::Statement& statement) {
             return emit(statement, func);
         }
-        bool operator()(const ast::Declaration<Yield, Await, Return>& declaration) {
+        bool operator()(const ast::Declaration& declaration) {
             emit(declaration, func);
             return false;
         }
     };
 
-    for (const ast::StatementListItem<Yield, Await, Return>& statement : list.items) {
+    for (const ast::StatementListItem& statement : list.items) {
         if (std::visit(visitor{func}, statement.value)) {
             return true;
         }
@@ -1354,8 +1320,7 @@ bool emit(const ast::StatementList<Yield, Await, Return>& list, FunctionEmitter&
 }
 
 
-template<bool Yield, bool Await, bool Return>
-bool emit(const ast::Block<Yield, Await, Return>& block, FunctionEmitter& func) {
+inline bool emit(const ast::Block& block, FunctionEmitter& func) {
     if (block.statementList) {
         auto _ = func.pushScope();
         return emit(*block.statementList, func);
@@ -1364,19 +1329,18 @@ bool emit(const ast::Block<Yield, Await, Return>& block, FunctionEmitter& func) 
 }
 
 
-template<bool Yield, bool Await, bool Default>
-SignaturePtr getSignature(const ast::FunctionDeclaration<Yield, Await, Default>& decl) {
+inline SignaturePtr getSignature(const ast::FunctionDeclaration& decl) {
     auto sig = std::make_shared<Signature>();
     if (!decl.returnType) {
         return nullptr;
     }
     sig->ret = getType(decl.returnType->type.name.name);
 
-    for (const ast::FormalParameter<Yield, Await>& arg : decl.parameters.parameterList) {
-        if (!std::holds_alternative<ast::BindingIdentifier<Yield, Await>>(arg.value)) {
+    for (const ast::FormalParameter& arg : decl.parameters.parameterList) {
+        if (!std::holds_alternative<ast::BindingIdentifier>(arg.value)) {
             return nullptr;
         }
-        const auto& binding = std::get<ast::BindingIdentifier<Yield, Await>>(arg.value);
+        const auto& binding = std::get<ast::BindingIdentifier>(arg.value);
 
         if (!arg.type) {
             return nullptr;
@@ -1388,8 +1352,7 @@ SignaturePtr getSignature(const ast::FunctionDeclaration<Yield, Await, Default>&
     return sig;
 }
 
-template<bool Yield, bool Await, bool Default>
-FunctionEmitter emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl, SignaturePtr sig, const std::map<cfg::Identifier, cfg::SignaturePtr>& otherSignatures) {
+inline FunctionEmitter emit(const ast::FunctionDeclaration& decl, SignaturePtr sig, const std::map<cfg::Identifier, cfg::SignaturePtr>& otherSignatures) {
     if (!decl.name) {
         throw std::runtime_error("Function declarations must have a name");
     }
@@ -1398,7 +1361,7 @@ FunctionEmitter emit(const ast::FunctionDeclaration<Yield, Await, Default>& decl
     out.setSignature(sig);
     out.setFunctionName(decl.name->identifier.name.name);
 
-    emit(*decl.body, out);
+    emit(decl.body->statementList, out);
 
     if (out.getActiveBlock()->jump.type == Terminal::None) {
         out.getActiveBlock()->jump = Terminal::ret();

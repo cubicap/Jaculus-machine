@@ -10,51 +10,44 @@ namespace jac::ast::traverse {
 
 
 struct Functions {
-    std::vector<const FunctionDeclaration<false, false, false>*> functions;
+    std::vector<const FunctionDeclaration*> functions;
 
-    template<bool Yield, bool Await, bool Default>
-    void add(const FunctionDeclaration<Yield, Await, Default>& func) {
-        if constexpr (!Yield && !Await && !Default) {
-            functions.push_back(&func);
-        }
+    void add(const FunctionDeclaration& func) {
+        functions.push_back(&func);
     }
 };
 
-template<bool Yield, bool Await, bool Return>
-void funcs(const Statement<Yield, Await, Return>& statement, Functions& out) {
+inline void funcs(const Statement& statement, Functions& out) {
     // XXX: ignore for now (ignores nested functions)
 }
 
-template<bool Yield, bool Await, bool Default>
-void funcs(const HoistableDeclaration<Yield, Await, Default>& hoistable, Functions& out) {
-    if (!std::holds_alternative<FunctionDeclaration<Yield, Await, Default>>(hoistable.value)) {
+inline void funcs(const HoistableDeclaration& hoistable, Functions& out) {
+    if (!std::holds_alternative<FunctionDeclaration>(hoistable.value)) {
         return;
     }
 
-    auto& func = std::get<FunctionDeclaration<Yield, Await, Default>>(hoistable.value);
+    auto& func = std::get<FunctionDeclaration>(hoistable.value);
     out.add(func);
 }
 
-template<bool Yield, bool Await, bool Return>
-void funcs(const Declaration<Yield, Await, Return>& declaration, Functions& out) {
-    if (!std::holds_alternative<HoistableDeclaration<Yield, Await, false>>(declaration.value)) {
+inline void funcs(const Declaration& declaration, Functions& out) {
+    if (!std::holds_alternative<HoistableDeclaration>(declaration.value)) {
         return;
     }
 
-    auto& hoistable = std::get<HoistableDeclaration<Yield, Await, false>>(declaration.value);
+    auto& hoistable = std::get<HoistableDeclaration>(declaration.value);
     funcs(hoistable, out);
 }
 
-template<bool Yield, bool Await, bool Return>
-void funcs(const StatementListItem<Yield, Await, Return>& statement, Functions& out) {
+inline void funcs(const StatementListItem& statement, Functions& out) {
     struct visitor {
         Functions& out;
 
-        void operator()(const Statement<Yield, Await, Return>& statement) {
+        void operator()(const Statement& statement) {
             funcs(statement, out);
         }
 
-        void operator()(const Declaration<Yield, Await, Return>& declaration) {
+        void operator()(const Declaration& declaration) {
             funcs(declaration, out);
         }
     };
@@ -63,8 +56,7 @@ void funcs(const StatementListItem<Yield, Await, Return>& statement, Functions& 
 }
 
 
-template<bool Yield, bool Await, bool Return>
-void funcs(const StatementList<Yield, Await, Return>& statementList, Functions& out) {
+inline void funcs(const StatementList& statementList, Functions& out) {
     for (const auto& statement : statementList.items) {
         funcs(statement, out);
     }
