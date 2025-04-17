@@ -528,23 +528,34 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 }, init->value);
             }
             else if (auto call = std::get_if<Call>(&statement.op)) {
-                if (call->res.type != ValueType::Void) {
-                    cc.reg(call->res.id, call->res.type);
-                }
                 std::vector<MIR_op_t> args;
-                if (!call->isNative()) {
+                if (call->isNative()) {
+                    if (call->res.type != ValueType::Void && call->res.type != ValueType::Any) {
+                        cc.reg(call->res.id, call->res.type);
+                    }
+                    auto [proto, forward] = prototypes.at(std::get<Identifier>(call->obj));
+                    args.push_back(MIR_new_ref_op(ctx, proto));
+                    args.push_back(MIR_new_ref_op(ctx, forward));
+                    if (call->res.type != ValueType::Void && call->res.type != ValueType::Any) {
+                        args.push_back(regOp(call->res.id));
+                    }
+                    for (auto& arg : call->args) {
+                        auto [type, size] = getMIRArgType(arg.type);
+                        if (MIR_blk_type_p(type)) {
+                            args.push_back(MIR_new_mem_op(ctx, type, size, cc.jsValAddr(arg.id), 0, 0));
+                        }
+                        else {
+                            args.push_back(regOp(arg.id));
+                    }
+                    }
+                    if (call->res.type == ValueType::Any) {
+                        args.push_back(MIR_new_reg_op(ctx, cc.jsValAddr(call->res.id)));
+                    }
+                    cc.insert(MIR_new_insn_arr(ctx, MIR_CALL, args.size(), args.data()));
+                }
+                else {
                     throw std::runtime_error("Object calls are not supported");
                 }
-                auto [proto, forward] = prototypes.at(std::get<Identifier>(call->obj));
-                args.push_back(MIR_new_ref_op(ctx, proto));
-                args.push_back(MIR_new_ref_op(ctx, forward));
-                if (call->res.type != ValueType::Void) {
-                    args.push_back(regOp(call->res.id));
-                }
-                for (auto& arg : call->args) {
-                    args.push_back(regOp(arg.id));
-                }
-                cc.insert(MIR_new_insn_arr(ctx, MIR_CALL, args.size(), args.data()));
             }
         }
 

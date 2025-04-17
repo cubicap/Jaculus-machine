@@ -714,6 +714,25 @@ TEST_CASE("Any", "[aot]") {
             "1234", "5678.9", "false"
         });
     }
+
+    SECTION("Call") {
+        machine.initialize();
+        std::string code(R"(
+            function id(a: any): any {
+                return a;
+            }
+
+            function fun(a: any): any {
+                return id(a);
+            }
+
+            report(id(7));
+            report(fun(2.5));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"7", "2.5"});
+    }
 }
 
 
