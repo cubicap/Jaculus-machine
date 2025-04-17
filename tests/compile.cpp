@@ -863,6 +863,66 @@ TEST_CASE("Object", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
     }
+
+    SECTION("Call(void)") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object): any {
+                return a();
+            }
+
+            function memFn() {  // no type annotations -> not compiled
+                return 42;
+            }
+
+            report(test(memFn));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
+
+    SECTION("Call member(void)") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object): any {
+                let c: any = a.b();
+                return c;
+            }
+
+            function memFn() {  // no type annotations -> not compiled
+                return 42;
+            }
+
+            let o = new Object();
+            o.b = memFn;
+            report(test(o));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
+
+    SECTION("Call with args") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object, b: Int32): any {
+                let c: any = a.b(b);
+                return c;
+            }
+
+            function memFn(a) {  // no type annotations -> not compiled
+                return a + 1;
+            }
+
+            let o = new Object();
+            o.b = memFn;
+            report(test(o, 41));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
 }
 
 

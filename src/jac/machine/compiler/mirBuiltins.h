@@ -312,6 +312,26 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    addNativeFunction(ctx, builtins, "__callAny", { ValueType::Any, ValueType::I32 }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue obj, int32_t argc, JSValue* argv) {
+            JSValue res = JS_Call(ctx_->ctx, obj, JS_UNDEFINED, argc, argv);
+            if (JS_IsException(res)) {
+                // TODO: handle exception
+            }
+            argv[0] = res;
+        }
+    );
+    addNativeFunction(ctx, builtins, "__callObj", { ValueType::Object, ValueType::I32 }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSObject* obj, int32_t argc, JSValue* argv) {
+            JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
+            JSValue res = JS_Call(ctx_->ctx, objVal, JS_UNDEFINED, argc, argv);
+            if (JS_IsException(res)) {
+                // TODO: handle exception
+            }
+            argv[0] = res;
+        }
+    );
+
     return builtins;
 }
 

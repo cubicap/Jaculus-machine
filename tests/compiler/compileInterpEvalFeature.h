@@ -107,7 +107,7 @@ class AotEvalFeature : public EvalFeature<Next> {
         }
 
         for (const auto& astFunc : functions.functions) {
-            if (!astFunc->name) {
+            if (!astFunc->name || !signatures.contains(astFunc->name->identifier.name.name)) {
                 continue;
             }
             try {

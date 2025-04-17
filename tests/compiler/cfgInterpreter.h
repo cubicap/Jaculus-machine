@@ -356,6 +356,36 @@ inline RegVal convert(JSContext* ctx, RegVal v, ValueType type) {
 }
 
 
+struct WrapAnyVisitor {
+    JSContext* ctx;
+
+    Any operator()(Any v) {
+        return v;
+    }
+    Any operator()(ObjectPtr v) {
+        JSValue val = JS_MKPTR(JS_TAG_OBJECT, *v);
+        return val;
+    }
+    Any operator()(Int32 v) {
+        return JS_NewInt32(ctx, *v);
+    }
+    Any operator()(Float v) {
+        return JS_NewFloat64(ctx, *v);
+    }
+    Any operator()(Bool v) {
+        return JS_NewBool(ctx, *v);
+    }
+    Any operator()(auto) {
+        throw std::runtime_error("Invalid conversion to JSValue");
+    }
+};
+
+inline Any wrapAny(JSContext* ctx, RegVal v) {
+    return std::visit(WrapAnyVisitor{ctx}, v);
+}
+
+
+
 namespace detail {
 
     struct lshift {
@@ -631,7 +661,7 @@ class CFGInterpreter {
         std::vector<JSValue> args;
         args.reserve(call.args.size());
         for (auto& arg : call.args) {
-            args.push_back(*convert<Any>(ctx, getReg(arg.id)));
+            args.push_back(*wrapAny(ctx, getReg(arg.id)));
         }
 
         auto& fn = it->second;
@@ -640,6 +670,29 @@ class CFGInterpreter {
         JSValue res = interp.run(fn.fn, ctx, JS_UNDEFINED, args.size(), args.data());
 
         setReg(call.res.id, convert(ctx, Any{ res }, call.res.type));
+    }
+
+    void evalCallFn(JSContext* ctx, const Call& call) {
+        auto obj = getReg(std::get<Temp>(call.obj).id);
+
+        std::vector<JSValue> args;
+        args.reserve(call.args.size());
+        for (auto& arg : call.args) {
+            args.push_back(*wrapAny(ctx, getReg(arg.id)));
+        }
+
+        JSValue res;
+        if (std::holds_alternative<Any>(obj)) {
+            res = JS_Call(ctx, *std::get<Any>(obj), JS_UNDEFINED, args.size(), args.data());
+        }
+        else if (std::holds_alternative<ObjectPtr>(obj)) {
+            JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, *std::get<ObjectPtr>(obj));
+            res = JS_Call(ctx, objVal, JS_UNDEFINED, args.size(), args.data());
+        }
+        else {
+            throw std::runtime_error("Invalid call operand type");
+        }
+        setReg(call.res.id, Any{ res });
     }
 public:
     CFGInterpreter(std::map<std::string, CompFn>& compiledHolder) : _compiledHolder(compiledHolder) {}
@@ -721,7 +774,7 @@ public:
                     self.evalCallNative(ctx, call);
                 }
                 else {
-                    throw std::runtime_error("Not implemented (call)");
+                    self.evalCallFn(ctx, call);
                 }
             }
         };
@@ -859,7 +912,7 @@ public:
                             if (!std::holds_alternative<Any>(val)) {
                                 throw std::runtime_error("Invalid return type");
                             }
-                            return *convert<Any>(ctx, val);
+                            return *std::get<Any>(val);
                         case ValueType::String:
                             throw std::runtime_error("Not implemented (return String)");
                         case ValueType::StringConst:

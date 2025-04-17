@@ -232,8 +232,13 @@ struct CompileContext {
         return MIR_new_reg_op(ctx, regs.at(id));
     }
 
+    auto scratch(auto prefix, MIR_type_t type) {
+        auto r = MIR_new_func_reg(ctx, func, type, (prefix + std::to_string(getId())).c_str());
+        return r;
+    }
+
     auto calcOff(MIR_reg_t base, int off, size_t size) {
-        auto addr = MIR_new_func_reg(ctx, func, MIR_T_I64, ("_addr" + std::to_string(getId())).c_str());
+        auto addr = scratch("_addr", MIR_T_I64);
         MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, addr), MIR_new_reg_op(ctx, base), MIR_new_int_op(ctx, off * size)));
         return addr;
     }
@@ -554,7 +559,35 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     cc.insert(MIR_new_insn_arr(ctx, MIR_CALL, args.size(), args.data()));
                 }
                 else {
-                    throw std::runtime_error("Object calls are not supported");
+                    auto startBlock = cc.scratch("_bstart", MIR_T_I64);
+                    cc.insert(MIR_new_insn(ctx, MIR_BSTART, MIR_new_reg_op(ctx, startBlock)));
+
+                    auto argsStart = cc.scratch("_args", MIR_T_I64);
+                    auto argCount = cc.scratch("_argCount", MIR_T_I64);
+                    cc.insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, argCount), MIR_new_int_op(ctx, call->args.size())));
+                    cc.insert(MIR_new_insn(ctx, MIR_ALLOCA,
+                        MIR_new_reg_op(ctx, argsStart),
+                        MIR_new_int_op(ctx, sizeof(JSValue) * std::min(call->args.size(), static_cast<size_t>(1)))));
+                    for (size_t i = 0; i < call->args.size(); ++i) {
+                        auto arg = call->args[i];
+                        auto addr = cc.calcOff(argsStart, i, sizeof(JSValue));
+                        cc.toJSVal(arg, addr);
+                    }
+
+                    auto funObj = std::get<Temp>(call->obj);
+                    if (funObj.type == ValueType::Any) {
+                        insertCall(ctx, cc.fun, builtins, "__callAny", { cc.jsValAddr(funObj.id), argCount, argsStart });
+                    }
+                    else if (funObj.type == ValueType::Object) {
+                        insertCall(ctx, cc.fun, builtins, "__callObj", { cc.regs.at(funObj.id), argCount, argsStart });
+                    }
+                    else {
+                        throw std::runtime_error("Invalid call operand type");
+                    }
+
+                    cc.copyJSVal(argsStart, cc.jsValAddr(call->res.id));
+
+                    cc.insert(MIR_new_insn(ctx, MIR_BEND, MIR_new_reg_op(ctx, startBlock)));
                 }
             }
         }
