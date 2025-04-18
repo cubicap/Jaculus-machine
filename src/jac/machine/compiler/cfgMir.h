@@ -36,82 +36,6 @@ inline auto getJSTag(ValueType type) {
     }
 }
 
-inline MIR_insn_code_t chooseArithmetic(Opcode op, ValueType type) {
-    switch (op) {
-        case Opcode::Add:  switch (type) {  // TODO: support strings
-            case ValueType::I32:    return MIR_ADDS;
-            case ValueType::Double: return MIR_DADD;
-            default: assert(false && "Invalid Add operand type");
-        }
-        case Opcode::Sub:  switch (type) {
-            case ValueType::I32:    return MIR_SUBS;
-            case ValueType::Double: return MIR_DSUB;
-            default: assert(false && "Invalid Sub operand type");
-        }
-        case Opcode::Mul:  switch (type) {
-            case ValueType::I32:    return MIR_MULS;
-            case ValueType::Double: return MIR_DMUL;
-            default: assert(false && "Invalid Mul operand type");
-        }
-        case Opcode::Div:  switch (type) {
-            case ValueType::I32:    return MIR_DIVS;
-            case ValueType::Double: return MIR_DDIV;
-            default: assert(false && "Invalid Div operand type");
-        }
-        case Opcode::Rem:  switch (type) {
-            case ValueType::I32:    return MIR_MODS;
-            case ValueType::Double: throw std::runtime_error("fmod is not supported");
-            default: assert(false && "Invalid Rem operand type");
-        }
-        case Opcode::Pow: throw std::runtime_error("Pow is not supported");
-        case Opcode::UnMinus: switch (type) {
-            case ValueType::I32:    return MIR_NEGS;
-            case ValueType::Double: return MIR_DNEG;
-            default: assert(false && "Invalid UnMinus operand type");
-        }
-        default:
-            assert(false && "Invalid arithmetic operation");
-    }
-}
-
-inline MIR_insn_code_t chooseBitwise(Opcode op, ValueType type) {
-    assert(isIntegral(type));  // TODO: support doubles
-    switch (op) {
-        case Opcode::LShift: switch (type) {
-            case ValueType::I32:    return MIR_LSHS;
-            case ValueType::Bool:   return MIR_LSHS;
-            default: assert(false && "Invalid LShift operand type");
-        }
-        case Opcode::RShift: switch (type) {
-            case ValueType::I32:    return MIR_RSHS;
-            case ValueType::Bool:   return MIR_RSHS;
-            default: assert(false && "Invalid RShift operand type");
-        }
-        case Opcode::URShift: switch (type) {
-            case ValueType::I32:    return MIR_URSHS;
-            case ValueType::Bool:   return MIR_URSHS;
-            default: assert(false && "Invalid URShift operand type");
-        }
-        case Opcode::BitAnd: switch (type) {
-            case ValueType::I32:    return MIR_ANDS;
-            case ValueType::Bool:   return MIR_ANDS;
-            default: assert(false && "Invalid BitAnd operand type");
-        }
-        case Opcode::BitOr: switch (type) {
-            case ValueType::I32:    return MIR_ORS;
-            case ValueType::Bool:   return MIR_ORS;
-            default: assert(false && "Invalid BitOr operand type");
-        }
-        case Opcode::BitXor:  switch (type) {
-            case ValueType::I32:    return MIR_XORS;
-            case ValueType::Bool:   return MIR_XORS;
-            default: assert(false && "Invalid BitXor operand type");
-        }
-        default:
-            assert(false && "Invalid bitwise operation");
-    }
-}
-
 inline MIR_insn_code_t chooseComparison(Opcode op, ValueType type) {
     assert(type != ValueType::Void);
     switch (op) {
@@ -285,6 +209,85 @@ struct CompileContext {
     }
 };
 
+inline MIR_insn_code_t chooseSimpleArithmetic(Opcode op, ValueType type) {
+    switch (op) {
+        case Opcode::Add:  switch (type) {  // TODO: support strings
+            case ValueType::I32:    return MIR_ADDS;
+            case ValueType::Double: return MIR_DADD;
+            default: assert(false && "Invalid Add operand type");
+        }
+        case Opcode::Sub:  switch (type) {
+            case ValueType::I32:    return MIR_SUBS;
+            case ValueType::Double: return MIR_DSUB;
+            default: assert(false && "Invalid Sub operand type");
+        }
+        case Opcode::Mul:  switch (type) {
+            case ValueType::I32:    return MIR_MULS;
+            case ValueType::Double: return MIR_DMUL;
+            default: assert(false && "Invalid Mul operand type");
+        }
+        case Opcode::Div:  switch (type) {
+            case ValueType::I32:    return MIR_DIVS;
+            case ValueType::Double: return MIR_DDIV;
+            default: assert(false && "Invalid Div operand type");
+        }
+        case Opcode::Rem:  switch (type) {
+            case ValueType::I32:    return MIR_MODS;
+            case ValueType::Double: throw std::runtime_error("fmod is not supported");
+            default: assert(false && "Invalid Rem operand type");
+        }
+        case Opcode::UnMinus: switch (type) {
+            case ValueType::I32:    return MIR_NEGS;
+            case ValueType::Double: return MIR_DNEG;
+            default: assert(false && "Invalid UnMinus operand type");
+        }
+        default:
+            assert(false && "Invalid arithmetic operation");
+    }
+}
+
+inline const char* chooseArithmeticBuiltin(Opcode op, ValueType type) {
+    switch (op) {
+        case Opcode::Add:  return "__add";
+        case Opcode::Sub:  return "__sub";
+        case Opcode::Mul:  return "__mul";
+        case Opcode::Div:  return "__div";
+        case Opcode::Rem:  return "__rem";
+        default:
+            assert(false && "Invalid arithmetic operation");
+    }
+}
+
+inline void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res, Builtins& builtins) {
+    assert(a.type == b.type && a.type == res.type);
+    if (a.type == ValueType::Any) {
+        insertCall(cc.ctx, cc.fun, builtins, chooseArithmeticBuiltin(op, a.type), { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) });
+    }
+    else {
+        cc.insert(MIR_new_insn(cc.ctx, chooseSimpleArithmetic(op, a.type), cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
+    }
+}
+
+inline MIR_insn_code_t chooseBitwise(Opcode op, ValueType type) {
+    assert(type == ValueType::I32);  // TODO: support doubles
+    switch (op) {
+        case Opcode::LShift:
+            return MIR_LSHS;
+        case Opcode::RShift:
+            return MIR_RSHS;
+        case Opcode::URShift:
+            return MIR_URSHS;
+        case Opcode::BitAnd:
+            return MIR_ANDS;
+        case Opcode::BitOr:
+            return MIR_ORS;
+        case Opcode::BitXor:
+            return MIR_XORS;
+        default:
+            assert(false && "Invalid bitwise operation");
+    }
+}
+
 inline void createBoolConv(CompileContext cc, Temp a, Temp res, bool inverted) {
     switch (a.type) {
         case ValueType::I32:  case ValueType::Bool:
@@ -402,11 +405,11 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                 switch (op->op) {
                     // Binary
                     case Opcode::Add:  case Opcode::Sub:  case Opcode::Mul:
-                    case Opcode::Div:  case Opcode::Rem:  case Opcode::Pow:
-                        assert(op->a.type == op->b.type && op->res.type == op->a.type);
-                        cc.insert(MIR_new_insn(ctx, chooseArithmetic(op->op, op->a.type),
-                            regOp(op->res.id), regOp(op->a.id), regOp(op->b.id)));
+                    case Opcode::Div:  case Opcode::Rem:
+                        generateArithmetic(cc, op->op, op->a, op->b, op->res, builtins);
                         break;
+                    case Opcode::Pow:
+                        throw std::runtime_error("Pow is not supported");
                     case Opcode::LShift:  case Opcode::RShift:  case Opcode::URShift:
                     case Opcode::BitAnd:  case Opcode::BitOr:   case Opcode::BitXor:
                         assert(isIntegral(op->b.type) && op->res.type == op->a.type);
@@ -478,7 +481,7 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     } break;
                     case Opcode::UnMinus: {
                         assert(op->a.type == op->res.type);
-                        cc.insert(MIR_new_insn(ctx, chooseArithmetic(op->op, op->a.type),
+                        cc.insert(MIR_new_insn(ctx, chooseSimpleArithmetic(op->op, op->a.type),
                             regOp(op->res.id), regOp(op->a.id)));
                     } break;
                     case Opcode::Dup:

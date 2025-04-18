@@ -11,6 +11,7 @@
 #include <utility>
 
 #include <jac/machine/compiler/cfg.h>
+#include <jac/machine/compiler/quickjsOps.h>
 #include <jac/util.h>
 #include <quickjs.h>
 
@@ -385,8 +386,156 @@ inline Any wrapAny(JSContext* ctx, RegVal v) {
 }
 
 
-
 namespace detail {
+
+    template<typename T>
+    concept NotAny = !std::is_same_v<T, JSValue>;
+
+    template<typename T>
+    struct plus;
+    template<>
+    struct plus<JSValue> {
+        JSContext* ctx;
+        JSValue operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::add(ctx, a, b);
+        }
+    };
+    template<typename T>
+        requires NotAny<T>
+    struct plus<T> {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::plus<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct minus;
+    template<>
+    struct minus<JSValue> {
+        JSContext* ctx;
+        JSValue operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::sub(ctx, a, b);
+        }
+    };
+    template<typename T>
+        requires NotAny<T>
+    struct minus<T> {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::minus<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct multiplies;
+    template<>
+    struct multiplies<JSValue> {
+        JSContext* ctx;
+        JSValue operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::mul(ctx, a, b);
+        }
+    };
+    template<typename T>
+        requires NotAny<T>
+    struct multiplies<T> {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::multiplies<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct divides;
+    template<>
+    struct divides<JSValue> {
+        JSContext* ctx;
+        JSValue operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::div(ctx, a, b);
+        }
+    };
+    template<typename T>
+        requires NotAny<T>
+    struct divides<T> {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::divides<T>{}(a, b);
+        }
+    };
+
+
+    template<typename T>
+    struct equal_to {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::equal_to<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct not_equal_to {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::not_equal_to<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct greater {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::greater<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct greater_equal {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::greater_equal<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct less {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::less<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct less_equal {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::less_equal<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct bit_and {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::bit_and<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct bit_or {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::bit_or<T>{}(a, b);
+        }
+    };
+
+    template<typename T>
+    struct bit_xor {
+        JSContext* ctx;
+        decltype(auto) operator()(T a, T b) {
+            return std::bit_xor<T>{}(a, b);
+        }
+    };
+
 
     struct lshift {
         Int32 operator()(int32_t a, uint32_t b) {
@@ -545,8 +694,8 @@ class CFGInterpreter {
     std::vector<RegVal> freeStack;
 
     template<template<typename> class Op, typename Com, typename Res>
-    void evalBinop(JSContext*, const Operation& op) {
-        setReg(op.res.id, Res{Op<std::decay_t<decltype(*std::declval<Com>())>>{}(
+    void evalBinop(JSContext* ctx, const Operation& op) {
+        setReg(op.res.id, Res{Op<std::decay_t<decltype(*std::declval<Com>())>>{ctx}(
             *std::get<Com>(getReg(op.a.id)),
             *std::get<Com>(getReg(op.b.id))
         )});
@@ -563,6 +712,9 @@ class CFGInterpreter {
                 break;
             case ValueType::Bool:
                 evalBinop<Op, Bool, Bool>(ctx, op);
+                break;
+            case ValueType::Any:
+                evalBinop<Op, Any, Any>(ctx, op);
                 break;
             default:
                 throw std::runtime_error("Not implemented (result type)");
@@ -595,12 +747,18 @@ class CFGInterpreter {
         freeStack.push_back(getReg(op.a.id));
     }
 
-    void evalRem(JSContext*, const Operation& op) {
+    void evalRem(JSContext* ctx, const Operation& op) {
         if (op.res.type == ValueType::I32) {
             setReg(op.res.id, Int32{ *std::get<Int32>(getReg(op.a.id)) % *std::get<Int32>(getReg(op.b.id)) });
         }
-        else {
+        else if (op.res.type == ValueType::Double) {
             setReg(op.res.id, Float{ std::fmod(*std::get<Float>(getReg(op.a.id)), *std::get<Float>(getReg(op.b.id))) });
+        }
+        else if (op.res.type == ValueType::Any) {
+            setReg(op.res.id, Any{ jac::quickjs_ops::rem(ctx, *std::get<Any>(getReg(op.a.id)), *std::get<Any>(getReg(op.b.id))) });
+        }
+        else {
+            throw std::runtime_error("Invalid result type");
         }
     }
 
@@ -705,19 +863,19 @@ public:
             assert(checkType(getReg(op.b.id), op.b.type) && "Invalid operand type");
         }
         switch (op.op) {
-            case Opcode::Add: evalBinopResType<std::plus>(ctx, op); break;
-            case Opcode::Sub: evalBinopResType<std::minus>(ctx, op); break;
-            case Opcode::Mul: evalBinopResType<std::multiplies>(ctx, op); break;
-            case Opcode::Div: evalBinopResType<std::divides>(ctx, op); break;
-            case Opcode::Eq: evalRelational<std::equal_to>(ctx, op); break;
-            case Opcode::Neq: evalRelational<std::not_equal_to>(ctx, op); break;
-            case Opcode::Gt: evalRelational<std::greater>(ctx, op); break;
-            case Opcode::Gte: evalRelational<std::greater_equal>(ctx, op); break;
-            case Opcode::Lt: evalRelational<std::less>(ctx, op); break;
-            case Opcode::Lte: evalRelational<std::less_equal>(ctx, op); break;
-            case Opcode::BitAnd: evalBinop<std::bit_and, Int32, Int32>(ctx, op); break;
-            case Opcode::BitOr: evalBinop<std::bit_or, Int32, Int32>(ctx, op); break;
-            case Opcode::BitXor: evalBinop<std::bit_xor, Int32, Int32>(ctx, op); break;
+            case Opcode::Add: evalBinopResType<detail::plus>(ctx, op); break;
+            case Opcode::Sub: evalBinopResType<detail::minus>(ctx, op); break;
+            case Opcode::Mul: evalBinopResType<detail::multiplies>(ctx, op); break;
+            case Opcode::Div: evalBinopResType<detail::divides>(ctx, op); break;
+            case Opcode::Eq: evalRelational<detail::equal_to>(ctx, op); break;
+            case Opcode::Neq: evalRelational<detail::not_equal_to>(ctx, op); break;
+            case Opcode::Gt: evalRelational<detail::greater>(ctx, op); break;
+            case Opcode::Gte: evalRelational<detail::greater_equal>(ctx, op); break;
+            case Opcode::Lt: evalRelational<detail::less>(ctx, op); break;
+            case Opcode::Lte: evalRelational<detail::less_equal>(ctx, op); break;
+            case Opcode::BitAnd: evalBinop<detail::bit_and, Int32, Int32>(ctx, op); break;
+            case Opcode::BitOr: evalBinop<detail::bit_or, Int32, Int32>(ctx, op); break;
+            case Opcode::BitXor: evalBinop<detail::bit_xor, Int32, Int32>(ctx, op); break;
             case Opcode::Dup: evalDup(ctx, op); break;
             case Opcode::PushFree: evalPushFree(ctx, op); break;
             case Opcode::Rem: evalRem(ctx, op); break;

@@ -733,6 +733,50 @@ TEST_CASE("Any", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"7", "2.5"});
     }
+
+    SECTION("Arithmetic") {
+        machine.initialize();
+        std::string code(R"(
+            function add(a: any, b: any): any {
+                return a + b;
+            }
+            function sub(a: any, b: any): any {
+                return a - b;
+            }
+            function mul(a: any, b: any): any {
+                return a * b;
+            }
+            function div(a: any, b: any): any {
+                return a / b;
+            }
+            function rem(a: any, b: any): any {
+                return a % b;
+            }
+
+            report(add(1, 2));
+            report(add(1.5, 2.5));
+            report(add(true, false));
+
+            report(sub(1, 2));
+            report(sub(1.5, 2.5));
+            report(sub(true, false));
+
+            report(mul(1, 2));
+
+            report(div(1, 2));
+
+            report(rem(5, 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{
+            "3", "4", "1",
+            "-1", "-1", "1",
+            "2",
+            "0.5",
+            "1"
+        });
+    }
 }
 
 

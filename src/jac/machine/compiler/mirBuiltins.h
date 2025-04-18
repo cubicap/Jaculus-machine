@@ -10,6 +10,7 @@
 #include <quickjs.h>
 
 #include "opcode.h"
+#include "quickjsOps.h"
 
 
 namespace jac::cfg::mir_emit {
@@ -329,6 +330,32 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
                 // TODO: handle exception
             }
             argv[0] = res;
+        }
+    );
+
+    addNativeFunction(ctx, builtins, "__add", { ValueType::Any, ValueType::Any }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
+            *res = quickjs_ops::add(ctx_->ctx, a, b);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__sub", { ValueType::Any, ValueType::Any }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
+            *res = quickjs_ops::sub(ctx_->ctx, a, b);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__mul", { ValueType::Any, ValueType::Any }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
+            *res = quickjs_ops::mul(ctx_->ctx, a, b);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__div", { ValueType::Any, ValueType::Any }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
+            *res = quickjs_ops::div(ctx_->ctx, a, b);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__rem", { ValueType::Any, ValueType::Any }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
+            *res = quickjs_ops::rem(ctx_->ctx, a, b);
         }
     );
 
