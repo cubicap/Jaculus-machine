@@ -2000,7 +2000,8 @@ TEST_CASE("Member access", "[parser]") {
 
         jac::ast::ParserState state(tokens);
 
-        auto result = state.pushCallPop<jac::ast::Return(true)>([&](){ return jac::ast::Statement::parse(state); });
+        auto _ = state.pushTemplate<jac::ast::Return(true)>();
+        auto result = jac::ast::Statement::parse(state);
         CAPTURE(state.getErrorMessage());
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());

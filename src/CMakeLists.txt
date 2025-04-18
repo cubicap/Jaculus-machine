@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 set(JAC_MACHINE_SRC
     "jac/machine/machine.cpp"
     "jac/machine/context.cpp"
+    "jac/machine/compiler/ast.cpp"
     "jac/machine/compiler/cfg.cpp"
     "jac/machine/compiler/mirUtil.cpp"
 )
