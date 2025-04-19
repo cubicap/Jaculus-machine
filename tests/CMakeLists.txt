@@ -46,4 +46,7 @@ add_test(NAME compileNative COMMAND ${EXECUTABLE_OUTPUT_PATH}/compileNative)
 add_test_executable(cfgInterp)
 add_test_executable(regression)
 
+add_executable(bench bench.cpp)
+target_link_libraries(bench PUBLIC jac-machine Catch2::Catch2WithMain)
+
 file(COPY test_files DESTINATION "./")
