@@ -1322,7 +1322,7 @@ std::optional<Script> Script::parse(ParserState& state) {
 }
 
 
-inline std::optional<UpdateExpression> UpdateExpression::parse(ParserState& state) {
+std::optional<UpdateExpression> UpdateExpression::parse(ParserState& state) {
     // TODO: handle situations like multiple ++ or -- operators
     // TODO: check that "AssignmentTargetType" is simple
     if (state.current().kind == lex::Token::Punctuator) {
@@ -1354,7 +1354,7 @@ inline std::optional<UpdateExpression> UpdateExpression::parse(ParserState& stat
 }
 
 
-inline std::optional<ConditionalExpression> ConditionalExpression::parse(ParserState& state) {
+std::optional<ConditionalExpression> ConditionalExpression::parse(ParserState& state) {
     auto start = state.getPosition();
     if (auto shortCircuit = BinaryExpression::parse(state)) {
         if (state.current().kind == lex::Token::Punctuator && state.current().text == "?") {
@@ -1378,7 +1378,7 @@ inline std::optional<ConditionalExpression> ConditionalExpression::parse(ParserS
 }
 
 
-inline std::optional<BindingElement> BindingElement::parse(ParserState& state) {
+std::optional<BindingElement> BindingElement::parse(ParserState& state) {
     if (auto id = BindingIdentifier::parse(state)) {
         auto annotation = TypeAnnotation::parse(state);
 
@@ -1412,7 +1412,7 @@ inline std::optional<BindingElement> BindingElement::parse(ParserState& state) {
 }
 
 
-inline std::optional<Assignment> Assignment::parse(ParserState& state) {
+std::optional<Assignment> Assignment::parse(ParserState& state) {
     auto start = state.getPosition();
     auto lhs = LeftHandSideExpression::parse(state);
     if (!lhs) {
@@ -1438,7 +1438,7 @@ inline std::optional<Assignment> Assignment::parse(ParserState& state) {
 }
 
 
-inline std::optional<Arguments> Arguments::parse(ParserState& state) {
+std::optional<Arguments> Arguments::parse(ParserState& state) {
     auto start = state.getPosition();
     if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
         return std::nullopt;
@@ -1486,7 +1486,7 @@ inline std::optional<Arguments> Arguments::parse(ParserState& state) {
 }
 
 
-inline std::optional<LexicalBinding> LexicalBinding::parse(ParserState& state) {
+std::optional<LexicalBinding> LexicalBinding::parse(ParserState& state) {
     if (auto id = BindingIdentifier::parse(state)) {
         auto annotation = TypeAnnotation::parse(state);
 
@@ -1520,7 +1520,7 @@ inline std::optional<LexicalBinding> LexicalBinding::parse(ParserState& state) {
 }
 
 
-inline std::optional<Expression> Expression::parse(ParserState& state) {
+std::optional<Expression> Expression::parse(ParserState& state) {
     Expression expr;
     auto last = state.getPosition();
     while (true) {
@@ -1545,7 +1545,7 @@ inline std::optional<Expression> Expression::parse(ParserState& state) {
 }
 
 
-inline std::optional<IfStatement> IfStatement::parse(ParserState& state) {
+std::optional<IfStatement> IfStatement::parse(ParserState& state) {
     auto start = state.getPosition();
     if (state.current().kind != lex::Token::Keyword || state.current().text != "if") {
         return std::nullopt;
@@ -1585,7 +1585,7 @@ inline std::optional<IfStatement> IfStatement::parse(ParserState& state) {
 }
 
 
-inline std::optional<DoWhileStatement> DoWhileStatement::parse(ParserState& state) {
+std::optional<DoWhileStatement> DoWhileStatement::parse(ParserState& state) {
     auto start = state.getPosition();
     if (state.current().kind != lex::Token::Keyword || state.current().text != "do") {
         return std::nullopt;
@@ -1625,7 +1625,7 @@ inline std::optional<DoWhileStatement> DoWhileStatement::parse(ParserState& stat
 }
 
 
-inline std::optional<WhileStatement> WhileStatement::parse(ParserState& state) {
+std::optional<WhileStatement> WhileStatement::parse(ParserState& state) {
     auto start = state.getPosition();
     if (state.current().kind != lex::Token::Keyword || state.current().text != "while") {
         return std::nullopt;
@@ -1655,7 +1655,7 @@ std::optional<ForInOfStatement> ForInOfStatement::parse(ParserState&) {
 }
 
 
-inline std::optional<ForStatement> ForStatement::parse(ParserState& state) {
+std::optional<ForStatement> ForStatement::parse(ParserState& state) {
     auto start = state.getPosition();
     if (state.current().kind != lex::Token::Keyword || state.current().text != "for") {
         return std::nullopt;
@@ -1732,7 +1732,7 @@ inline std::optional<ForStatement> ForStatement::parse(ParserState& state) {
 }
 
 
-inline std::optional<StatementList> StatementList::parse(ParserState& state) {
+std::optional<StatementList> StatementList::parse(ParserState& state) {
     StatementList list;
     while (true) {
         if (auto item = StatementListItem::parse(state)) {
