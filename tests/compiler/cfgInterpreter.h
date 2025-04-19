@@ -834,18 +834,26 @@ class CFGInterpreter {
         auto obj = getReg(std::get<Temp>(call.obj).id);
 
         std::vector<JSValue> args;
-        args.reserve(call.args.size());
-        for (auto& arg : call.args) {
-            args.push_back(*wrapAny(ctx, getReg(arg.id)));
+        args.reserve(call.args.size() - 1);
+        for (size_t i = 1; i < call.args.size(); ++i) {
+            args.push_back(*wrapAny(ctx, getReg(call.args[i].id)));
+        }
+
+        JSValue thisVal;
+        if (call.args[0].type == ValueType::Void) {
+            thisVal = JS_UNDEFINED;
+        }
+        else {
+            thisVal = *wrapAny(ctx, getReg(call.args[0].id));
         }
 
         JSValue res;
         if (std::holds_alternative<Any>(obj)) {
-            res = JS_Call(ctx, *std::get<Any>(obj), JS_UNDEFINED, args.size(), args.data());
+            res = JS_Call(ctx, *std::get<Any>(obj), thisVal, args.size(), args.data());
         }
         else if (std::holds_alternative<ObjectPtr>(obj)) {
             JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, *std::get<ObjectPtr>(obj));
-            res = JS_Call(ctx, objVal, JS_UNDEFINED, args.size(), args.data());
+            res = JS_Call(ctx, objVal, thisVal, args.size(), args.data());
         }
         else {
             throw std::runtime_error("Invalid call operand type");

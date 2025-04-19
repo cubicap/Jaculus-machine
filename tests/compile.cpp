@@ -967,6 +967,28 @@ TEST_CASE("Object", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
     }
+
+    SECTION("Call this") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: Object): any {
+                let c: any = a.b();
+                return c;
+            }
+
+            function memFn() {  // no return type -> not compiled
+                return this.a;
+            }
+
+            let o = new Object();
+            o.a = 42;
+            o.b = memFn;
+            report(test(o));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
 }
 
 

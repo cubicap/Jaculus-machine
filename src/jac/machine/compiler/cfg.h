@@ -35,6 +35,9 @@ struct Temp {
     static Temp create(ValueType type_) {
         return { type_, newTmpId() };
     }
+    static Temp undefined() {
+        return { ValueType::Void, 0 };
+    }
 };
 
 /*

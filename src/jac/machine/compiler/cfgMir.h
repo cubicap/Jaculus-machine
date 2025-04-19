@@ -246,7 +246,7 @@ inline MIR_insn_code_t chooseSimpleArithmetic(Opcode op, ValueType type) {
     }
 }
 
-inline const char* chooseArithmeticBuiltin(Opcode op, ValueType type) {
+inline const char* chooseArithmeticBuiltin(Opcode op) {
     switch (op) {
         case Opcode::Add:  return "__add";
         case Opcode::Sub:  return "__sub";
@@ -261,7 +261,7 @@ inline const char* chooseArithmeticBuiltin(Opcode op, ValueType type) {
 inline void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res, Builtins& builtins) {
     assert(a.type == b.type && a.type == res.type);
     if (a.type == ValueType::Any) {
-        insertCall(cc.ctx, cc.fun, builtins, chooseArithmeticBuiltin(op, a.type), { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) });
+        insertCall(cc.ctx, cc.fun, builtins, chooseArithmeticBuiltin(op), { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) });
     }
     else {
         cc.insert(MIR_new_insn(cc.ctx, chooseSimpleArithmetic(op, a.type), cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
@@ -562,27 +562,55 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                     cc.insert(MIR_new_insn_arr(ctx, MIR_CALL, args.size(), args.data()));
                 }
                 else {
+                    assert(call->args.size() >= 1);
+
                     auto startBlock = cc.scratch("_bstart", MIR_T_I64);
                     cc.insert(MIR_new_insn(ctx, MIR_BSTART, MIR_new_reg_op(ctx, startBlock)));
 
                     auto argsStart = cc.scratch("_args", MIR_T_I64);
                     auto argCount = cc.scratch("_argCount", MIR_T_I64);
-                    cc.insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, argCount), MIR_new_int_op(ctx, call->args.size())));
+                    cc.insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, argCount), MIR_new_int_op(ctx, call->args.size() - 1)));
                     cc.insert(MIR_new_insn(ctx, MIR_ALLOCA,
                         MIR_new_reg_op(ctx, argsStart),
-                        MIR_new_int_op(ctx, sizeof(JSValue) * std::min(call->args.size(), static_cast<size_t>(1)))));
-                    for (size_t i = 0; i < call->args.size(); ++i) {
+                        MIR_new_int_op(ctx, sizeof(JSValue) * std::min(call->args.size() - 1, static_cast<size_t>(1))))
+                    );
+                    for (size_t i = 1; i < call->args.size(); ++i) {
                         auto arg = call->args[i];
-                        auto addr = cc.calcOff(argsStart, i, sizeof(JSValue));
+                        auto addr = cc.calcOff(argsStart, i - 1, sizeof(JSValue));
                         cc.toJSVal(arg, addr);
                     }
 
                     auto funObj = std::get<Temp>(call->obj);
+                    auto thisArg = call->args[0];
                     if (funObj.type == ValueType::Any) {
-                        insertCall(ctx, cc.fun, builtins, "__callAny", { cc.jsValAddr(funObj.id), argCount, argsStart });
+                        auto funReg = cc.jsValAddr(funObj.id);
+                        if (thisArg.type == ValueType::Any) {
+                            insertCall(ctx, cc.fun, builtins, "__callAnyAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart });
+                        }
+                        else if (thisArg.type == ValueType::Object) {
+                            insertCall(ctx, cc.fun, builtins, "__callAnyObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart });
+                        }
+                        else if (thisArg.type == ValueType::Void) {
+                            insertCall(ctx, cc.fun, builtins, "__callAnyUndefined", { funReg, argCount, argsStart });
+                        }
+                        else {
+                            throw std::runtime_error("Invalid call operand type");
+                        }
                     }
                     else if (funObj.type == ValueType::Object) {
-                        insertCall(ctx, cc.fun, builtins, "__callObj", { cc.regs.at(funObj.id), argCount, argsStart });
+                        auto funReg = cc.regs.at(funObj.id);
+                        if (thisArg.type == ValueType::Any) {
+                            insertCall(ctx, cc.fun, builtins, "__callObjAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart });
+                        }
+                        else if (thisArg.type == ValueType::Object) {
+                            insertCall(ctx, cc.fun, builtins, "__callObjObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart });
+                        }
+                        else if (thisArg.type == ValueType::Void) {
+                            insertCall(ctx, cc.fun, builtins, "__callObjUndefined", { funReg, argCount, argsStart });
+                        }
+                        else {
+                            throw std::runtime_error("Invalid call operand type");
+                        }
                     }
                     else {
                         throw std::runtime_error("Invalid call operand type");

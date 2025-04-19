@@ -313,23 +313,38 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
-    addNativeFunction(ctx, builtins, "__callAny", { ValueType::Any, ValueType::I32 }, ValueType::Any,
-        +[](RuntimeContext* ctx_, JSValue obj, int32_t argc, JSValue* argv) {
-            JSValue res = JS_Call(ctx_->ctx, obj, JS_UNDEFINED, argc, argv);
-            if (JS_IsException(res)) {
-                // TODO: handle exception
-            }
-            argv[0] = res;
+    static constexpr auto callAnyAny = +[](RuntimeContext* ctx_, JSValue obj, JSValue this_, int32_t argc, JSValue* argv) {
+        JSValue res = JS_Call(ctx_->ctx, obj, this_, argc, argv);
+        if (JS_IsException(res)) {
+            // TODO: handle exception
+        }
+        argv[0] = res;
+    };
+
+    addNativeFunction(ctx, builtins, "__callAnyAny", { ValueType::Any, ValueType::Any, ValueType::I32 }, ValueType::Any, callAnyAny);
+    addNativeFunction(ctx, builtins, "__callObjAny", { ValueType::Object, ValueType::Any, ValueType::I32 }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSObject* obj, JSValue this_, int32_t argc, JSValue* argv) {
+            callAnyAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), this_, argc, argv);
         }
     );
-    addNativeFunction(ctx, builtins, "__callObj", { ValueType::Object, ValueType::I32 }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__callAnyObj", { ValueType::Any, ValueType::Object, ValueType::I32 }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue obj, JSObject* this_, int32_t argc, JSValue* argv) {
+            callAnyAny(ctx_, obj, JS_MKPTR(JS_TAG_OBJECT, this_), argc, argv);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__callObjObj", { ValueType::Object, ValueType::Object, ValueType::I32 }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSObject* obj, JSObject* this_, int32_t argc, JSValue* argv) {
+            callAnyAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), JS_MKPTR(JS_TAG_OBJECT, this_), argc, argv);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__callAnyUndefined", { ValueType::Any, ValueType::I32 }, ValueType::Any,
+        +[](RuntimeContext* ctx_, JSValue obj, int32_t argc, JSValue* argv) {
+            callAnyAny(ctx_, obj, JS_UNDEFINED, argc, argv);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__callObjUndefined", { ValueType::Object, ValueType::I32 }, ValueType::Any,
         +[](RuntimeContext* ctx_, JSObject* obj, int32_t argc, JSValue* argv) {
-            JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
-            JSValue res = JS_Call(ctx_->ctx, objVal, JS_UNDEFINED, argc, argv);
-            if (JS_IsException(res)) {
-                // TODO: handle exception
-            }
-            argv[0] = res;
+            callAnyAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), JS_UNDEFINED, argc, argv);
         }
     );
 

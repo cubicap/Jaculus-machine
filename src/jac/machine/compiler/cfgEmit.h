@@ -462,6 +462,13 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
             RValue res = { Temp::create(ValueType::Any) };  // TODO: infer type from called function
 
             std::vector<Temp> args;
+            args.reserve(call.second.arguments.size() + 1);
+            if (obj.isRValue()) {
+                args.push_back(Temp::undefined());
+            }
+            else {
+                args.push_back(obj.asLVRef().self);
+            }
             for (const auto& [ spread, expr ] : call.second.arguments) {
                 if (spread) {
                     throw std::runtime_error("Spread arguments are not supported");
