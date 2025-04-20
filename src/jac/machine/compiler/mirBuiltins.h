@@ -16,11 +16,90 @@
 namespace jac::cfg::mir_emit {
 
 
+// an implementation of stack as a linked list with expanding blocks
+// to reduce allocations and reallocations
+template<typename T>
+class BlockStack {
+    struct Node {
+        std::vector<T> data;
+        std::unique_ptr<Node> next;
+
+        Node(size_t size) {
+            data.reserve(size);
+        }
+    };
+
+    std::unique_ptr<Node> head;
+    Node* tail;
+
+public:
+    struct Iterator {
+        Node* node;
+        size_t index;
+
+        Iterator(Node* node_, size_t index_): node(node_), index(index_) {}
+
+        T& operator*() {
+            return node->data[index];
+        }
+        Iterator& operator++() {
+            if (++index == node->data.size()) {
+                node = node->next.get();
+                index = 0;
+            }
+            return *this;
+        }
+        bool operator!=(const Iterator& other) const {
+            return node != other.node || index != other.index;
+        }
+    };
+
+    BlockStack(): head(nullptr), tail(nullptr) {}
+
+    void push_back(T value) {
+        if (!head) {
+            head = std::make_unique<Node>(4);
+            tail = head.get();
+        }
+        else if (tail->data.size() == tail->data.capacity()) {
+            tail->next = std::make_unique<Node>(tail->data.capacity() * 2);
+            tail = tail->next.get();
+        }
+        tail->data.emplace_back(value);
+    }
+
+    Iterator begin() {
+        return Iterator(head.get(), 0);
+    }
+    Iterator end() {
+        return Iterator(nullptr, 0);
+    }
+};
+
+
+
 struct RuntimeContext {
     JSContext* ctx;
-    std::vector<std::vector<JSValue>> freeStackFrames;
+    std::vector<BlockStack<JSValue>> freeStackFrames;
     std::vector<std::unique_ptr<char[]>> stringConsts;
 };
+
+
+inline void pushFreeStackFrame(RuntimeContext* rtCtx) {
+    rtCtx->freeStackFrames.emplace_back();
+}
+inline void popFreeStackFrame(RuntimeContext* rtCtx) {
+    for (auto& val : rtCtx->freeStackFrames.back()) {
+        JS_FreeValue(rtCtx->ctx, val);
+    }
+    rtCtx->freeStackFrames.pop_back();
+}
+inline void pushFreeImpl(RuntimeContext* rtCtx, JSValue value) {
+    if (!JS_VALUE_HAS_REF_COUNT(value)) {
+        return;
+    }
+    rtCtx->freeStackFrames.back().push_back(value);
+}
 
 
 struct NativeFunction {
@@ -256,11 +335,7 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
             JS_DupValue(ctx_->ctx, a);
         }
     );
-    addNativeFunction(ctx, builtins, "__pushFreeVal", { ValueType::Any }, ValueType::Void,
-        +[](RuntimeContext* ctx_, JSValue a) {
-            ctx_->freeStackFrames.back().push_back(a);
-        }
-    );
+    addNativeFunction(ctx, builtins, "__pushFreeVal", { ValueType::Any }, ValueType::Void, pushFreeImpl);
     addNativeFunction(ctx, builtins, "__dupObj", { ValueType::Object }, ValueType::Void,
         +[](RuntimeContext* ctx_, JSObject* obj) {
             JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
@@ -270,21 +345,18 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
     addNativeFunction(ctx, builtins, "__pushFreeObj", { ValueType::Object }, ValueType::Void,
         +[](RuntimeContext* ctx_, JSObject* obj) {
             JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
-            ctx_->freeStackFrames.back().push_back(val);
+            pushFreeImpl(ctx_, val);
         }
     );
 
     addNativeFunction(ctx, builtins, "__enterStackFrame", {}, ValueType::Void,
         +[](RuntimeContext* ctx_) {
-            ctx_->freeStackFrames.emplace_back();
+            pushFreeStackFrame(ctx_);
         }
     );
     addNativeFunction(ctx, builtins, "__exitStackFrame", {}, ValueType::Void,
         +[](RuntimeContext* ctx_) {
-            for (auto& val : ctx_->freeStackFrames.back()) {
-                JS_FreeValue(ctx_->ctx, val);
-            }
-            ctx_->freeStackFrames.pop_back();
+            popFreeStackFrame(ctx_);
         }
     );
 

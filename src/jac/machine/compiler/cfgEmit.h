@@ -524,8 +524,20 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
 [[nodiscard]] inline Value emit(const std::pair<ast::MemberExpressionPtr, ast::Expression>& memBracket, FunctionEmitter& func) {
     const auto& [mem, acc] = memBracket;
     Value obj = emit(*mem, func);
-    RValue objR = materialize(obj, func);
-    emitPushFree(objR, func);
+    RValue objR;
+    if (obj.isRValue()) {
+        objR = obj.asRValue();
+    }
+    else {
+        LVRef objLV = obj.asLVRef();
+        if (objLV.isMember()) {
+            objR = materialize(obj, func);
+            emitPushFree(objR, func);
+        }
+        else {
+            objR = { objLV.self };
+        }
+    }
 
     RValue accR = emit(acc, func);
 

@@ -6,8 +6,6 @@
 #include <string_view>
 
 
-
-
 namespace jac::quickjs_ops {
 
 
