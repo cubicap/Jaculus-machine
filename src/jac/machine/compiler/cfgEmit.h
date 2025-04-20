@@ -247,17 +247,15 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
         RValue parent = { target.self };
         RValue ident = { *target.memberIdent };
 
-        RValue converted = emitCastAndFree(value, target.type(), func);
-
         emitPushFree(ident, func);  // XXX: broken if target is used multiple times
 
         func.emitStatement({Operation{
             .op = Opcode::SetMember,
             .a = ident,
-            .b = converted,
+            .b = value,
             .res = parent
         }});
-        return converted;
+        return value;
     }
     else {
         if (target.type() != value.type()) {

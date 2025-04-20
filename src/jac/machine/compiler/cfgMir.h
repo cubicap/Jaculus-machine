@@ -435,17 +435,36 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                             throw std::runtime_error("GetMember is not fully supported");
                         }
                         break;
-                    case Opcode::SetMember:
-                        if (op->a.type == ValueType::StringConst && op->b.type == ValueType::Any && op->res.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__setMemberObjCStr", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), cc.jsValAddr(op->b.id) });
+                    case Opcode::SetMember: {
+                        MIR_reg_t srcAddr;
+                        std::optional<MIR_reg_t> startBlock;
+                        if (op->b.type == ValueType::Any) {
+                            srcAddr = cc.jsValAddr(op->b.id);
                         }
-                        else if (op->a.type == ValueType::I32 && op->b.type == ValueType::Any && op->res.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__setMemberObjI32", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), cc.jsValAddr(op->b.id) });
+                        else {
+                            srcAddr = cc.scratch("_addr", MIR_T_I64);
+                            startBlock = cc.scratch("_bstart", MIR_T_I64);
+                            cc.insert(MIR_new_insn(ctx, MIR_BSTART, MIR_new_reg_op(ctx, *startBlock)));
+                            cc.insert(MIR_new_insn(ctx, MIR_ALLOCA,
+                                MIR_new_reg_op(ctx, srcAddr),
+                                MIR_new_int_op(ctx, sizeof(JSValue)))
+                            );
+                            cc.toJSVal(op->b, srcAddr);
+                        }
+                        if (op->a.type == ValueType::StringConst && op->res.type == ValueType::Object) {
+                            insertCall(ctx, cc.fun, builtins, "__setMemberObjCStr", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), srcAddr });
+                        }
+                        else if (op->a.type == ValueType::I32 && op->res.type == ValueType::Object) {
+                            insertCall(ctx, cc.fun, builtins, "__setMemberObjI32", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), srcAddr });
                         }
                         else {
                             throw std::runtime_error("SetMember is not fully supported");
                         }
-                        break;
+
+                        if (startBlock) {
+                            cc.insert(MIR_new_insn(ctx, MIR_BEND, MIR_new_reg_op(ctx, *startBlock)));
+                        }
+                    } break;
                     // Unary
                     case Opcode::Set: {
                         if (op->a.type == ValueType::Any && op->res.type == ValueType::Any) {
