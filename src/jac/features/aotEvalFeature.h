@@ -225,7 +225,7 @@ class AotEvalFeature : public EvalFeature<Next> {
         MIR_load_module(ctx, mod);
 
         MIR_gen_init(ctx, 1);
-        MIR_link(ctx, MIR_set_interp_interface, nullptr);
+        MIR_link(ctx, MIR_set_gen_interface, nullptr);
 
         FunctionFactory ff(this->context());
 
@@ -237,7 +237,6 @@ class AotEvalFeature : public EvalFeature<Next> {
 
             auto [it, _] = compiledHolder.emplace(name, std::move(compFn));
 
-            MIR_gen(ctx, 0, funcs[i]);
             void* ptr = MIR_gen(ctx, 0, callers[i]);
             i++;
 
