@@ -13,6 +13,13 @@
 namespace jac::cfg {
 
 
+class IRGenError : public std::runtime_error {
+public:
+    explicit IRGenError(const std::string& message)
+        : std::runtime_error(message) {}
+};
+
+
 enum class ShortCircuitKind {
     And,
     Or
@@ -90,7 +97,7 @@ const std::unordered_map<std::string_view, ValueType> types = {
 inline ValueType getType(std::string_view name) {
     auto it = types.find(name);
     if (it == types.end()) {
-        throw std::runtime_error("Invalid type literal");
+        throw IRGenError("Invalid type literal");
     }
     return it->second;
 }
@@ -99,11 +106,11 @@ inline ValueType getType(std::string_view name) {
 inline const ast::PrimaryExpression& newExpGetPrimary(const ast::NewExpression& newExp) {
     const auto member = std::get_if<ast::MemberExpression>(&(newExp.value));
     if (!member) {
-        throw std::runtime_error("Only member expressions are supported");
+        throw IRGenError("Only member expressions are supported");
     }
     const auto primary = std::get_if<ast::PrimaryExpression>(&(member->value));
     if (!primary) {
-        throw std::runtime_error("Only primary expressions are supported");
+        throw IRGenError("Only primary expressions are supported");
     }
 
     return *primary;
@@ -116,7 +123,7 @@ inline const ast::PrimaryExpression& lhsGetPrimary(const ast::LeftHandSideExpres
         return newExpGetPrimary(*newExp);
     }
 
-    throw std::runtime_error("Only new expressions are supported");
+    throw IRGenError("Only new expressions are supported");
 }
 
 inline const std::optional<Identifier> memberGetIdentifier(const ast::MemberExpression& member) {
@@ -174,7 +181,7 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
         FunctionEmitter& func;
 
         RValue operator()(const ast::NullLiteral&) {
-            throw std::runtime_error("Null literals are not supported");
+            throw IRGenError("Null literals are not supported");
         }
         RValue operator()(const ast::BooleanLiteral& lit) {
             return emitConst(lit.value, func);
@@ -192,7 +199,7 @@ inline void emitPushFree(Value val, FunctionEmitter& func) {
 
 [[nodiscard]] inline RValue giveSimple(LVRef lv, FunctionEmitter&) {
     if (lv.isMember()) {
-        throw std::runtime_error("Cannot move member");
+        throw IRGenError("Cannot move member");
     }
     return { lv.self };
 }
@@ -312,7 +319,7 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
     static_assert(std::is_invocable_v<G, RValue, bool>);
 
     if (lhs.type() != ValueType::Bool) {
-        throw std::runtime_error("Short circuit expressions support only boolean operands");
+        throw IRGenError("Short circuit expressions support only boolean operands");
     }
 
     auto preBlock = func.getActiveBlock();
@@ -357,13 +364,13 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
         FunctionEmitter& func;
 
         Value operator()(const ast::ThisExpr&) {
-            throw std::runtime_error("This expressions are not supported");
+            throw IRGenError("This expressions are not supported");
         }
         Value operator()(const ast::IdentifierReference& identifier) {
             Identifier ident = identifier.identifier.name.name;
             auto local = func.getLocal(ident);
             if (!local) {
-                throw std::runtime_error("Identifier referenced before declaration (" + identifier.identifier.name.name + ")");
+                throw IRGenError("Identifier referenced before declaration (" + identifier.identifier.name.name + ")");
             }
             return { *local };
         }
@@ -371,31 +378,31 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
             return { emit(literal, func) };
         }
         Value operator()(const ast::ArrayLiteral&) {
-            throw std::runtime_error("Array literals are not supported");
+            throw IRGenError("Array literals are not supported");
         }
         Value operator()(const ast::ObjectLiteral&) {
-            throw std::runtime_error("Object literals are not supported");
+            throw IRGenError("Object literals are not supported");
         }
         Value operator()(const ast::FunctionExpression&) {
-            throw std::runtime_error("Function expressions are not supported");
+            throw IRGenError("Function expressions are not supported");
         }
         Value operator()(const ast::ClassExpression&) {
-            throw std::runtime_error("Class expressions are not supported");
+            throw IRGenError("Class expressions are not supported");
         }
         Value operator()(const ast::GeneratorExpression&) {
-            throw std::runtime_error("Generator expressions are not supported");
+            throw IRGenError("Generator expressions are not supported");
         }
         Value operator()(const ast::AsyncFunctionExpression&) {
-            throw std::runtime_error("Async function expressions are not supported");
+            throw IRGenError("Async function expressions are not supported");
         }
         Value operator()(const ast::AsyncGeneratorExpression&) {
-            throw std::runtime_error("Async generator expressions are not supported");
+            throw IRGenError("Async generator expressions are not supported");
         }
         Value operator()(const ast::RegularExpressionLiteral&) {
-            throw std::runtime_error("Regular expression literals are not supported");
+            throw IRGenError("Regular expression literals are not supported");
         }
         Value operator()(const ast::TemplateLiteral&) {
-            throw std::runtime_error("Template literals are not supported");
+            throw IRGenError("Template literals are not supported");
         }
         Value operator()(const ast::ParenthesizedExpression& expr) {
             return { emit(expr.expression, func) };
@@ -408,7 +415,7 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
 [[nodiscard]] inline RValue emitCallNative(Identifier ident, const ast::Arguments& args_, FunctionEmitter& func) {
     auto sig = func.getSignature(ident);
     if (!sig) {
-        throw std::runtime_error("Function not found: " + ident);
+        throw IRGenError("Function not found: " + ident);
     }
 
     RValue res = { Temp::create(sig->ret) };
@@ -417,7 +424,7 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
     args.reserve(args_.arguments.size());
     for (const auto& [ spread, expr ] : args_.arguments) {  // TODO: check arguments count
         if (spread) {
-            throw std::runtime_error("Spread arguments are not supported");
+            throw IRGenError("Spread arguments are not supported");
         }
         Value arg = emit(*expr, func);
         auto argR = materialize(arg, func);
@@ -441,10 +448,10 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
         FunctionEmitter& func;
 
         RValue operator()(const ast::SuperCall&) {
-            throw std::runtime_error("Super calls are not supported");
+            throw IRGenError("Super calls are not supported");
         }
         RValue operator()(const ast::ImportCall&) {
-            throw std::runtime_error("Import calls are not supported");
+            throw IRGenError("Import calls are not supported");
         }
         RValue operator()(const std::pair<ast::MemberExpression, ast::Arguments>& call) {
             if (auto ident = memberGetIdentifier(call.first); ident) {
@@ -469,7 +476,7 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
             }
             for (const auto& [ spread, expr ] : call.second.arguments) {
                 if (spread) {
-                    throw std::runtime_error("Spread arguments are not supported");
+                    throw IRGenError("Spread arguments are not supported");
                 }
                 Value arg = emit(*expr, func);
                 auto argR = materialize(arg, func);
@@ -487,19 +494,19 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
             return res;
         }
         RValue operator()(const std::pair<ast::CallExpressionPtr, ast::Arguments>&) { // call
-            throw std::runtime_error("Call -> args are not supported");
+            throw IRGenError("Call -> args are not supported");
         }
         RValue operator()(const std::pair<ast::CallExpressionPtr, ast::Expression>&) { // brackets
-            throw std::runtime_error("Call -> brackets are not supported");
+            throw IRGenError("Call -> brackets are not supported");
         }
         RValue operator()(const std::pair<ast::CallExpressionPtr, ast::IdentifierName>&) { // .
-            throw std::runtime_error("Call -> dots are not supported");
+            throw IRGenError("Call -> dots are not supported");
         }
         RValue operator()(const std::pair<ast::CallExpressionPtr, ast::PrivateIdentifier>&) { // .private
-            throw std::runtime_error("Call -> .private are not supported");
+            throw IRGenError("Call -> .private are not supported");
         }
         RValue operator()(const std::pair<ast::CallExpressionPtr, ast::TemplateLiteral>&) { // template
-            throw std::runtime_error("Call -> template literals are not supported");
+            throw IRGenError("Call -> template literals are not supported");
         }
     };
 
@@ -551,11 +558,11 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
         FunctionEmitter& func;
 
         Value operator()(const ast::SuperProperty&) {
-            throw std::runtime_error("Super properties are not supported");
+            throw IRGenError("Super properties are not supported");
         }
 
         Value operator()(const ast::MetaProperty&) {
-            throw std::runtime_error("Meta properties are not supported");
+            throw IRGenError("Meta properties are not supported");
         }
 
         Value operator()(const ast::PrimaryExpression& primary) {
@@ -571,15 +578,15 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
         }
 
         Value operator()(const std::pair<ast::MemberExpressionPtr, ast::PrivateIdentifier>&) { // .private
-            throw std::runtime_error("Member -> .private are not supported");
+            throw IRGenError("Member -> .private are not supported");
         }
 
         Value operator()(const std::pair<ast::MemberExpressionPtr, ast::TemplateLiteral>&) { // template
-            throw std::runtime_error("Member -> template literals are not supported");
+            throw IRGenError("Member -> template literals are not supported");
         }
 
         Value operator()(const std::pair<ast::MemberExpressionPtr, ast::Arguments>&) { // new
-            throw std::runtime_error("New expressions are not supported");
+            throw IRGenError("New expressions are not supported");
         }
     };
 
@@ -595,7 +602,7 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
             return emit(member, func);
         }
         Value operator()(const ast::NewExpressionPtr&) {
-            throw std::runtime_error("New expressions are not supported");
+            throw IRGenError("New expressions are not supported");
         }
     };
 
@@ -641,12 +648,12 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
         return val;
     }
     if (val.isRValue()) {
-        throw std::runtime_error("The operand of an update expression must be a left-hand side expression");
+        throw IRGenError("The operand of an update expression must be a left-hand side expression");
     }
 
     RValue lop = materialize(val, func);
     if (lop.type() != ValueType::I32 && lop.type() != ValueType::Double) {
-        throw std::runtime_error("Unsupported type for update expression");
+        throw IRGenError("Unsupported type for update expression");
     }
     RValue rop = emitConst(static_cast<int32_t>(1), func);
     emitPushFree(rop, func);
@@ -709,7 +716,7 @@ inline Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
 
     auto it = unaryOps.find(un.second);
     if (it == unaryOps.end()) {
-        throw std::runtime_error("Unsupported unary operator '" + std::string(un.second) + "'");
+        throw IRGenError("Unsupported unary operator '" + std::string(un.second) + "'");
     }
     Opcode op = it->second;
 
@@ -760,7 +767,7 @@ inline Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
 
             auto it = binaryOps.find(std::get<2>(binExpr));
             if (it == binaryOps.end()) {
-                throw std::runtime_error("Unsupported binary operator");
+                throw IRGenError("Unsupported binary operator");
             }
 
             Value lop = emit(*std::get<0>(binExpr), func);
@@ -860,13 +867,13 @@ inline Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
             return emit(cond, func);
         }
         Value operator()(const ast::YieldExpression&) {
-            throw std::runtime_error("Yield expressions are not supported");
+            throw IRGenError("Yield expressions are not supported");
         }
         Value operator()(const ast::ArrowFunction&) {
-            throw std::runtime_error("Arrow functions are not supported");
+            throw IRGenError("Arrow functions are not supported");
         }
         Value operator()(const ast::AsyncArrowFunction&) {
-            throw std::runtime_error("Async arrow functions are not supported");
+            throw IRGenError("Async arrow functions are not supported");
         }
         Value operator()(const ast::Assignment& assign) {
             return { emit(assign, func) };
@@ -885,16 +892,16 @@ inline Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
             return emit(expr, func);
         }
         Value operator()(const ast::NewExpressionPtr&) {
-            throw std::runtime_error("Assignment patterns are not supported");
+            throw IRGenError("Assignment patterns are not supported");
         }
     };
 
     if (!std::holds_alternative<ast::NewExpression>(assign.lhs.value)) {
-        throw std::runtime_error("Only new expressions are supported in assignments");
+        throw IRGenError("Only new expressions are supported in assignments");
     }
     Value target = std::visit(visitor{func}, std::get<ast::NewExpression>(assign.lhs.value).value);
     if (target.isRValue()) {
-        throw std::runtime_error("Invalid assignment target");
+        throw IRGenError("Invalid assignment target");
     }
 
     if (assign.op == "=") {
@@ -938,7 +945,7 @@ inline Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
 
         return targetR;
     }
-    throw std::runtime_error("Unsupported assignment operator");
+    throw IRGenError("Unsupported assignment operator");
 }
 
 
@@ -972,13 +979,13 @@ inline void emit(const ast::LexicalDeclaration& lexical, FunctionEmitter& func) 
             emitPushFree(giveSimple(target, func), func);
         }
         void operator()(const std::pair<ast::BindingPattern, ast::InitializerPtr>&) {
-            throw std::runtime_error("Binding patterns are not supported");
+            throw IRGenError("Binding patterns are not supported");
         }
     };
 
     for (const ast::LexicalBinding& binding : lexical.bindings) {
         if (!binding.type) {
-            throw std::runtime_error("Lexical bindings must have a type");
+            throw IRGenError("Lexical bindings must have a type");
         }
         std::visit(visitor{ func, getType(binding.type->type.name.name) }, binding.value);
     }
@@ -987,7 +994,7 @@ inline void emit(const ast::LexicalDeclaration& lexical, FunctionEmitter& func) 
 
 inline void emit(const ast::Declaration& declaration, FunctionEmitter& func) {
     if (!std::holds_alternative<ast::LexicalDeclaration>(declaration.value)) {
-        throw std::runtime_error("Only lexical declarations are supported");
+        throw IRGenError("Only lexical declarations are supported");
     }
 
     emit(std::get<ast::LexicalDeclaration>(declaration.value), func);
@@ -1003,7 +1010,7 @@ inline void emit(const ast::Declaration& declaration, FunctionEmitter& func) {
         Value last = emit(*expr.items.back(), func);
         return materialize(last, func);
     }
-    throw std::runtime_error("Empty expression");
+    throw IRGenError("Empty expression");
 }
 
 
@@ -1116,7 +1123,7 @@ inline void emit(const ast::ForStatement& stmt, FunctionEmitter& func) {
             emitPushFree(v, func);
         }
         void operator()(const ast::VariableDeclarationList&) {
-            throw std::runtime_error("Variable declarations are not supported");
+            throw IRGenError("Variable declarations are not supported");
         }
         void operator()(const ast::LexicalDeclaration& decl) {
             emit(decl, func);
@@ -1188,7 +1195,7 @@ inline void emit(const ast::IterationStatement& stmt, FunctionEmitter& func) {
             emit(stmt, func);
         }
         void operator()(const ast::ForInOfStatement&) {
-            throw std::runtime_error("For-in/of statements are not supported");
+            throw IRGenError("For-in/of statements are not supported");
         }
     };
 
@@ -1205,7 +1212,7 @@ inline void emit(const ast::BreakableStatement& stmt, FunctionEmitter& func) {
             emit(stmt, func);
         }
         void operator()(const ast::SwitchStatement&) {
-            throw std::runtime_error("Switch statements are not supported");
+            throw IRGenError("Switch statements are not supported");
         }
     };
 
@@ -1229,25 +1236,25 @@ inline void emit(const ast::ReturnStatement& stmt, FunctionEmitter& func) {
 
 inline void emit(const ast::ContinueStatement& stmt, FunctionEmitter& func) {
     if (stmt.label) {
-        throw std::runtime_error("Labeled continue statements are not supported");
+        throw IRGenError("Labeled continue statements are not supported");
     }
     if (auto target = func.getContinueTarget()) {
         func.getActiveBlock()->jump = Terminal::jump(target);
     }
     else {
-        throw std::runtime_error("Continue statement without target");
+        throw IRGenError("Continue statement without target");
     }
 }
 
 inline void emit(const ast::BreakStatement& stmt, FunctionEmitter& func) {
     if (stmt.label) {
-        throw std::runtime_error("Labeled break statements are not supported");
+        throw IRGenError("Labeled break statements are not supported");
     }
     if (auto target = func.getBreakTarget()) {
         func.getActiveBlock()->jump = Terminal::jump(target);
     }
     else {
-        throw std::runtime_error("Break statement without target");
+        throw IRGenError("Break statement without target");
     }
 }
 
@@ -1263,10 +1270,10 @@ inline bool emit(const ast::Statement& statement, FunctionEmitter& func) {
             return emit(stmt, func);
         }
         bool operator()(const ast::VariableStatement&) {
-            throw std::runtime_error("Variable statements are not supported");
+            throw IRGenError("Variable statements are not supported");
         }
         bool operator()(const ast::EmptyStatement&) {
-            throw std::runtime_error("Empty statements are not supported");
+            throw IRGenError("Empty statements are not supported");
         }
         bool operator()(const ast::ExpressionStatement& stmt) {
             RValue v = emit(stmt.expression, func);
@@ -1294,19 +1301,19 @@ inline bool emit(const ast::Statement& statement, FunctionEmitter& func) {
             return true;
         }
         bool operator()(const ast::WithStatement&) {
-            throw std::runtime_error("With statements are not supported");
+            throw IRGenError("With statements are not supported");
         }
         bool operator()(const ast::LabeledStatement&) {
-            throw std::runtime_error("Labeled statements are not supported");
+            throw IRGenError("Labeled statements are not supported");
         }
         bool operator()(const ast::ThrowStatement&) {
-            throw std::runtime_error("Throw statements are not supported");
+            throw IRGenError("Throw statements are not supported");
         }
         bool operator()(const ast::TryStatement&) {
-            throw std::runtime_error("Try statements are not supported");
+            throw IRGenError("Try statements are not supported");
         }
         bool operator()(const ast::DebuggerStatement&) {
-            throw std::runtime_error("Debugger statements are not supported");
+            throw IRGenError("Debugger statements are not supported");
         }
     };
 
@@ -1371,7 +1378,7 @@ inline SignaturePtr getSignature(const ast::FunctionDeclaration& decl) {
 
 inline FunctionEmitter emit(const ast::FunctionDeclaration& decl, SignaturePtr sig, const std::map<cfg::Identifier, cfg::SignaturePtr>& otherSignatures) {
     if (!decl.name) {
-        throw std::runtime_error("Function declarations must have a name");
+        throw IRGenError("Function declarations must have a name");
     }
 
     FunctionEmitter out(otherSignatures);

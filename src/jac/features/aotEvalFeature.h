@@ -23,7 +23,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
-#include <iostream>
 #include <list>
 #include <map>
 #include <sstream>
@@ -126,39 +125,12 @@ class AotEvalFeature : public EvalFeature<Next> {
             if (!astFunc->name || !signatures.contains(astFunc->name->identifier.name.name)) {
                 continue;
             }
-            try {
-                auto sig = signatures.at(astFunc->name->identifier.name.name);
-                auto cfgFuncEm = jac::cfg::emit(*astFunc, sig, signatures);
-                jac::cfg::removeEmptyBlocks(cfgFuncEm);
+            auto sig = signatures.at(astFunc->name->identifier.name.name);
+            auto cfgFuncEm = jac::cfg::emit(*astFunc, sig, signatures);
+            jac::cfg::removeEmptyBlocks(cfgFuncEm);
 
-                auto cfgFunc = cfgFuncEm.output();
-                result.emplace_back(std::move(cfgFunc), astFunc->code);
-            }
-            catch (const std::exception& e) {
-                std::cerr << "Error compiling function " << astFunc->name->identifier.name.name << ": " << e.what() << '\n';
-                signatures.erase(astFunc->name->identifier.name.name);
-                continue;
-            }
-        }
-
-        // remove functions that depend on non-simple functions
-        bool erased = true;
-        while (erased) {
-            erased = false;
-            auto it = result.begin();
-            while (it != result.end()) {
-                auto& cfgFunc = it->first;
-                for (const auto& req : cfgFunc.requiredFunctions) {
-                    if (!signatures.contains(req)) {
-                        signatures.erase(cfgFunc.name());
-                        result.erase(it++);
-                        erased = true;
-                        goto next;
-                    }
-                }
-                ++it;
-                next:;
-            }
+            auto cfgFunc = cfgFuncEm.output();
+            result.emplace_back(std::move(cfgFunc), astFunc->code);
         }
 
         return result;
@@ -299,9 +271,8 @@ public:
         try {
             code = tryAot(code, filename, flags);
         }
-        catch (std::exception& e) {
-            std::cerr << "Error during AOT compilation: " << e.what() << '\n';
-            return EvalFeature<Next>::eval(std::move(code), filename, flags);
+        catch (const cfg::IRGenError& e) {
+            throw jac::Exception::create(jac::Exception::Type::SyntaxError, "AOT compilation error: " + std::string(e.what()));
         }
 
         return EvalFeature<Next>::eval(std::move(code), filename, flags);
