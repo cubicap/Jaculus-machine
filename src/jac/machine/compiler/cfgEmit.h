@@ -86,11 +86,11 @@ const std::unordered_map<std::string_view, Opcode> unaryOps = {
 };
 
 const std::unordered_map<std::string_view, ValueType> types = {
-    { "Int32", ValueType::I32 },
-    { "Float", ValueType::Double },
-    { "Bool", ValueType::Bool },
-    { "Object", ValueType::Object },
-    { "Void", ValueType::Void },
+    { "int32", ValueType::I32 },
+    { "float64", ValueType::F64 },
+    { "boolean", ValueType::Bool },
+    { "object", ValueType::Object },
+    { "void", ValueType::Void },
     { "any", ValueType::Any }
 };
 
@@ -652,7 +652,7 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
     }
 
     RValue lop = materialize(val, func);
-    if (lop.type() != ValueType::I32 && lop.type() != ValueType::Double) {
+    if (lop.type() != ValueType::I32 && lop.type() != ValueType::F64) {
         throw IRGenError("Unsupported type for update expression");
     }
     RValue rop = emitConst(static_cast<int32_t>(1), func);

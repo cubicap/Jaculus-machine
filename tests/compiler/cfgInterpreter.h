@@ -77,11 +77,11 @@ struct Int32 {
     }
 };
 
-struct Float {
+struct Float64 {
     double value;
-    RefCounter<Float> refCounter;
+    RefCounter<Float64> refCounter;
 
-    Float(double v) : value(v), refCounter(RefCounter<Float>::create()) {}
+    Float64(double v) : value(v), refCounter(RefCounter<Float64>::create()) {}
 
     double& operator*() {
         return value;
@@ -97,11 +97,11 @@ struct Float {
 };
 
 
-struct Bool {
+struct Boolean {
     bool value;
-    RefCounter<Bool> refCounter;
+    RefCounter<Boolean> refCounter;
 
-    Bool(bool v) : value(v), refCounter(RefCounter<Bool>::create()) {}
+    Boolean(bool v) : value(v), refCounter(RefCounter<Boolean>::create()) {}
 
     bool& operator*() {
         return value;
@@ -154,26 +154,6 @@ struct StringConst {
     }
 };
 
-struct String {
-    char* value;
-
-    char*& operator*() {
-        return value;
-    }
-
-    void _dup(JSContext* ctx) {
-        if (value) {
-            JS_DupValue(ctx, JS_MKPTR(JS_TAG_STRING, value));
-        }
-    }
-
-    void _free(JSContext* ctx) {
-        if (value) {
-            JS_FreeCString(ctx, value);
-        }
-    }
-};
-
 struct Any {
     JSValue value;
 
@@ -194,10 +174,10 @@ struct Any {
 
 
 template<typename T>
-concept I32Able = std::is_same_v<T, Int32> || std::is_same_v<T, Bool>;
+concept I32Able = std::is_same_v<T, Int32> || std::is_same_v<T, Boolean>;
 
 template<typename L>
-concept DoubleAble = std::is_same_v<L, Float> || I32Able<L>;
+concept DoubleAble = std::is_same_v<L, Float64> || I32Able<L>;
 
 template<typename T>
 struct ConvertVisitor {};
@@ -225,45 +205,45 @@ struct ConvertVisitor<Int32> {
 };
 
 template<>
-struct ConvertVisitor<Float> {
+struct ConvertVisitor<Float64> {
     JSContext* ctx;
 
-    Float operator()(Float v) {
+    Float64 operator()(Float64 v) {
         return v;
     }
-    Float operator()(DoubleAble auto v) {
+    Float64 operator()(DoubleAble auto v) {
         return static_cast<double>(*v);
     }
-    Float operator()(Any v) {
+    Float64 operator()(Any v) {
         double res;
         if (JS_ToFloat64(ctx, &res, *v) < 0) {
-            throw std::runtime_error("Invalid conversion to Float");
+            throw std::runtime_error("Invalid conversion to Float64");
         }
         return res;
     }
-    Float operator()(auto) {
-        throw std::runtime_error("Invalid conversion to Double");
+    Float64 operator()(auto) {
+        throw std::runtime_error("Invalid conversion to Float64");
     }
 };
 
 template<>
-struct ConvertVisitor<Bool> {
+struct ConvertVisitor<Boolean> {
     JSContext* ctx;
 
-    Bool operator()(Bool v) {
+    Boolean operator()(Boolean v) {
         return v;
     }
-    Bool operator()(DoubleAble auto v) {
+    Boolean operator()(DoubleAble auto v) {
         return *v != 0;
     }
-    Bool operator()(Any v) {
+    Boolean operator()(Any v) {
         int32_t res = JS_ToBool(ctx, *v);
         if (res < 0) {
             throw std::runtime_error("Invalid conversion to Bool");
         }
         return res != 0;
     }
-    Bool operator()(auto) {
+    Boolean operator()(auto) {
         throw std::runtime_error("Invalid conversion to Bool");
     }
 };
@@ -314,10 +294,10 @@ struct ConvertVisitor<Any> {
     Any operator()(Int32 v) {
         return JS_NewInt32(ctx, *v);
     }
-    Any operator()(Float v) {
+    Any operator()(Float64 v) {
         return JS_NewFloat64(ctx, *v);
     }
-    Any operator()(Bool v) {
+    Any operator()(Boolean v) {
         return JS_NewBool(ctx, *v);
     }
     Any operator()(auto) {
@@ -325,7 +305,7 @@ struct ConvertVisitor<Any> {
     }
 };
 
-using RegVal = std::variant<Int32, Float, Bool, ObjectPtr, StringConst, String, Any>;
+using RegVal = std::variant<Int32, Float64, Boolean, ObjectPtr, StringConst, Any>;
 
 template<typename T>
 T convert(JSContext* ctx, RegVal v) {
@@ -336,18 +316,14 @@ inline RegVal convert(JSContext* ctx, RegVal v, ValueType type) {
     switch (type) {
         case ValueType::I32:
             return convert<Int32>(ctx, v);
-        case ValueType::Double:
-            return convert<Float>(ctx, v);
+        case ValueType::F64:
+            return convert<Float64>(ctx, v);
         case ValueType::Bool:
-            return convert<Bool>(ctx, v);
+            return convert<Boolean>(ctx, v);
         case ValueType::Object:
             return convert<ObjectPtr>(ctx, v);
         case ValueType::Any:
             return convert<Any>(ctx, v);
-        case ValueType::Buffer:
-            throw std::runtime_error("Invalid conversion to Buffer");
-        case ValueType::String:
-            throw std::runtime_error("Not implemented (convert to string)");
         case ValueType::StringConst:
             throw std::runtime_error("Impossible conversion to StringConst");
         case ValueType::Void:
@@ -370,10 +346,10 @@ struct WrapAnyVisitor {
     Any operator()(Int32 v) {
         return JS_NewInt32(ctx, *v);
     }
-    Any operator()(Float v) {
+    Any operator()(Float64 v) {
         return JS_NewFloat64(ctx, *v);
     }
-    Any operator()(Bool v) {
+    Any operator()(Boolean v) {
         return JS_NewBool(ctx, *v);
     }
     Any operator()(auto) {
@@ -559,13 +535,13 @@ namespace detail {
         Int32 operator()(I32Able auto a) {
             return +(*a);
         }
-        Float operator()(DoubleAble auto a) {
+        Float64 operator()(DoubleAble auto a) {
             return +(*a);
         }
-        Bool operator()(Bool a) {
+        Boolean operator()(Boolean a) {
             return +(*a);
         }
-        Float operator()(auto) {
+        Float64 operator()(auto) {
             throw std::runtime_error("Invalid type");
         }
     };
@@ -574,10 +550,10 @@ namespace detail {
         Int32 operator()(I32Able auto a) {
             return -*a;
         }
-        Float operator()(DoubleAble auto a) {
+        Float64 operator()(DoubleAble auto a) {
             return -*a;
         }
-        Float operator()(auto) {
+        Float64 operator()(auto) {
             throw std::runtime_error("Invalid type");
         }
     };
@@ -630,13 +606,13 @@ namespace detail {
         int operator()(auto id, Int32 val, JSValue parent) {
             return this->operator()(id, JS_MKVAL(JS_TAG_INT, *val), parent);
         }
-        int operator()(auto id, Float val, JSValue parent) {
+        int operator()(auto id, Float64 val, JSValue parent) {
             JSValue v;
             v.tag = JS_TAG_FLOAT64;
             v.u.float64 = *val;
             return this->operator()(id, v, parent);
         }
-        int operator()(auto id, Bool val, JSValue parent) {
+        int operator()(auto id, Boolean val, JSValue parent) {
             return this->operator()(id, JS_MKVAL(JS_TAG_BOOL, *val), parent);
         }
         int operator()(auto id, ObjectPtr val, JSValue parent) {
@@ -666,18 +642,14 @@ inline bool checkType(const RegVal& val, ValueType type) {
     switch (type) {
         case ValueType::I32:
             return std::holds_alternative<Int32>(val);
-        case ValueType::Double:
-            return std::holds_alternative<Float>(val);
+        case ValueType::F64:
+            return std::holds_alternative<Float64>(val);
         case ValueType::Bool:
-            return std::holds_alternative<Bool>(val);
+            return std::holds_alternative<Boolean>(val);
         case ValueType::Object:
             return std::holds_alternative<ObjectPtr>(val);
         case ValueType::Any:
             return std::holds_alternative<Any>(val);
-        case ValueType::Buffer:
-            return false;
-        case ValueType::String:
-            return std::holds_alternative<String>(val);
         case ValueType::StringConst:
             return std::holds_alternative<StringConst>(val);
         case ValueType::Void:
@@ -707,11 +679,11 @@ class CFGInterpreter {
             case ValueType::I32:
                 evalBinop<Op, Int32, Int32>(ctx, op);
                 break;
-            case ValueType::Double:
-                evalBinop<Op, Float, Float>(ctx, op);
+            case ValueType::F64:
+                evalBinop<Op, Float64, Float64>(ctx, op);
                 break;
             case ValueType::Bool:
-                evalBinop<Op, Bool, Bool>(ctx, op);
+                evalBinop<Op, Boolean, Boolean>(ctx, op);
                 break;
             case ValueType::Any:
                 evalBinop<Op, Any, Any>(ctx, op);
@@ -725,13 +697,13 @@ class CFGInterpreter {
     void evalRelational(JSContext* ctx, const Operation& op) {
         switch (commonUpcast(op.a.type, op.b.type)) {
             case ValueType::I32:
-                evalBinop<Op, Int32, Bool>(ctx, op);
+                evalBinop<Op, Int32, Boolean>(ctx, op);
                 break;
-            case ValueType::Double:
-                evalBinop<Op, Float, Bool>(ctx, op);
+            case ValueType::F64:
+                evalBinop<Op, Float64, Boolean>(ctx, op);
                 break;
             case ValueType::Bool:
-                evalBinop<Op, Bool, Bool>(ctx, op);
+                evalBinop<Op, Boolean, Boolean>(ctx, op);
                 break;
             default:
                 throw std::runtime_error("Not implemented (common upcast)");
@@ -751,8 +723,8 @@ class CFGInterpreter {
         if (op.res.type == ValueType::I32) {
             setReg(op.res.id, Int32{ *std::get<Int32>(getReg(op.a.id)) % *std::get<Int32>(getReg(op.b.id)) });
         }
-        else if (op.res.type == ValueType::Double) {
-            setReg(op.res.id, Float{ std::fmod(*std::get<Float>(getReg(op.a.id)), *std::get<Float>(getReg(op.b.id))) });
+        else if (op.res.type == ValueType::F64) {
+            setReg(op.res.id, Float64{ std::fmod(*std::get<Float64>(getReg(op.a.id)), *std::get<Float64>(getReg(op.b.id))) });
         }
         else if (op.res.type == ValueType::Any) {
             setReg(op.res.id, Any{ jac::quickjs_ops::rem(ctx, *std::get<Any>(getReg(op.a.id)), *std::get<Any>(getReg(op.b.id))) });
@@ -783,11 +755,11 @@ class CFGInterpreter {
             case ValueType::I32:
                 setReg(op.res.id, Op{}(std::get<Int32>(getReg(op.a.id))));
                 break;
-            case ValueType::Double:
-                setReg(op.res.id, Op{}(std::get<Float>(getReg(op.a.id))));
+            case ValueType::F64:
+                setReg(op.res.id, Op{}(std::get<Float64>(getReg(op.a.id))));
                 break;
             case ValueType::Bool:
-                setReg(op.res.id, Op{}(std::get<Bool>(getReg(op.a.id))));
+                setReg(op.res.id, Op{}(std::get<Boolean>(getReg(op.a.id))));
                 break;
             default:
                 throw std::runtime_error("Not implemented (unop)");
@@ -807,7 +779,7 @@ class CFGInterpreter {
     }
 
     void evalBoolNot(JSContext*, const Operation& op) {
-        setReg(op.res.id, Bool{ !*std::get<Bool>(getReg(op.a.id)) });
+        setReg(op.res.id, Boolean{ !*std::get<Boolean>(getReg(op.a.id)) });
     }
 
     void evalCallNative(JSContext* ctx, const Call& call) {
@@ -911,10 +883,10 @@ public:
                 return Int32{ value };
             }
             RegVal operator()(double value) {
-                return Float{ value };
+                return Float64{ value };
             }
             RegVal operator()(bool value) {
-                return Bool{ value };
+                return Boolean{ value };
             }
             RegVal operator()(const std::string& value) {
                 return StringConst{ value };
@@ -997,17 +969,17 @@ public:
                     JS_ToInt32(ctx, &value, argv[i]);
                     set(func.args[i].id, Int32{ value });
                 } break;
-                case ValueType::Double: {
+                case ValueType::F64: {
                     double value;
                     JS_ToFloat64(ctx, &value, argv[i]);
-                    set(func.args[i].id, Float{ value });
+                    set(func.args[i].id, Float64{ value });
                 } break;
                 case ValueType::Bool: {
                     auto val = JS_ToBool(ctx, argv[i]);
                     if (val < 0) {
                         throw std::runtime_error("Invalid conversion to Bool");
                     }
-                    set(func.args[i].id, Bool{ val != 0 });
+                    set(func.args[i].id, Boolean{ val != 0 });
                 } break;
                 case ValueType::Object: {
                     set(func.args[i].id, ObjectPtr{ JS_VALUE_GET_OBJ(argv[i]) });
@@ -1031,7 +1003,7 @@ public:
                     activeBlock = activeBlock->jump.target;
                     break;
                 case Terminal::Branch:
-                    if (*std::get<Bool>(getReg(activeBlock->jump.value->id))) {
+                    if (*std::get<Boolean>(getReg(activeBlock->jump.value->id))) {
                         activeBlock = activeBlock->jump.target;
                     }
                     else {
@@ -1051,8 +1023,8 @@ public:
                             }
                             throw std::runtime_error("Invalid return type");
                         }
-                        case ValueType::Double: {
-                            if (auto valPtr = std::get_if<Float>(&val)) {
+                        case ValueType::F64: {
+                            if (auto valPtr = std::get_if<Float64>(&val)) {
                                 auto res = *convert<Any>(ctx, val);
                                 valPtr->_free(ctx);
                                 return res;
@@ -1060,7 +1032,7 @@ public:
                             throw std::runtime_error("Invalid return type");
                         }
                         case ValueType::Bool: {
-                            if (auto valPtr = std::get_if<Bool>(&val)) {
+                            if (auto valPtr = std::get_if<Boolean>(&val)) {
                                 auto res = *convert<Any>(ctx, val);
                                 valPtr->_free(ctx);
                                 return res;
@@ -1079,12 +1051,8 @@ public:
                                 throw std::runtime_error("Invalid return type");
                             }
                             return *std::get<Any>(val);
-                        case ValueType::String:
-                            throw std::runtime_error("Not implemented (return String)");
                         case ValueType::StringConst:
                             throw std::runtime_error("Not implemented (return StringConst)");
-                        case ValueType::Buffer:
-                            throw std::runtime_error("Invalid return type");
                         case ValueType::Void:
                             throw std::runtime_error("Invalid return type");
                     }

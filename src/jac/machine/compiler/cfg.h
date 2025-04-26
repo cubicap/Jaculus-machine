@@ -134,7 +134,7 @@ struct ConstInit {
             return ValueType::I32;
         }
         else if (std::holds_alternative<double>(value)) {
-            return ValueType::Double;
+            return ValueType::F64;
         }
         else if (std::holds_alternative<bool>(value)) {
             return ValueType::Bool;

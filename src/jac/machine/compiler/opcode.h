@@ -10,12 +10,10 @@ namespace jac::cfg {
 enum class ValueType {  // XXX: replace Void with undefined?
     Void,
     I32,
-    Double,
+    F64,
     Bool,
     Object,
-    String,
     StringConst,
-    Buffer,
     Any
 };
 
@@ -23,10 +21,10 @@ inline bool isNumeric(ValueType type) {
     switch (type) {
         case ValueType::Void:
             assert(false);
-        case ValueType::I32:  case ValueType::Double:  case ValueType::Bool:
+        case ValueType::I32:  case ValueType::F64:  case ValueType::Bool:
             return true;
-        case ValueType::Object:  case ValueType::String:  case ValueType::StringConst:
-        case ValueType::Buffer:  case ValueType::Any:
+        case ValueType::Object:  case ValueType::StringConst:
+        case ValueType::Any:
             return false;
     }
     assert(false);
@@ -38,38 +36,26 @@ inline bool isIntegral(ValueType type) {
             assert(false);
         case ValueType::I32:  case ValueType::Bool:
             return true;
-        case ValueType::Double:  case ValueType::Object:  case ValueType::String:
-        case ValueType::StringConst:  case ValueType::Buffer:  case ValueType::Any:
-            return false;
-    }
-    assert(false);
-}
-
-inline bool isString(ValueType type) {
-    switch (type) {
-        case ValueType::Void:
-            assert(false);
-        case ValueType::String:  case ValueType::StringConst:
-            return true;
-        default:
+        case ValueType::F64:  case ValueType::Object:
+        case ValueType::StringConst:  case ValueType::Any:
             return false;
     }
     assert(false);
 }
 
 inline ValueType toNumber(ValueType type) {
-    return isIntegral(type) ? ValueType::I32 : ValueType::Double;
+    return isIntegral(type) ? ValueType::I32 : ValueType::F64;
 }
 
 inline ValueType toPrimitive(ValueType type) {  // XXX: not by spec
     switch (type) {
         case ValueType::Void:
             assert(false);
-        case ValueType::I32:  case ValueType::Double:  case ValueType::Bool:
+        case ValueType::I32:  case ValueType::F64:  case ValueType::Bool:
             return type;
-        case ValueType::String:  case ValueType::StringConst:
+        case ValueType::StringConst:
             return type;
-        case ValueType::Object:  case ValueType::Buffer:  case ValueType::Any:
+        case ValueType::Object:  case ValueType::Any:
             return ValueType::Any;
     }
     assert(false);
@@ -84,26 +70,26 @@ enum class Opcode {
     Div,        // a a -> a
     Rem,        // a a -> a
     Pow,        // a a -> a
-    LShift,     // Int32 Int32 -> Int32
-    RShift,     // Int32 Int32 -> Int32
-    URShift,    // Int32 Int32 -> Int32
-    BitAnd,     // Int32 Int32 -> Int32
-    BitOr,      // Int32 Int32 -> Int32
-    BitXor,     // Int32 Int32 -> Int32
-    Eq,         // a a -> Bool
-    Neq,        // a a -> Bool
-    Gt,         // a a -> Bool
-    Gte,        // a a -> Bool
-    Lt,         // a a -> Bool
-    Lte,        // a a -> Bool
-    GetMember,  // a b -> Any        (a: Object | Any)
-    SetMember,  // id val -> parent  (id: StringConst, parent: Object | Any)
+    LShift,     // int32 int32 -> int32
+    RShift,     // int32 int32 -> int32
+    URShift,    // int32 int32 -> int32
+    BitAnd,     // int32 int32 -> int32
+    BitOr,      // int32 int32 -> int32
+    BitXor,     // int32 int32 -> int32
+    Eq,         // a a -> bool
+    Neq,        // a a -> bool
+    Gt,         // a a -> bool
+    Gte,        // a a -> bool
+    Lt,         // a a -> bool
+    Lte,        // a a -> bool
+    GetMember,  // a b -> any        (a: object | any)
+    SetMember,  // id val -> parent  (id: StringConst, parent: object | any)
 
     // Unary
     Set,        // a -> b
-    BoolNot,    // a -> Bool
-    BitNot,     // Int32 -> Int32
-    UnPlus,     // a -> Number
+    BoolNot,    // a -> bool
+    BitNot,     // int32 -> int32
+    UnPlus,     // a -> number
     UnMinus,    // a -> a
     Dup,        // a -> void
     PushFree    // a -> void
@@ -148,8 +134,8 @@ namespace detail {  // FIXME: check conversions
     }
 
     inline ValueType numericUpcast(ValueType a, ValueType b) {
-        if (a == ValueType::Double || b == ValueType::Double) {
-            return ValueType::Double;
+        if (a == ValueType::F64 || b == ValueType::F64) {
+            return ValueType::F64;
         }
         return ValueType::I32;
     }
@@ -161,10 +147,7 @@ namespace detail {  // FIXME: check conversions
         if (aPrim == bPrim) {
             return aPrim;
         }
-        if (isString(aPrim) || isString(bPrim)) {
-            return ValueType::String;
-        }
-        if (aPrim == ValueType::Any || bPrim == ValueType::Any) {
+        if (!isNumeric(aPrim) || !isNumeric(bPrim)) {
             return ValueType::Any;
         }
         return numericUpcast(a, b);
@@ -250,8 +233,8 @@ inline ValueType commonUpcast(ValueType a, ValueType b) {
     if (detail::anyAny(a, b) || detail::anyObject(a, b)) {
         return ValueType::Any;
     }
-    if (a == ValueType::Double || b == ValueType::Double) {
-        return ValueType::Double;
+    if (a == ValueType::F64 || b == ValueType::F64) {
+        return ValueType::F64;
     }
     return ValueType::I32;
 }

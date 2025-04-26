@@ -130,7 +130,7 @@ inline std::pair<MIR_type_t, size_t> getMIRArgType(ValueType type) {
     switch (type) {
         case ValueType::I32:
             return { MIR_T_I32, 0 };
-        case ValueType::Double:
+        case ValueType::F64:
             return { MIR_T_D, 0 };
         case ValueType::Bool:
             return { MIR_T_I32, 0 };
@@ -158,7 +158,7 @@ inline MIR_type_t getMIRRegType(ValueType type) {
     if (isIntegral(type) || type == ValueType::Object || type == ValueType::StringConst) {
         return MIR_T_I64;
     }
-    if (type == ValueType::Double) {
+    if (type == ValueType::F64) {
         return MIR_T_D;
     }
     throw std::runtime_error("Invalid reg type");

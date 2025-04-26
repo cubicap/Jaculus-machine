@@ -28,7 +28,7 @@ inline std::string name(TmpId id) {
 inline auto getJSTag(ValueType type) {
     switch (type) {
         case ValueType::I32:    return JS_TAG_INT;
-        case ValueType::Double: return JS_TAG_FLOAT64;
+        case ValueType::F64: return JS_TAG_FLOAT64;
         case ValueType::Bool:   return JS_TAG_BOOL;
         case ValueType::Object: return JS_TAG_OBJECT;
         default:
@@ -41,34 +41,34 @@ inline MIR_insn_code_t chooseComparison(Opcode op, ValueType type) {
     switch (op) {
         case Opcode::Eq:  switch (type) {
             case ValueType::I32:    return MIR_EQS;
-            case ValueType::Double: return MIR_DEQ;
+            case ValueType::F64: return MIR_DEQ;
             case ValueType::Bool:   return MIR_EQS;
             default: assert(false && "Invalid Eq operand type");
         }
         case Opcode::Neq:  switch (type) {
             case ValueType::I32:    return MIR_NES;
-            case ValueType::Double: return MIR_DNE;
+            case ValueType::F64: return MIR_DNE;
             case ValueType::Bool:   return MIR_NES;
             default: assert(false && "Invalid Neq operand type");
         }
         case Opcode::Gt:  switch (type) {
             case ValueType::I32:    return MIR_GTS;
-            case ValueType::Double: return MIR_DGT;
+            case ValueType::F64: return MIR_DGT;
             default: assert(false && "Invalid Gt operand type");
         }
         case Opcode::Gte:  switch (type) {
             case ValueType::I32:    return MIR_GES;
-            case ValueType::Double: return MIR_DGE;
+            case ValueType::F64: return MIR_DGE;
             default: assert(false && "Invalid Gte operand type");
         }
         case Opcode::Lt:  switch (type) {
             case ValueType::I32:    return MIR_LTS;
-            case ValueType::Double: return MIR_DLT;
+            case ValueType::F64: return MIR_DLT;
             default: assert(false && "Invalid Lt operand type");
         }
         case Opcode::Lte:  switch (type) {
             case ValueType::I32:    return MIR_LES;
-            case ValueType::Double: return MIR_DLE;
+            case ValueType::F64: return MIR_DLE;
             default: assert(false && "Invalid Lte operand type");
         }
         default:
@@ -80,7 +80,7 @@ inline MIR_insn_code_t chooseMove(ValueType type) {
     switch (type) {
         case ValueType::I32:  case ValueType::Bool:  case ValueType::Object:
             return MIR_MOV;
-        case ValueType::Double:
+        case ValueType::F64:
             return MIR_DMOV;
         default:
             throw std::runtime_error("Set type not implemented");
@@ -94,11 +94,11 @@ inline MIR_insn_code_t chooseConversion(ValueType from, ValueType to) {
     switch (from) {
         case ValueType::I32:
             switch (to) {
-                case ValueType::Double:    return MIR_I2D;
+                case ValueType::F64:    return MIR_I2D;
                 case ValueType::Bool:
                 default: throw std::runtime_error("Conversion not implemented");
             }
-        case ValueType::Double:
+        case ValueType::F64:
             switch (to) {
                 case ValueType::I32:    return MIR_D2I;
                 default: throw std::runtime_error("Conversion not implemented");
@@ -106,7 +106,7 @@ inline MIR_insn_code_t chooseConversion(ValueType from, ValueType to) {
         case ValueType::Bool:
             switch (to) {
                 case ValueType::I32:    return MIR_MOV;
-                case ValueType::Double: return MIR_I2D;
+                case ValueType::F64: return MIR_I2D;
                 default: throw std::runtime_error("Conversion not implemented");
             }
         default:
@@ -213,32 +213,32 @@ inline MIR_insn_code_t chooseSimpleArithmetic(Opcode op, ValueType type) {
     switch (op) {
         case Opcode::Add:  switch (type) {  // TODO: support strings
             case ValueType::I32:    return MIR_ADDS;
-            case ValueType::Double: return MIR_DADD;
+            case ValueType::F64: return MIR_DADD;
             default: assert(false && "Invalid Add operand type");
         }
         case Opcode::Sub:  switch (type) {
             case ValueType::I32:    return MIR_SUBS;
-            case ValueType::Double: return MIR_DSUB;
+            case ValueType::F64: return MIR_DSUB;
             default: assert(false && "Invalid Sub operand type");
         }
         case Opcode::Mul:  switch (type) {
             case ValueType::I32:    return MIR_MULS;
-            case ValueType::Double: return MIR_DMUL;
+            case ValueType::F64: return MIR_DMUL;
             default: assert(false && "Invalid Mul operand type");
         }
         case Opcode::Div:  switch (type) {
             case ValueType::I32:    return MIR_DIVS;
-            case ValueType::Double: return MIR_DDIV;
+            case ValueType::F64: return MIR_DDIV;
             default: assert(false && "Invalid Div operand type");
         }
         case Opcode::Rem:  switch (type) {
             case ValueType::I32:    return MIR_MODS;
-            case ValueType::Double: throw std::runtime_error("fmod is not supported");
+            case ValueType::F64: throw std::runtime_error("fmod is not supported");
             default: assert(false && "Invalid Rem operand type");
         }
         case Opcode::UnMinus: switch (type) {
             case ValueType::I32:    return MIR_NEGS;
-            case ValueType::Double: return MIR_DNEG;
+            case ValueType::F64: return MIR_DNEG;
             default: assert(false && "Invalid UnMinus operand type");
         }
         default:
@@ -294,7 +294,7 @@ inline void createBoolConv(CompileContext cc, Temp a, Temp res, bool inverted) {
             cc.insert(MIR_new_insn(cc.ctx, MIR_EQS,
                 cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, !inverted)));
             break;
-        case ValueType::Double:
+        case ValueType::F64:
             cc.insert(MIR_new_insn(cc.ctx, MIR_DNE,
                 cc.regOp(res.id), cc.regOp(a.id), MIR_new_double_op(cc.ctx, !inverted)));
             break;
@@ -731,7 +731,7 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
                 insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, reg), MIR_new_mem_op(ctx, getMIRRegType(arg.type), 0, argvReg, posReg, argOffset)));
                 argOps.push_back(MIR_new_reg_op(ctx, reg));
             } break;
-            case ValueType::Double: {
+            case ValueType::F64: {
                 auto reg = MIR_new_func_reg(ctx, callerFunc, getMIRRegType(arg.type), name.c_str());
                 insert(MIR_new_insn(ctx, MIR_DMOV, MIR_new_reg_op(ctx, reg), MIR_new_mem_op(ctx, getMIRRegType(arg.type), 0, argvReg, posReg, argOffset)));
                 argOps.push_back(MIR_new_reg_op(ctx, reg));
@@ -785,7 +785,7 @@ inline MIR_item_t compileCaller(MIR_context_t ctx, Function& cfg, MIR_item_t fun
             insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_OBJECT)));
             insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, VAL_DISP, resReg, 0, 0), MIR_new_reg_op(ctx, calleeRes)));
             break;
-        case ValueType::Double:
+        case ValueType::F64:
             insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_FLOAT64)));
             insert(MIR_new_insn(ctx, MIR_DMOV, MIR_new_mem_op(ctx, MIR_T_D, VAL_DISP, resReg, 0, 0), MIR_new_reg_op(ctx, calleeRes)));
             break;

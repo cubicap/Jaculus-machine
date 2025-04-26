@@ -62,14 +62,14 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
     SECTION("Linear I32") {
         auto code = R"(
-            function test(a: Int32, b: Int32): Int32 {
-                let c: Int32 = a + b;
-                let d: Int32 = c - 2;
+            function test(a: int32, b: int32): int32 {
+                let c: int32 = a + b;
+                let d: int32 = c - 2;
                 d = d * 2 + 1;
-                let f: Int32 = (-6) % 4;
-                let g: Int32 = 1 << 2;
-                let h: Int32 = 8 >> 2;
-                let i: Int32 = (g | h) & 5;
+                let f: int32 = (-6) % 4;
+                let g: int32 = 1 << 2;
+                let h: int32 = 8 >> 2;
+                let i: int32 = (g | h) & 5;
                 return +(f + i == 2);
             }
         )";
@@ -92,15 +92,15 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
     SECTION("Fib iterative") {
         auto code = R"(
-            function fib(n: Int32): Int32 {
-                let n0: Int32 = 0;
-                let n1: Int32 = 1;
-                let n2: Int32 = 0;
+            function fib(n: int32): int32 {
+                let n0: int32 = 0;
+                let n1: int32 = 1;
+                let n2: int32 = 0;
 
                 if (n == 0) {
                     return n0;
                 }
-                for (let i: Int32 = 2; i <= n; i = i + 1) {
+                for (let i: int32 = 2; i <= n; i = i + 1) {
                     n2 = n0 + n1;
                     n0 = n1;
                     n1 = n2;
@@ -127,9 +127,9 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
     SECTION("Object") {
         auto code = R"(
-            function test(a: Object): Object {
-                let b: Object = a;
-                let c: Object = b;
+            function test(a: object): object {
+                let b: object = a;
+                let c: object = b;
 
                 return c;
             }
@@ -166,8 +166,8 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
     SECTION("Assign cast") {
         auto code = R"(
-            function test(a: Int32): Float {
-                let b: Float = 1.1;
+            function test(a: int32): float64 {
+                let b: float64 = 1.1;
                 b = a;
                 return b;
             }
@@ -186,8 +186,8 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
     SECTION("Member get") {
         auto code = R"(
-            function test(a: Object, num: Int32): Int32 {
-                let c: Int32 = a.b.c;
+            function test(a: object, num: int32): int32 {
+                let c: int32 = a.b.c;
 
                 return c + num;
             }
@@ -226,7 +226,7 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
     SECTION("Member set") {
         auto code = R"(
-            function test(a: Object, num: Int32): Int32 {
+            function test(a: object, num: int32): int32 {
                 a.b.c = num;
                 a.b = a.b;
 
@@ -267,7 +267,7 @@ TEST_CASE("CfgInterpreter", "[cfg]") {
 
     SECTION("Member set complex") {
         auto code = R"(
-            function test(a: Object, d: Object): Int32 {
+            function test(a: object, d: object): int32 {
                 a.b.c = d;
                 a.b.c = a.b.c.e;
 

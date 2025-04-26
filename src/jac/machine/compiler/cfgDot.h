@@ -49,12 +49,10 @@ inline void printShort(std::ostream& os, ValueType type) {
     switch (type) {
         case ValueType::Void: os << "v"; break;
         case ValueType::I32: os << "i32"; break;
-        case ValueType::Double: os << "d"; break;
+        case ValueType::F64: os << "f64"; break;
         case ValueType::Bool: os << "b"; break;
         case ValueType::Object: os << "o"; break;
-        case ValueType::String: os << "s"; break;
         case ValueType::StringConst: os << "sc"; break;
-        case ValueType::Buffer: os << "buf"; break;
         case ValueType::Any: os << "a"; break;
     }
 }

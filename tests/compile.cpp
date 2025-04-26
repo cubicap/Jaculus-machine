@@ -31,7 +31,7 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Id") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32): Int32 {
+            function fun(a: int32): int32 {
                 return a;
             }
 
@@ -45,7 +45,7 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Simpler") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 return a + b + 1;
             }
 
@@ -59,8 +59,8 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Simple") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
-                let c: Int32 = a + b + 3;
+            function fun(a: int32, b: int32): int32 {
+                let c: int32 = a + b + 3;
                 c = c * 2;
                 c = +(-c);
                 return c;
@@ -77,10 +77,10 @@ TEST_CASE("Basic", "[aot]") {
         machine.initialize();
         std::string code(R"(
 
-            function haha(a: Int32, b: Int32, c: Int32, d: Int32, e: Int32, f: Int32, g: Int32, h: Int32,
-                          i: Int32, j: Int32, k: Int32, l: Int32, m: Int32, n: Int32, o: Int32, p: Int32,
-                          q: Int32, r: Int32, s: Int32, t: Int32, u: Int32, v: Int32, w: Int32, x: Int32,
-                          y: Int32, z: Int32, aa: Int32, ab: Int32, ac: Int32, ad: Int32, ae: Int32, af: Int32): Int32 {
+            function haha(a: int32, b: int32, c: int32, d: int32, e: int32, f: int32, g: int32, h: int32,
+                          i: int32, j: int32, k: int32, l: int32, m: int32, n: int32, o: int32, p: int32,
+                          q: int32, r: int32, s: int32, t: int32, u: int32, v: int32, w: int32, x: int32,
+                          y: int32, z: int32, aa: int32, ab: int32, ac: int32, ad: int32, ae: int32, af: int32): int32 {
                 return a + b + c + d + e + f + g + h
                      + i + j + k + l + m + n + o + p
                      + q + r + s + t + u + v + w + x
@@ -100,11 +100,11 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Two") {
         machine.initialize();
         std::string code(R"(
-            function id(a: Int32): Int32 {
+            function id(a: int32): int32 {
                 return a;
             }
 
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 return a + b;
             }
 
@@ -119,11 +119,11 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Call") {
         machine.initialize();
         std::string code(R"(
-            function id(a: Int32): Int32 {
+            function id(a: int32): int32 {
                 return a;
             }
 
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 return id(a) + id(b);
             }
 
@@ -138,8 +138,8 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Block") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
-                let c: Int32 = 0;
+            function fun(a: int32, b: int32): int32 {
+                let c: int32 = 0;
                 {
                     c = a + b;
                 }
@@ -156,10 +156,10 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Shadow") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
-                let c: Int32 = 0;
+            function fun(a: int32, b: int32): int32 {
+                let c: int32 = 0;
                 {
-                    let c: Int32 = a + b;
+                    let c: int32 = a + b;
                     b = c;
                 }
                 return b;
@@ -175,8 +175,8 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Dead code") {
         machine.initialize();
         std::string code(R"(
-            function fun(): Int32 {
-                let c: Int32 = 0;
+            function fun(): int32 {
+                let c: int32 = 0;
                 return 1;
 
                 c = 2;
@@ -192,8 +192,8 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Dead code block") {
         machine.initialize();
         std::string code(R"(
-            function fun(): Int32 {
-                let c: Int32 = 0;
+            function fun(): int32 {
+                let c: int32 = 0;
                 {
                     return 1;
                     c = 2;
@@ -210,8 +210,8 @@ TEST_CASE("Basic", "[aot]") {
     SECTION("Dead code branch") {
         machine.initialize();
         std::string code(R"(
-            function fun(): Int32 {
-                let c: Int32 = 0;
+            function fun(): int32 {
+                let c: int32 = 0;
                 if (c == 0) {
                     return 1;
                     c = 2;
@@ -242,8 +242,8 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("If") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
-                let c: Int32 = 0;
+            function fun(a: int32, b: int32): int32 {
+                let c: int32 = 0;
                 if (a > b) {
                     c = a;
                 }
@@ -264,7 +264,7 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Nested if") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32, c: Int32): Int32 {
+            function fun(a: int32, b: int32, c: int32): int32 {
                 if (a == 0) {
                     if (b > c) {
                         return b;
@@ -290,13 +290,13 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Recursive fib") {
         machine.initialize();
         std::string code(R"(
-            function fib(n: Int32): Int32 {
+            function fib(n: int32): int32 {
                 if (n == 0 || n == 1) {
                     return n;
                 }
 
-                let first: Int32 = fib(n - 1);
-                let second: Int32 = fib(n - 2);
+                let first: int32 = fib(n - 1);
+                let second: int32 = fib(n - 2);
                 return first + second;
             }
 
@@ -319,8 +319,8 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("While") {
         machine.initialize();
         std::string code(R"(
-            function pow(a: Int32, b: Int32): Int32 {
-                let c: Int32 = 1;
+            function pow(a: int32, b: int32): int32 {
+                let c: int32 = 1;
                 while (b > 0) {
                     c = c * a;
                     b -= 1;
@@ -339,7 +339,7 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Empty while") {
         machine.initialize();
         std::string code(R"(
-            function pow(a: Int32, b: Int32): Int32 {
+            function pow(a: int32, b: int32): int32 {
                 while (b == 0) {}
 
                 return a;
@@ -355,8 +355,8 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Do while") {
         machine.initialize();
         std::string code(R"(
-            function add(a: Int32, b: Int32): Int32 {
-                let c: Int32 = 0;
+            function add(a: int32, b: int32): int32 {
+                let c: int32 = 0;
                 do {
                     c += a;
                     b = b - 1;
@@ -376,9 +376,9 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("For") {
         machine.initialize();
         std::string code(R"(
-            function mul(a: Int32, b: Int32): Int32 {
-                let c: Int32 = 0;
-                for (let i: Int32 = 0; i < b; i += 1) {
+            function mul(a: int32, b: int32): int32 {
+                let c: int32 = 0;
+                for (let i: int32 = 0; i < b; i += 1) {
                     c = c + a;
                 }
 
@@ -396,11 +396,11 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Iterative fib") {
         machine.initialize();
         std::string code(R"(
-            function fib(n: Int32): Int32 {
-                let a: Int32 = 0;
-                let b: Int32 = 1;
-                let c: Int32 = 0;
-                for (let i: Int32 = 0; i < n; i++) {
+            function fib(n: int32): int32 {
+                let a: int32 = 0;
+                let b: int32 = 1;
+                let c: int32 = 0;
+                for (let i: int32 = 0; i < n; i++) {
                     c = a + b;
                     a = b;
                     b = c;
@@ -428,7 +428,7 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Early return") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 if (a > b) {
                     return a;
                 }
@@ -448,7 +448,7 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Bool conversion") {
         machine.initialize();
         std::string code(R"(
-            function pos(a: Int32): Int32 {
+            function pos(a: int32): int32 {
                 while (a) {
                     if (a) {
                         for (; a;) {
@@ -460,7 +460,7 @@ TEST_CASE("Control flow", "[aot]") {
                 }
                 return 4;
             }
-            function neg(a: Int32): Int32 {
+            function neg(a: int32): int32 {
                 while (a) {
                     return 1;
                 }
@@ -484,10 +484,10 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Break") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32): Int32 {
-                let c: Int32 = 0;
-                for (let i: Int32 = 0; i < a; ++i) {
-                    let j: Int32 = 0;
+            function fun(a: int32): int32 {
+                let c: int32 = 0;
+                for (let i: int32 = 0; i < a; ++i) {
+                    let j: int32 = 0;
                     while (j < a) {
                         c++;
                         if (j == i) {
@@ -509,10 +509,10 @@ TEST_CASE("Control flow", "[aot]") {
     SECTION("Continue") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32): Int32 {
-                let c: Int32 = 0;
-                for (let i: Int32 = 0; i < a; i++) {
-                    let j: Int32 = 0;
+            function fun(a: int32): int32 {
+                let c: int32 = 0;
+                for (let i: int32 = 0; i < a; i++) {
+                    let j: int32 = 0;
                     while (j < a) {
                         if (++j == i) {
                             continue;
@@ -541,10 +541,10 @@ TEST_CASE("Types", "[aot]") {
 
     Machine machine;
 
-    SECTION("Int32") {
+    SECTION("int32") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32): Int32 {
+            function fun(a: int32): int32 {
                 return a + 1;
             }
 
@@ -555,10 +555,10 @@ TEST_CASE("Types", "[aot]") {
         REQUIRE(machine.getReports() == std::vector<std::string>{"1235"});
     }
 
-    SECTION("Float") {
+    SECTION("Float64") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Float): Float {
+            function fun(a: float64): float64 {
                 return a + 1.2;
             }
 
@@ -572,7 +572,7 @@ TEST_CASE("Types", "[aot]") {
     SECTION("Bool") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Bool): Bool {
+            function fun(a: boolean): boolean {
                 return !a;
             }
 
@@ -587,7 +587,7 @@ TEST_CASE("Types", "[aot]") {
     SECTION("Void") {
         machine.initialize();
         std::string code(R"(
-            function fun(): Void {
+            function fun(): void {
                 return;
             }
 
@@ -601,7 +601,7 @@ TEST_CASE("Types", "[aot]") {
     SECTION("Mixed") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Float, c: Bool): Float {
+            function fun(a: int32, b: float64, c: boolean): float64 {
                 if (a < b) {
                     return (a + b) + c;
                 }
@@ -670,8 +670,8 @@ TEST_CASE("Any", "[aot]") {
     SECTION("Mixed") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: any): any {
-                let c: Int32 = a;
+            function fun(a: int32, b: any): any {
+                let c: int32 = a;
                 let d: any = b;
 
                 return d;
@@ -691,13 +691,13 @@ TEST_CASE("Any", "[aot]") {
     SECTION("Wrap-unwrap") {
         machine.initialize();
         std::string code(R"(
-            function toInt32(a: any): Int32 { return a; }
-            function toFloat(a: any): Float { return a; }
-            function toBool(a: any): Bool { return a; }
+            function toInt32(a: any): int32 { return a; }
+            function toFloat(a: any): float64 { return a; }
+            function toBool(a: any): boolean { return a; }
 
-            function _fromInt32(a: Int32): Int32 { return a; }
-            function _fromFloat(a: Float): Float { return a; }
-            function _fromBool(a: Bool): Bool { return a; }
+            function _fromInt32(a: int32): int32 { return a; }
+            function _fromFloat(a: float64): float64 { return a; }
+            function _fromBool(a: boolean): boolean { return a; }
 
             report(toInt32(1234));
             report(toFloat(5678.9));
@@ -792,9 +792,9 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Object") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object): Object {
-                let b: Object = a;
-                let c: Object = b;
+            function test(a: object): object {
+                let b: object = a;
+                let c: object = b;
 
                 return c;
             }
@@ -811,7 +811,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Get member") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object): any {
+            function test(a: object): any {
                 let c: any = a.b;
 
                 return c;
@@ -829,7 +829,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Get member brackets") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object, b: any): any {
+            function test(a: object, b: any): any {
                 let c: any = a["b"];
                 return c;
             }
@@ -846,7 +846,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Set member") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object, b: any): Void {
+            function test(a: object, b: any): void {
                 a.b = b;
             }
 
@@ -862,7 +862,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Set member brackets") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object, b: any): Void {
+            function test(a: object, b: any): void {
                 a["b"] = b;
             }
 
@@ -878,7 +878,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Set member int int") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object, b: Int32): Void {
+            function test(a: object, b: int32): void {
                 a[0] = b;
             }
 
@@ -894,7 +894,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Get member int") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object): any {
+            function test(a: object): any {
                 let c: any = a[0];
                 return c;
             }
@@ -911,7 +911,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Set member int") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object, b: any): Void {
+            function test(a: object, b: any): void {
                 a[0] = b;
             }
 
@@ -927,7 +927,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Call(void)") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object): any {
+            function test(a: object): any {
                 return a();
             }
 
@@ -945,7 +945,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Call member(void)") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object): any {
+            function test(a: object): any {
                 let c: any = a.b();
                 return c;
             }
@@ -966,7 +966,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Call with args") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object, b: Int32): any {
+            function test(a: object, b: int32): any {
                 let c: any = a.b(b);
                 return c;
             }
@@ -987,7 +987,7 @@ TEST_CASE("Object", "[aot]") {
     SECTION("Call this") {
         machine.initialize();
         auto code = R"(
-            function test(a: Object): any {
+            function test(a: object): any {
                 let c: any = a.b();
                 return c;
             }
@@ -1020,7 +1020,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Arithmetic") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 return a + b - 2 * 4 / 2 % 3;
             }
 
@@ -1034,7 +1034,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Unary") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32): Int32 {
+            function fun(a: int32): int32 {
                 return -a + +a;
             }
 
@@ -1048,7 +1048,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Bitwise") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 return a & b | a ^ b;
             }
 
@@ -1062,7 +1062,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Shift") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 return (a << b) >> 1;
             }
 
@@ -1076,7 +1076,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Assignment") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32, c: Int32): Int32 {
+            function fun(a: int32, b: int32, c: int32): int32 {
                 a += b;
                 a -= c;
                 a *= b;
@@ -1100,10 +1100,10 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Update") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Int32, b: Int32): Int32 {
+            function fun(a: int32, b: int32): int32 {
                 a++;
                 --b;
-                let c: Int32 = --a + b++;
+                let c: int32 = --a + b++;
                 return c;
             }
 
@@ -1118,7 +1118,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Short-circuit") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Bool, b: Bool, c: Bool): Bool {
+            function fun(a: boolean, b: boolean, c: boolean): boolean {
                 return a && b || c;
             }
 
@@ -1134,7 +1134,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Assignment short-circuit") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Bool, b: Bool, c: Bool): Bool {
+            function fun(a: boolean, b: boolean, c: boolean): boolean {
                 a &&= b;
                 c ||= a;
                 return c;
@@ -1152,7 +1152,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Conditional") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Bool, b: Int32, c: Int32): Int32 {
+            function fun(a: boolean, b: int32, c: int32): int32 {
                 return a ? b : c;
             }
 
@@ -1167,7 +1167,7 @@ TEST_CASE("Operators", "[aot]") {
     SECTION("Complex conditional") {
         machine.initialize();
         std::string code(R"(
-            function fun(a: Bool, b: Bool, c: Int32, d: Int32, e: Int32): Int32 {
+            function fun(a: boolean, b: boolean, c: int32, d: int32, e: int32): int32 {
                 return a && b ? c : a || b ? d : e;
             }
 
