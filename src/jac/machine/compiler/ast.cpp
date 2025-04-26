@@ -4,15 +4,10 @@
 namespace jac::ast {
 
 
-std::optional<IdentifierName> IdentifierName::parse(ParserState& state) {
-    if (state.isEnd()) {
-        state.error("Unexpected end of input");
-        return std::nullopt;
-    }
-
-    if (state.current().kind == lex::Token::IdentifierName) {
+std::optional<IdentifierName> parseIdentifierName(ParserState& state, bool allowReserved) {
+    if (state.current().kind == lex::Token::IdentifierName || (allowReserved && state.current().kind == lex::Token::Keyword)) {
         IdentifierName id;
-        id.name = state.current().text;
+        id = state.current().text;
         state.advance();
         return id;
     }
@@ -22,13 +17,7 @@ std::optional<IdentifierName> IdentifierName::parse(ParserState& state) {
 
 
 std::optional<Identifier> Identifier::parse(ParserState& state) {
-    auto start = state.getPosition();
-    if (auto id = IdentifierName::parse(state)) {
-        if (keywords.contains(id->name)) {
-            state.restorePosition(start);
-            state.error("Reserved word used as identifier");
-            return std::nullopt;
-        }
+    if (auto id = parseIdentifierName(state, false)) {
         return Identifier{*id};
     }
 
@@ -39,12 +28,12 @@ std::optional<Identifier> Identifier::parse(ParserState& state) {
 std::optional<IdentifierReference> IdentifierReference::parse(ParserState& state) {
     auto start = state.getPosition();
     if (auto id = Identifier::parse(state)) {
-        if (state.getYield() && id->name.name == "yield") {
+        if (state.getYield() && id->name == "yield") {
             state.restorePosition(start);
             state.error("Unexpected yield");
             return std::nullopt;
         }
-        if (state.getAwait() && id->name.name == "await") {
+        if (state.getAwait() && id->name == "await") {
             state.restorePosition(start);
             state.error("Unexpected await");
             return std::nullopt;
@@ -68,12 +57,12 @@ std::optional<BindingIdentifier> BindingIdentifier::parse(ParserState& state) {
 std::optional<LabelIdentifier> LabelIdentifier::parse(ParserState& state) {
     auto start = state.getPosition();
     if (auto id = Identifier::parse(state)) {
-        if (state.getYield() && id->name.name == "yield") {
+        if (state.getYield() && id->name == "yield") {
             state.restorePosition(start);
             state.error("Unexpected yield");
             return std::nullopt;
         }
-        if (state.getAwait() && id->name.name == "await") {
+        if (state.getAwait() && id->name == "await") {
             state.restorePosition(start);
             state.error("Unexpected await");
             return std::nullopt;
@@ -87,8 +76,8 @@ std::optional<LabelIdentifier> LabelIdentifier::parse(ParserState& state) {
 
 std::optional<PrivateIdentifier> PrivateIdentifier::parse(ParserState& state) {
     auto start = state.getPosition();
-    if (auto id = IdentifierName::parse(state)) {
-        if (id->name.size() < 2 || id->name[0] != '#') {
+    if (auto id = parseIdentifierName(state, false)) {
+        if (id->size() < 2 || (*id)[0] != '#') {
             state.restorePosition(start);
             state.error("Private identifier must start with #");
             return std::nullopt;
@@ -488,7 +477,11 @@ std::optional<BindingPattern> BindingPattern::parse(ParserState&) {
 std::optional<TypeAnnotation> TypeAnnotation::parse(ParserState& state) {
     if (state.current().kind == lex::Token::Punctuator && state.current().text == ":") {
         state.advance();
-        if (auto id = Identifier::parse(state)) {
+        if (state.current().kind == lex::Token::Keyword && !allowedKWTypes.contains(state.current().text)) {
+            state.error("Invalid type annotation");
+            return std::nullopt;
+        }
+        if (auto id = parseIdentifierName(state, true)) {
             return TypeAnnotation{*id};
         }
     }
@@ -824,9 +817,27 @@ std::optional<LabeledStatement> LabeledStatement::parse(ParserState&) {
 }
 
 
-std::optional<ThrowStatement> ThrowStatement::parse(ParserState&) {
-    // XXX: ignore for now
-    return std::nullopt;
+std::optional<ThrowStatement> ThrowStatement::parse(ParserState& state) {
+    if (state.current().kind != lex::Token::Keyword || state.current().text != "throw") {
+        return std::nullopt;
+    }
+    state.advance();
+
+    ThrowStatement statement;
+
+    auto start = state.getPosition();
+    if (auto expr = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+        statement.expression = std::move(*expr);
+    }
+
+    if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
+        state.error("Expected ;");
+        state.restorePosition(start);
+        return std::nullopt;
+    }
+
+    state.advance();
+    return statement;
 }
 
 
@@ -1122,7 +1133,7 @@ std::optional<MemberExpression> MemberExpression::parse(ParserState& state) {
         }
         if (state.current().kind == lex::Token::Punctuator && state.current().text == ".") {
             state.advance();
-            if (auto identifier = IdentifierName::parse(state)) {
+            if (auto identifier = parseIdentifierName(state, false)) {
                 auto ptr = std::make_unique<MemberExpression>(std::move(*member));
                 member.emplace(MemberExpression{std::pair{std::move(ptr), std::move(*identifier)}});
                 continue;
@@ -1230,7 +1241,7 @@ std::optional<CallExpression> CallExpression::parse(ParserState& state) {
         }
         if (state.current().kind == lex::Token::Punctuator && state.current().text == ".") {
             state.advance();
-            if (auto identifier = IdentifierName::parse(state)) {
+            if (auto identifier = parseIdentifierName(state, false)) {
                 auto ptr = std::make_unique<CallExpression>(std::move(*call));
                 call.emplace(CallExpression{std::pair{std::move(ptr), std::move(*identifier)}});
                 continue;

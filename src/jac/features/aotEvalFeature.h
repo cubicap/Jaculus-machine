@@ -117,15 +117,15 @@ class AotEvalFeature : public EvalFeature<Next> {
             }
             auto sig = jac::cfg::getSignature(*astFunc);
             if (sig) {
-                signatures.emplace(astFunc->name->identifier.name.name, sig);
+                signatures.emplace(astFunc->name->identifier.name, sig);
             }
         }
 
         for (const auto& astFunc : functions.functions) {
-            if (!astFunc->name || !signatures.contains(astFunc->name->identifier.name.name)) {
+            if (!astFunc->name || !signatures.contains(astFunc->name->identifier.name)) {
                 continue;
             }
-            auto sig = signatures.at(astFunc->name->identifier.name.name);
+            auto sig = signatures.at(astFunc->name->identifier.name);
             auto cfgFuncEm = jac::cfg::emit(*astFunc, sig, signatures);
             jac::cfg::removeEmptyBlocks(cfgFuncEm);
 

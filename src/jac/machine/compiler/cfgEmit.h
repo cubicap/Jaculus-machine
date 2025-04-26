@@ -136,7 +136,7 @@ inline const std::optional<Identifier> memberGetIdentifier(const ast::MemberExpr
         return std::nullopt;
     }
 
-    return identifier->identifier.name.name;
+    return identifier->identifier.name;
 }
 
 
@@ -367,10 +367,10 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
             throw IRGenError("This expressions are not supported");
         }
         Value operator()(const ast::IdentifierReference& identifier) {
-            Identifier ident = identifier.identifier.name.name;
+            Identifier ident = identifier.identifier.name;
             auto local = func.getLocal(ident);
             if (!local) {
-                throw IRGenError("Identifier referenced before declaration (" + identifier.identifier.name.name + ")");
+                throw IRGenError("Identifier referenced before declaration (" + identifier.identifier.name + ")");
             }
             return { *local };
         }
@@ -520,7 +520,7 @@ inline RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuit
     RValue objR = materialize(obj, func);
     emitPushFree(objR, func);
 
-    RValue identR = emitConst(ident.name, func);
+    RValue identR = emitConst(ident, func);
 
     LVRef res = LVRef::mbr(objR, identR, false);
 
@@ -955,14 +955,14 @@ inline void emit(const ast::LexicalDeclaration& lexical, FunctionEmitter& func) 
         ValueType type;
 
         void operator()(const ast::BindingIdentifier& decl) {
-            func.addLexical(decl.identifier.name.name, type, false);
+            func.addLexical(decl.identifier.name, type, false);
             // do nothing
         }
         void operator()(const std::pair<ast::BindingIdentifier, ast::InitializerPtr>& assign) {
             const auto& [binding, initializer] = assign;
 
             Value rhs = emit(*initializer, func);
-            LVRef target = func.addLexical(binding.identifier.name.name, type, false);
+            LVRef target = func.addLexical(binding.identifier.name, type, false);
 
             RValue rhsR = materialize(rhs, func);
 
@@ -987,7 +987,7 @@ inline void emit(const ast::LexicalDeclaration& lexical, FunctionEmitter& func) 
         if (!binding.type) {
             throw IRGenError("Lexical bindings must have a type");
         }
-        std::visit(visitor{ func, getType(binding.type->type.name.name) }, binding.value);
+        std::visit(visitor{ func, getType(binding.type->type) }, binding.value);
     }
 }
 
@@ -1358,7 +1358,7 @@ inline SignaturePtr getSignature(const ast::FunctionDeclaration& decl) {
     if (!decl.returnType) {
         return nullptr;
     }
-    sig->ret = getType(decl.returnType->type.name.name);
+    sig->ret = getType(decl.returnType->type);
 
     for (const ast::FormalParameter& arg : decl.parameters.parameterList) {
         if (!std::holds_alternative<ast::BindingIdentifier>(arg.value)) {
@@ -1370,7 +1370,7 @@ inline SignaturePtr getSignature(const ast::FunctionDeclaration& decl) {
             return nullptr;
         }
 
-        sig->args.emplace_back(binding.identifier.name.name, getType(arg.type->type.name.name));
+        sig->args.emplace_back(binding.identifier.name, getType(arg.type->type));
     }
 
     return sig;
@@ -1383,7 +1383,7 @@ inline FunctionEmitter emit(const ast::FunctionDeclaration& decl, SignaturePtr s
 
     FunctionEmitter out(otherSignatures);
     out.setSignature(sig);
-    out.setFunctionName(decl.name->identifier.name.name);
+    out.setFunctionName(decl.name->identifier.name);
 
     emit(decl.body->statementList, out);
 

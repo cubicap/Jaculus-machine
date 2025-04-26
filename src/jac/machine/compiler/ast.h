@@ -179,11 +179,8 @@ public:
 };
 
 
-struct IdentifierName {
-    std::string name;
+using IdentifierName = std::string;
 
-    static std::optional<IdentifierName> parse(ParserState& state);
-};
 
 struct Identifier {
     IdentifierName name;
@@ -377,7 +374,7 @@ struct BindingPattern {
 
 // XXX: EXTENSION, incompatible with standard
 struct TypeAnnotation {
-    Identifier type;
+    IdentifierName type;
 
     static std::optional<TypeAnnotation> parse(ParserState& state);
 };

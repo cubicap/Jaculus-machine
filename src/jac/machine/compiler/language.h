@@ -86,4 +86,8 @@ const std::unordered_set<std::string_view> assignmentOperator = {
     "\?\?="
 };
 
+const std::unordered_set<std::string_view> allowedKWTypes = {
+    "void",
+};
+
 } // namespace jac

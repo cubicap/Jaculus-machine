@@ -127,7 +127,7 @@ inline NestOStream& operator<<(NestOStream& os, const std::vector<T>& vec) {
 
 inline NestOStream& operator<<(NestOStream& os, const IdentifierName& node) {
     auto _ = os.nest("IdentifierName");
-    os << node.name;
+    os << node;
     return os;
 }
 

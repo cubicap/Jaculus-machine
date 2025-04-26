@@ -61,7 +61,7 @@ std::string_view unaryExpIdentifier(jac::ast::UnaryExpressionPtr& expr) {
           ->value)
         .value)
       .value)
-    .value).identifier.name.name;
+    .value).identifier.name;
 }
 
 jac::ast::BinaryExpression& assignExpBinary(jac::ast::AssignmentExpression& expr) {
@@ -81,7 +81,7 @@ auto lhsExpIdentifier(jac::ast::LeftHandSideExpression& expr) {
           std::get<jac::ast::NewExpression>(expr.value)
           .value)
       .value)
-    .value).identifier.name.name;
+    .value).identifier.name;
 }
 
 
@@ -373,12 +373,12 @@ TEST_CASE("Identifier", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE(result->name.name == "label");
+        REQUIRE(result->name == "label");
     }
 
     SECTION("var") {
         auto tokens = TokenVector{
-            jac::lex::Token(1, 1, "var", jac::lex::Token::IdentifierName)
+            jac::lex::Token(1, 1, "var", jac::lex::Token::Keyword)
         };
 
         jac::ast::ParserState state(tokens);
@@ -409,7 +409,7 @@ TEST_CASE("IdentifierReference", "[parser]") {
 
     SECTION("yield fail") {
         auto tokens = TokenVector{
-            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::Keyword)
         };
 
         jac::ast::ParserState state(tokens);
@@ -422,7 +422,7 @@ TEST_CASE("IdentifierReference", "[parser]") {
 
     SECTION("yield fail2") {
         auto tokens = TokenVector{
-            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::Keyword)
         };
 
         jac::ast::ParserState state(tokens);
@@ -449,12 +449,12 @@ TEST_CASE("BindingIdentifier", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE(result->identifier.name.name == "label");
+        REQUIRE(result->identifier.name == "label");
     }
 
     SECTION("yield fail") {
         auto tokens = TokenVector{
-            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::Keyword)
         };
 
         jac::ast::ParserState state(tokens);
@@ -467,7 +467,7 @@ TEST_CASE("BindingIdentifier", "[parser]") {
 
     SECTION("yield fail2") {
         auto tokens = TokenVector{
-            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::Keyword)
         };
 
         jac::ast::ParserState state(tokens);
@@ -498,7 +498,7 @@ TEST_CASE("LabelIdentifier", "[parser]") {
 
     SECTION("yield fail") {
         auto tokens = TokenVector{
-            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::Keyword)
         };
 
         jac::ast::ParserState state(tokens);
@@ -511,7 +511,7 @@ TEST_CASE("LabelIdentifier", "[parser]") {
 
     SECTION("yield fail2") {
         auto tokens = TokenVector{
-            jac::lex::Token(1, 1, "yield", jac::lex::Token::IdentifierName)
+            jac::lex::Token(1, 1, "yield", jac::lex::Token::Keyword)
         };
 
         jac::ast::ParserState state(tokens);
@@ -551,7 +551,7 @@ TEST_CASE("PrivateIdentifier", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE(result->name.name == "#label");
+        REQUIRE(result->name == "#label");
     }
 }
 
@@ -741,7 +741,7 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
 
         auto& binding = result->bindings[0];
         REQUIRE(std::holds_alternative<jac::ast::BindingIdentifier>(binding.value));
-        REQUIRE(std::get<jac::ast::BindingIdentifier>(binding.value).identifier.name.name == "x");
+        REQUIRE(std::get<jac::ast::BindingIdentifier>(binding.value).identifier.name == "x");
     }
 
     SECTION("const x = 123;") {
@@ -766,7 +766,7 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
         auto& binding = result->bindings[0];
         REQUIRE(std::holds_alternative<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(binding.value));
         auto& pair = std::get<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(binding.value);
-        REQUIRE(pair.first.identifier.name.name == "x");
+        REQUIRE(pair.first.identifier.name == "x");
         REQUIRE(
             std::get<std::int32_t>(
               std::get<jac::ast::NumericLiteral>(
@@ -816,7 +816,7 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
         auto& binding = result->bindings[0];
         REQUIRE(std::holds_alternative<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(binding.value));
         auto& pair = std::get<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(binding.value);
-        REQUIRE(pair.first.identifier.name.name == "x");
+        REQUIRE(pair.first.identifier.name == "x");
         auto& exp = std::get<std::tuple<jac::ast::BinaryExpressionPtr, jac::ast::BinaryExpressionPtr, std::string_view>>(
             std::get<jac::ast::BinaryExpression>(
                 std::get<jac::ast::ConditionalExpression>(pair.second->value)
@@ -839,7 +839,7 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
                   ->value)
                 .value)
               .value)
-            .value).identifier.name.name == "abc"
+            .value).identifier.name == "abc"
         );
         REQUIRE(
             std::get<jac::ast::IdentifierReference>(
@@ -856,7 +856,7 @@ TEST_CASE("LexicalDeclaration", "[parser]") {
                   ->value)
                 .value)
               .value)
-            .value).identifier.name.name == "def"
+            .value).identifier.name == "def"
         );
     }
 }
@@ -1244,7 +1244,7 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE(result->name->identifier.name.name == "f");
+        REQUIRE(result->name->identifier.name == "f");
         REQUIRE(result->parameters.parameterList.empty());
         REQUIRE_FALSE(result->parameters.restParameter);
         REQUIRE(!result->body);
@@ -1285,15 +1285,15 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE(result->name->identifier.name.name == "fun");
+        REQUIRE(result->name->identifier.name == "fun");
         REQUIRE(result->parameters.parameterList.size() == 2);
         REQUIRE_FALSE(result->parameters.restParameter);
         REQUIRE(result->body);
 
         auto& argIdentA = std::get<jac::ast::BindingIdentifier>(result->parameters.parameterList[0].value);
-        REQUIRE(argIdentA.identifier.name.name == "a");
+        REQUIRE(argIdentA.identifier.name == "a");
         auto& argIdentB = std::get<jac::ast::BindingIdentifier>(result->parameters.parameterList[1].value);
-        REQUIRE(argIdentB.identifier.name.name == "b");
+        REQUIRE(argIdentB.identifier.name == "b");
 
 
         auto& statementList = result->body->statementList;
@@ -1304,14 +1304,14 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         REQUIRE(declX.isConst == true);
         REQUIRE(declX.bindings.size() == 1);
         auto& bindingX = std::get<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(declX.bindings[0].value);
-        REQUIRE(std::get<0>(bindingX).identifier.name.name == "x");
+        REQUIRE(std::get<0>(bindingX).identifier.name == "x");
 
         auto& declYStat = std::get<jac::ast::Declaration>(statementList.items[1].value);
         auto& declY = std::get<jac::ast::LexicalDeclaration>(declYStat.value);
         REQUIRE(declY.isConst == false);
         REQUIRE(declY.bindings.size() == 1);
         auto& bindingY = std::get<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(declY.bindings[0].value);
-        REQUIRE(std::get<0>(bindingY).identifier.name.name == "y");
+        REQUIRE(std::get<0>(bindingY).identifier.name == "y");
 
         auto& retStat = std::get<jac::ast::Statement>(statementList.items[2].value);
         auto& ret = std::get<jac::ast::ReturnStatement>(retStat.value);
@@ -1347,16 +1347,16 @@ TEST_CASE("FunctionDeclaration", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
-        REQUIRE(result->name->identifier.name.name == "fun");
+        REQUIRE(result->name->identifier.name == "fun");
         REQUIRE(result->parameters.parameterList.size() == 2);
         REQUIRE_FALSE(result->parameters.restParameter);
         REQUIRE(!result->body);
 
         auto& argIdentA = std::get<jac::ast::BindingIdentifier>(result->parameters.parameterList[0].value);
-        REQUIRE(argIdentA.identifier.name.name == "a");
+        REQUIRE(argIdentA.identifier.name == "a");
 
         auto& argB = std::get<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(result->parameters.parameterList[1].value);
-        REQUIRE(argB.first.identifier.name.name == "b");
+        REQUIRE(argB.first.identifier.name == "b");
         REQUIRE(unaryExpI32(assignExpUnary(*argB.second)) == 3);
     }
 }
@@ -1562,7 +1562,7 @@ TEST_CASE("BlockStatement", "[parser]") {
         REQUIRE(declLex.isConst == false);
         REQUIRE(declLex.bindings.size() == 1);
         auto& binding = std::get<std::pair<jac::ast::BindingIdentifier, jac::ast::InitializerPtr>>(declLex.bindings[0].value);
-        REQUIRE(binding.first.identifier.name.name == "x");
+        REQUIRE(binding.first.identifier.name == "x");
 
         auto& assignStat = std::get<jac::ast::Statement>(list->items[1].value);
         auto& assignExpStat = std::get<jac::ast::ExpressionStatement>(assignStat.value).expression;
@@ -1628,7 +1628,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression, jac::ast::Arguments>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference>(primary.value);
-        REQUIRE(ident.identifier.name.name == "f");
+        REQUIRE(ident.identifier.name == "f");
 
         REQUIRE(args.arguments.empty());
     }
@@ -1656,7 +1656,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression, jac::ast::Arguments>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference>(primary.value);
-        REQUIRE(ident.identifier.name.name == "func");
+        REQUIRE(ident.identifier.name == "func");
 
         REQUIRE(args.arguments.size() == 3);
     }
@@ -1680,7 +1680,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression, jac::ast::Arguments>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference>(primary.value);
-        REQUIRE(ident.identifier.name.name == "call");
+        REQUIRE(ident.identifier.name == "call");
 
         REQUIRE(args.arguments.size() == 1);
     }
@@ -1707,7 +1707,7 @@ TEST_CASE("Call expression", "[parser]") {
         auto& [mem, args] = std::get<std::pair<jac::ast::MemberExpression, jac::ast::Arguments>>(result->value);
         auto& primary = std::get<jac::ast::PrimaryExpression>(mem.value);
         auto& ident = std::get<jac::ast::IdentifierReference>(primary.value);
-        REQUIRE(ident.identifier.name.name == "call");
+        REQUIRE(ident.identifier.name == "call");
 
         REQUIRE(args.arguments.size() == 1);
     }
@@ -2024,5 +2024,25 @@ TEST_CASE("Member access", "[parser]") {
         CAPTURE(state.getErrorToken());
         REQUIRE(state.isEnd());
         REQUIRE(result);
+    }
+}
+
+TEST_CASE("Type annotation", "[parser]") {
+
+    SECTION(": void") {
+        auto tokens = TokenVector{
+            jac::lex::Token(1, 2, ":", jac::lex::Token::Punctuator),
+            jac::lex::Token(1, 4, "i32", jac::lex::Token::IdentifierName)
+        };
+
+        jac::ast::ParserState state(tokens);
+
+        auto result = jac::ast::TypeAnnotation::parse(state);
+        CAPTURE(state.getErrorMessage());
+        CAPTURE(state.getErrorToken());
+        REQUIRE(state.isEnd());
+        REQUIRE(result);
+
+        REQUIRE(result->type == "i32");
     }
 }
