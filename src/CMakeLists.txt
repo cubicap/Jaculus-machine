@@ -38,5 +38,6 @@ else()
     target_include_directories(jac-machine PUBLIC .)
     set_target_properties(jac-machine PROPERTIES LINKER_LANGUAGE CXX)
     target_link_libraries(jac-machine PUBLIC quickjs)
+    target_compile_options(jac-machine PUBLIC -Wall -Wextra -Wold-style-cast -Wshadow -Wimplicit-fallthrough -Wno-unused-parameter -Wno-cast-function-type -Wno-missing-field-initializers -Wno-old-style-cast)
 
 endif()
