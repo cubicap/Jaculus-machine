@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include <jac/features/eventLoopFeature.h>
+#include <jac/features/eventQueueFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
@@ -12,12 +14,15 @@
 
 
 TEST_CASE("Eval file", "[moduleLoader]") {
-    using Machine =
-        jac::ModuleLoaderFeature<
-        jac::FilesystemFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>>;
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        TestReportFeature,
+        jac::EventQueueFeature,
+        jac::EventLoopFeature,
+        jac::FilesystemFeature,
+        jac::ModuleLoaderFeature,
+        jac::EventLoopTerminal
+    >;
     Machine machine;
 
     using sgn = typename std::tuple<std::string, std::string, std::vector<std::string>>;
@@ -41,16 +46,24 @@ TEST_CASE("Eval file", "[moduleLoader]") {
         machine.initialize();
         evalFileThrows(machine, "test_files/moduleLoader/notFound.js");
     }
+
+    SECTION("Exception") {
+        machine.initialize();
+        evalFileThrows(machine, "test_files/moduleLoader/throw.js");
+    }
 }
 
 
 TEST_CASE("Import file", "[moduleLoader]") {
-    using Machine =
-        jac::ModuleLoaderFeature<
-        jac::FilesystemFeature<
-        TestReportFeature<
-        jac::MachineBase
-    >>>;
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        TestReportFeature,
+        jac::EventQueueFeature,
+        jac::EventLoopFeature,
+        jac::FilesystemFeature,
+        jac::ModuleLoaderFeature,
+        jac::EventLoopTerminal
+    >;
     Machine machine;
 
     using sgn = typename std::tuple<std::string, std::string, std::vector<std::string>>;

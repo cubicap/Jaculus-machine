@@ -20,6 +20,24 @@ class EventLoopFeature : public Next {
 private:
     std::atomic<bool> _shouldExit = false;
     int _exitCode = 1;
+
+protected:
+    std::optional<Exception> _error = std::nullopt;
+
+    void evalWithEventLoopCommon(Value& promise) {
+        auto promiseObj = promise.to<ObjectWeak>();
+
+        FunctionFactory ff(this->context());
+        auto fail = ff.newFunction(noal::function([this](Value err) {
+            this->_error = err.to<Exception>();
+            this->kill();
+        }));
+
+        auto catch_ = promiseObj.get<Function>("catch");
+        catch_.callThis<void>(promise, fail);
+
+        this->runEventLoop();
+    }
 public:
 
     void runEventLoop() {
@@ -62,6 +80,10 @@ public:
                 throw;
             }
         }
+
+        if (_error) {
+            throw (*_error);
+        }
     }
 
     void kill() {
@@ -78,6 +100,11 @@ public:
 
     int getExitCode() {
         return _exitCode;
+    }
+
+    void evalModuleWithEventLoop(std::string code, std::string filename) {
+        Value promise = this->eval(std::move(code), filename, EvalFlags::Module);
+        this->evalWithEventLoopCommon(promise);
     }
 
     virtual void runOnEventLoop() = 0;

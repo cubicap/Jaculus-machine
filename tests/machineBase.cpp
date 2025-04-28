@@ -3,19 +3,25 @@
 
 #include <string>
 
+#include <jac/features/eventLoopFeature.h>
+#include <jac/features/eventQueueFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
 
+#include "jac/features/eventLoopTerminal.h"
 #include "util.h"
 
 
 TEST_CASE("Register global", "[base]") {
     using Machine =
+        jac::EventLoopTerminal<
+        jac::EventLoopFeature<
+        jac::EventQueueFeature<
         TestReportFeature<
         jac::MachineBase
-    >;
+    >>>>;
 
     Machine machine;
     machine.initialize();
@@ -24,7 +30,7 @@ TEST_CASE("Register global", "[base]") {
     global.defineProperty("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
 
-    evalCode(machine, "report(test);", "test", jac::EvalFlags::Module);
+    evalCode(machine, "report(test);", "test", jac::EvalFlags::Global);
 
     REQUIRE(machine.getReports() == std::vector<std::string>{"test string"});
 }
@@ -32,9 +38,12 @@ TEST_CASE("Register global", "[base]") {
 
 TEST_CASE("Cpp Module", "[base]") {
     using Machine =
+        jac::EventLoopTerminal<
+        jac::EventLoopFeature<
+        jac::EventQueueFeature<
         TestReportFeature<
         jac::MachineBase
-    >;
+    >>>>;
 
     Machine machine;
     machine.initialize();
@@ -43,7 +52,7 @@ TEST_CASE("Cpp Module", "[base]") {
         auto& mdl = machine.newModule("testModule");
         mdl.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
-        evalCode(machine, "import * as testModule from 'testModule'; report(testModule.test);", "test", jac::EvalFlags::Module);
+        evalModuleWithEventLoop(machine, "import * as testModule from 'testModule'; report(testModule.test); exit(1);", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"test string"});
     }
@@ -52,7 +61,7 @@ TEST_CASE("Cpp Module", "[base]") {
         auto& mdl = machine.newModule("testModule");
         mdl.addExport("test", jac::Value::from<std::string>(machine.context(), "test string"));
 
-        evalCode(machine, "report('nothing');", "test", jac::EvalFlags::Module);
+        evalModuleWithEventLoop(machine, "report('nothing'); exit(1);", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"nothing"});
     }
@@ -64,12 +73,13 @@ TEST_CASE("Cpp Module", "[base]") {
         auto& module2 = machine.newModule("testModule2");
         module2.addExport("test2", jac::Value::from<std::string>(machine.context(), "test string 2"));
 
-        evalCode(machine, R"(
+        evalModuleWithEventLoop(machine, R"(
             import * as testModule1 from 'testModule1';
             import * as testModule2 from 'testModule2';
             report(testModule1.test1);
             report(testModule2.test2);
-        )", "test", jac::EvalFlags::Module);
+            exit(1);
+        )", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"test string 1", "test string 2"});
     }
@@ -77,9 +87,12 @@ TEST_CASE("Cpp Module", "[base]") {
 
 TEST_CASE("watchdog", "[base]") {
     using Machine =
+        jac::EventLoopTerminal<
+        jac::EventLoopFeature<
+        jac::EventQueueFeature<
         TestReportFeature<
         jac::MachineBase
-    >;
+    >>>>;
 
     Machine machine;
     machine.initialize();
@@ -92,12 +105,13 @@ TEST_CASE("watchdog", "[base]") {
             return true;
         }));
 
-        evalCodeThrows(machine, R"(
+        evalModuleWithEventLoopThrows(machine, R"(
             report('start');
             let until = Date.now() + 100;
             while (Date.now() < until) {}
             report('end');
-        )", "test", jac::EvalFlags::Module);
+            exit(1);
+        )", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"start"});
     }
@@ -110,12 +124,13 @@ TEST_CASE("watchdog", "[base]") {
             return true;
         }));
 
-        evalCode(machine, R"(
+        evalModuleWithEventLoop(machine, R"(
             report('start');
             let until = Date.now() + 20;
             while (Date.now() < until) {}
             report('end');
-        )", "test", jac::EvalFlags::Module);
+            exit(1);
+        )", "test");
 
         REQUIRE(machine.getReports() == std::vector<std::string>{"start", "end"});
     }

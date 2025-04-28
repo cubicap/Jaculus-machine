@@ -30,7 +30,6 @@ enum class EvalFlags : int {
     Module = JS_EVAL_TYPE_MODULE,
 
     Strict = JS_EVAL_FLAG_STRICT,
-    Strip = JS_EVAL_FLAG_STRIP,
     CompileOnly = JS_EVAL_FLAG_COMPILE_ONLY,
     BacktraceBarrier = JS_EVAL_FLAG_BACKTRACE_BARRIER
 };
@@ -166,6 +165,7 @@ public:
 
     /**
      * @brief Evaluate a string containing javascript code
+     * @note If the evaluation mode is EvalFlags::Module, the result will be a Promise
      *
      * @param code the code to evaluate
      * @param filename filename to use for the code. Used for error reporting

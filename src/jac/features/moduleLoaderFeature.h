@@ -40,11 +40,29 @@ private:
     }
 
 public:
+    /**
+     * @brief Evaluate a file
+     *
+     * @param path_ Path to the file
+     * @return A promise that will be resolved when the module ends, and rejected if
+     *         the module throws an exception.
+     */
     Value evalFile(std::string path_) {
         auto buffer = this->fs.loadCode(path_);
 
         Value val = this->eval(std::move(buffer), path_, EvalFlags::Module);
         return val;
+    }
+
+    /**
+     * @brief Evaluate a file and run the event loop until the program exits
+     *        or throws an exception.
+     *
+     * @param path_ Path to the file
+     */
+    void evalFileWithEventLoop(std::string path_) {
+        Value promise = this->evalFile(path_);
+        this->evalWithEventLoopCommon(promise);
     }
 
     void initialize() {

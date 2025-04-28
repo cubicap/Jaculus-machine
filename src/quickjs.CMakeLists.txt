@@ -7,7 +7,7 @@ set(QUICKJS_SRC
     "cutils.c"
     "libregexp.c"
     "libunicode.c"
-    "libbf.c"
+    "dtoa.c"
 )
 
 file(STRINGS "VERSION" QUICKJS_VERSION LIMIT_COUNT 1)

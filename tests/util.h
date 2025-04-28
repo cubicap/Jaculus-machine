@@ -42,17 +42,15 @@ public:
 };
 
 
-jac::Value evalFile(auto& machine, std::string path_) {
+void evalFile(auto& machine, std::string path_) {
     try {
-        return machine.evalFile(path_);
+        machine.evalFileWithEventLoop(path_);
     }
     catch (jac::Exception& e) {
         std::string message(e.what());
         CAPTURE(message);
         REQUIRE(false);
     }
-
-    return jac::Value::undefined(machine.context());
 };
 
 jac::Value evalCode(auto& machine, std::string code, std::string filename, jac::EvalFlags flags) {
@@ -69,10 +67,22 @@ jac::Value evalCode(auto& machine, std::string code, std::string filename, jac::
 };
 
 
+void evalModuleWithEventLoop(auto& machine, std::string code, std::string filename) {
+    try {
+        machine.evalModuleWithEventLoop(code, filename);
+    }
+    catch (jac::Exception& e) {
+        std::string message(e.what());
+        CAPTURE(message);
+        REQUIRE(false);
+    }
+};
+
+
 
 void evalFileThrows(auto& machine, std::string path_) {
     try {
-        machine.evalFile(path_);
+        machine.evalFileWithEventLoop(path_);
     }
     catch (jac::Exception& e) {
         return;
@@ -111,3 +121,24 @@ void evalCodeThrows(auto& machine, std::string code, std::string filename, jac::
     INFO("Expected jac::Exception, but no exception was thrown");
     REQUIRE(false);
 };
+
+void evalModuleWithEventLoopThrows(auto& machine, std::string code, std::string filename) {
+    try {
+        machine.evalModuleWithEventLoop(code, filename);
+    }
+    catch (jac::Exception& e) {
+        return;
+    }
+    catch (std::exception& e) {
+        std::string message(e.what());
+        INFO("Expected jac::Exception, got \"" + message + "\"");
+        REQUIRE(false);
+    }
+    catch (...) {
+        INFO("Expected jac::Exception, got unknown exception");
+        REQUIRE(false);
+    }
+
+    INFO("Expected jac::Exception, but no exception was thrown");
+    REQUIRE(false);
+}
