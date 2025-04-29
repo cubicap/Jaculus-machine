@@ -5,6 +5,7 @@ set(JAC_MACHINE_SRC
     "jac/machine/context.cpp"
     "jac/machine/compiler/ast.cpp"
     "jac/machine/compiler/cfg.cpp"
+    "jac/machine/compiler/cfgEmit.cpp"
     "jac/machine/compiler/mirUtil.cpp"
 )
 
