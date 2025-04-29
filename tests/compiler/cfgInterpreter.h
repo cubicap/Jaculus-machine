@@ -117,6 +117,8 @@ struct Boolean {
 };
 
 struct ObjectPtr {
+    using JSObject = void;
+
     JSObject* value;
 
     ObjectPtr(JSObject* v) : value(v) {}
@@ -258,7 +260,7 @@ struct ConvertVisitor<ObjectPtr> {
     ObjectPtr operator()(Any v) {
         if (JS_VALUE_GET_TAG(*v) == JS_TAG_OBJECT) {
             JS_DupValue(ctx, *v);
-            return JS_VALUE_GET_OBJ(*v);
+            return JS_VALUE_GET_PTR(*v);
         }
         throw std::runtime_error("Invalid conversion to ObjectPtr");
     }
@@ -982,7 +984,7 @@ public:
                     set(func.args[i].id, Boolean{ val != 0 });
                 } break;
                 case ValueType::Object: {
-                    set(func.args[i].id, ObjectPtr{ JS_VALUE_GET_OBJ(argv[i]) });
+                    set(func.args[i].id, ObjectPtr{ JS_VALUE_GET_PTR(argv[i]) });
                 } break;
                 case ValueType::Any: {
                     set(func.args[i].id, Any{ argv[i] });

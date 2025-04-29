@@ -325,6 +325,8 @@ inline void addNativeFunction(MIR_context_t ctx, Builtins& builtins, std::string
 
 
 inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
+    using JSObject = void;
+
     Builtins builtins{
         .rtCtx = rtCtx,
         .functions = {}
