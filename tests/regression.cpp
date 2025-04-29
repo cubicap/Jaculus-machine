@@ -55,7 +55,7 @@ TEST_CASE("Timer leak", "[timers]") {
 
     machine.initialize();
 
-    machine.eval("async () => { for (let i = 0; i < 100000; i++) { await sleep(0); }; exit(0); }()", "<eval>");
+    machine.eval("(async () => { for (let i = 0; i < 100000; i++) { await sleep(0); }; exit(0); })()", "<eval>");
 
     machine.runEventLoop();
 

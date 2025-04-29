@@ -156,22 +156,24 @@ public:
 
                 _timers.pop();
 
-                lock.unlock();
-
                 if (timer->isCancelled()) {
                     int id = timer->getId();
                     _timersById.erase(id);
                     continue;
                 }
 
+                lock.unlock();
+
                 this->scheduleEvent([timer, this]() mutable {
                     if (timer->isCancelled()) {
+                        std::lock_guard<std::mutex> lock_(_timersMutex);
                         int id = timer->getId();
                         _timersById.erase(id);
                         return;
                     }
                     timer->getCallback()();
 
+                    std::lock_guard<std::mutex> lock_(_timersMutex);
                     if (timer->isRepeating()) {
                         timer->update();
                         _timers.push(timer);

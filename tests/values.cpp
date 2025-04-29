@@ -1,7 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -34,7 +36,11 @@ TEST_CASE("To JS value", "[base]") {
         val{"uint8_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, uint8_t(42)); }, "number", "42"},
         val{"int16_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int16_t(-42)); }, "number", "-42"},
         val{"uint16_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, uint16_t(42)); }, "number", "42"},
-        val{"int32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int32_t(-42)); }, "number", "-42"},
+        val{"int32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int32_t(std::numeric_limits<int32_t>::max())); }, "number", std::to_string(std::numeric_limits<int32_t>::max())},
+        val{"int32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int32_t(std::numeric_limits<int32_t>::min())); }, "number", std::to_string(std::numeric_limits<int32_t>::min())},
+        val{"uint32_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, std::numeric_limits<uint32_t>::max()); }, "number", std::to_string(std::numeric_limits<uint32_t>::max())},
+        val{"int64_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, int64_t(-0xf00000000)); }, "number", std::to_string(-0xf00000000)},
+        val{"uint64_t", [](jac::ContextRef ctx) { return jac::Value::from(ctx, uint64_t(0xf00000000)); }, "number", std::to_string(0xf00000000)},
         val{"const c string", [](jac::ContextRef ctx) { return jac::Value::from(ctx, "Hello World"); }, "string", "Hello World"},
         val{"non const c string", [](jac::ContextRef ctx) {
                 std::string_view str = "Hello World";
@@ -83,14 +89,6 @@ TEST_CASE("To JS value", "[base]") {
         auto reports = machine.getReports();
         REQUIRE(reports[0] == "number");
         REQUIRE(reports[1].substr(0, 4) == "42.7");
-    }
-
-    SECTION("Invalid types") {
-        static_assert(std::is_void_v<decltype(jac::ConvTraits<uint32_t>::from(std::declval<jac::ContextRef>(), std::declval<jac::ValueWeak>()))>, "Invalid type");
-        static_assert(std::is_void_v<decltype(jac::ConvTraits<uint32_t>::to(std::declval<jac::ContextRef>(), std::declval<uint32_t>()))>, "Invalid type");
-
-        static_assert(std::is_void_v<decltype(jac::ConvTraits<int64_t>::from(std::declval<jac::ContextRef>(), std::declval<jac::ValueWeak>()))>, "Invalid type");
-        static_assert(std::is_void_v<decltype(jac::ConvTraits<int64_t>::to(std::declval<jac::ContextRef>(), std::declval<int64_t>()))>, "Invalid type");
     }
 }
 

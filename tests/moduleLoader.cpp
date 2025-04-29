@@ -4,6 +4,8 @@
 #include <string>
 
 #include <jac/features/evalFeature.h>
+#include <jac/features/eventLoopFeature.h>
+#include <jac/features/eventQueueFeature.h>
 #include <jac/features/filesystemFeature.h>
 #include <jac/features/moduleLoaderFeature.h>
 #include <jac/machine/machine.h>
@@ -17,8 +19,11 @@ TEST_CASE("Eval file", "[moduleLoader]") {
         jac::MachineBase,
         jac::EvalFeature,
         TestReportFeature,
+        jac::EventQueueFeature,
+        jac::EventLoopFeature,
         jac::FilesystemFeature,
-        jac::ModuleLoaderFeature
+        jac::ModuleLoaderFeature,
+        jac::EventLoopTerminal
     >;
     Machine machine;
 
@@ -43,6 +48,11 @@ TEST_CASE("Eval file", "[moduleLoader]") {
         machine.initialize();
         evalFileThrows(machine, "test_files/moduleLoader/notFound.js");
     }
+
+    SECTION("Exception") {
+        machine.initialize();
+        evalFileThrows(machine, "test_files/moduleLoader/throw.js");
+    }
 }
 
 
@@ -51,8 +61,11 @@ TEST_CASE("Import file", "[moduleLoader]") {
         jac::MachineBase,
         jac::EvalFeature,
         TestReportFeature,
+        jac::EventQueueFeature,
+        jac::EventLoopFeature,
         jac::FilesystemFeature,
-        jac::ModuleLoaderFeature
+        jac::ModuleLoaderFeature,
+        jac::EventLoopTerminal
     >;
     Machine machine;
 

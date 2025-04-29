@@ -30,7 +30,6 @@ enum class EvalFlags : int {
     Module = JS_EVAL_TYPE_MODULE,
 
     Strict = JS_EVAL_FLAG_STRICT,
-    Strip = JS_EVAL_FLAG_STRIP,
     CompileOnly = JS_EVAL_FLAG_COMPILE_ONLY,
     BacktraceBarrier = JS_EVAL_FLAG_BACKTRACE_BARRIER
 };
