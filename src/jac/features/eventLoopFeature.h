@@ -4,7 +4,11 @@
 #include <jac/machine/machine.h>
 
 #include <atomic>
+#include <optional>
+#include <string>
+
 #include <noal_func.h>
+
 
 #include "eventLoopTerminal.h"
 

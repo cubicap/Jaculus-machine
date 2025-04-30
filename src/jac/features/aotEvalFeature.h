@@ -189,7 +189,7 @@ class AotEvalFeature : public EvalFeature<Next> {
             for (auto& [cfgFunc, code] : cfgFunctions) {
                 auto proto = prototypes.at(cfgFunc.name()).first;
                 auto fun = prototypes.at(cfgFunc.name()).second;
-                auto caller = jac::cfg::mir_emit::compileCaller(ctx, cfgFunc, fun, proto);
+                auto caller = jac::cfg::mir_emit::compileCaller(ctx, builtins, cfgFunc, fun, proto);
                 callers.push_back(caller);
             }
         }

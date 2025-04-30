@@ -394,7 +394,7 @@ std::optional<BinaryExpression> BinaryExpression::parse(ParserState& state) {
         if (!unary) {
             return std::nullopt;
         }
-        output.push_back(std::make_unique<UnaryExpression>(std::move(*unary)));
+        output.emplace_back(std::make_unique<UnaryExpression>(std::move(*unary)));
         auto next = state.current();
         if (next.kind != lex::Token::Punctuator) {
             break;
@@ -411,13 +411,13 @@ std::optional<BinaryExpression> BinaryExpression::parse(ParserState& state) {
                 break;
             }
             operators.pop_back();
-            output.push_back(top);
+            output.emplace_back(top);
         }
         operators.push_back(next.text);
         state.advance();
     }
     while (!operators.empty()) {
-        output.push_back(operators.back());
+        output.emplace_back(operators.back());
         operators.pop_back();
     }
 
@@ -524,7 +524,7 @@ std::optional<FormalParameters> FormalParameters::parse(ParserState& state) {
 
 
 std::optional<FunctionBody> FunctionBody::parse(ParserState& state) {
-    if (auto stmts = (state.pushTemplate<Return(true)>(), StatementList::parse(state))) {
+    if (auto stmts = (state.pushTemplate<Return{true}>(), StatementList::parse(state))) {
         return FunctionBody{std::move(*stmts)};
     }
     return std::nullopt;
@@ -622,7 +622,7 @@ std::optional<EmptyStatement> EmptyStatement::parse(ParserState& state) {
 
 std::optional<ExpressionStatement> ExpressionStatement::parse(ParserState& state) {
     auto start = state.getPosition();
-    if (auto expr = (state.pushTemplate<In(false)>(), Expression::parse(state))) {
+    if (auto expr = (state.pushTemplate<In{false}>(), Expression::parse(state))) {
         if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
             state.error("Expected ;");
             state.restorePosition(start);
@@ -721,7 +721,7 @@ std::optional<ReturnStatement> ReturnStatement::parse(ParserState& state) {
     ReturnStatement statement;
 
     auto start = state.getPosition();
-    if (auto expr = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+    if (auto expr = (state.pushTemplate<In{true}>(), Expression::parse(state))) {
         statement.expression = std::move(*expr);
     }
 
@@ -767,7 +767,7 @@ std::optional<FunctionDeclaration> FunctionDeclaration::parse(ParserState& state
     }
     state.advance();
 
-    auto params = (state.pushTemplate<Yield(false), Await(false)>(), FormalParameters::parse(state));
+    auto params = (state.pushTemplate<Yield{false}, Await{false}>(), FormalParameters::parse(state));
     if (!params) {
         state.restorePosition(start);
         return std::nullopt;
@@ -789,7 +789,7 @@ std::optional<FunctionDeclaration> FunctionDeclaration::parse(ParserState& state
     }
     state.advance();
 
-    auto body = (state.pushTemplate<Yield(false), Await(false)>(), FunctionBody::parse(state));
+    auto body = (state.pushTemplate<Yield{false}, Await{false}>(), FunctionBody::parse(state));
 
     if (state.current().kind != lex::Token::Punctuator || state.current().text != "}") {
         state.error("Expected }");
@@ -826,7 +826,7 @@ std::optional<ThrowStatement> ThrowStatement::parse(ParserState& state) {
     ThrowStatement statement;
 
     auto start = state.getPosition();
-    if (auto expr = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+    if (auto expr = (state.pushTemplate<In{true}>(), Expression::parse(state))) {
         statement.expression = std::move(*expr);
     }
 
@@ -959,7 +959,7 @@ std::optional<Declaration> Declaration::parse(ParserState& state) {
     if (auto klass = ClassDeclaration::parse(state, false)) {
         return Declaration{std::move(*klass)};
     }
-    if (auto lexical = (state.pushTemplate<In(true)>(), LexicalDeclaration::parse(state))) {
+    if (auto lexical = (state.pushTemplate<In{true}>(), LexicalDeclaration::parse(state))) {
         return Declaration{std::move(*lexical)};
     }
     return std::nullopt;
@@ -998,7 +998,7 @@ std::optional<CoverParenthesizedExpressionAndArrowParameterList> CoverParenthesi
     CoverParenthesizedExpressionAndArrowParameterList result;
     bool canContinue = true;
 
-    if (auto expr = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+    if (auto expr = (state.pushTemplate<In{true}>(), Expression::parse(state))) {
         result.expression = std::move(*expr);
         if (state.current().kind != lex::Token::Punctuator || state.current().text != ",") {
             canContinue = false;
@@ -1012,11 +1012,9 @@ std::optional<CoverParenthesizedExpressionAndArrowParameterList> CoverParenthesi
         if (state.current().kind == lex::Token::Punctuator && state.current().text == "...") {
             state.advance();
             if (auto binding = BindingIdentifier::parse(state)) {
-                canContinue = false;
                 result.parameters.template emplace<BindingIdentifier>(std::move(*binding));
             }
             else if (auto pattern = BindingPattern::parse(state)) {
-                canContinue = false;
                 result.parameters.template emplace<BindingPattern>(std::move(*pattern));
             }
             else {
@@ -1120,7 +1118,7 @@ std::optional<MemberExpression> MemberExpression::parse(ParserState& state) {
 
         if (state.current().kind == lex::Token::Punctuator && state.current().text == "[") {
             state.advance();
-            if (auto expr = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+            if (auto expr = (state.pushTemplate<In{true}>(), Expression::parse(state))) {
                 if (state.current().kind == lex::Token::Punctuator && state.current().text == "]") {
                     state.advance();
                     auto ptr = std::make_unique<MemberExpression>(std::move(*member));
@@ -1228,7 +1226,7 @@ std::optional<CallExpression> CallExpression::parse(ParserState& state) {
         }
         if (state.current().kind == lex::Token::Punctuator && state.current().text == "[") {
             state.advance();
-            if (auto expr = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+            if (auto expr = (state.pushTemplate<In{true}>(), Expression::parse(state))) {
                 if (state.current().kind == lex::Token::Punctuator && state.current().text == "]") {
                     state.advance();
                     auto ptr = std::make_unique<CallExpression>(std::move(*call));
@@ -1323,7 +1321,7 @@ std::optional<Script> Script::parse(ParserState& state) {
         return Script{};
     }
 
-    auto _ = state.pushTemplate<Yield(false), Await(false), Return(false)>();
+    auto _ = state.pushTemplate<Yield{false}, Await{false}, Return{false}>();
 
     if (auto statementList = StatementList::parse(state)) {
         return Script{std::move(*statementList)};
@@ -1395,7 +1393,7 @@ std::optional<BindingElement> BindingElement::parse(ParserState& state) {
 
         if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
             state.advance();
-            if (auto initializer = (state.pushTemplate<In(true)>(), AssignmentExpression::parse(state))) {
+            if (auto initializer = (state.pushTemplate<In{true}>(), AssignmentExpression::parse(state))) {
                 auto ptr = std::make_unique<AssignmentExpression>(std::move(*initializer));
                 return BindingElement{std::pair{std::move(*id), std::move(ptr)}, std::move(annotation)};
             }
@@ -1409,7 +1407,7 @@ std::optional<BindingElement> BindingElement::parse(ParserState& state) {
 
         if (state.current().kind == lex::Token::Punctuator && state.current().text == "=") {
             state.advance();
-            if (auto initializer = (state.pushTemplate<In(true)>(), AssignmentExpression::parse(state))) {
+            if (auto initializer = (state.pushTemplate<In{true}>(), AssignmentExpression::parse(state))) {
                 auto ptr = std::make_unique<AssignmentExpression>(std::move(*initializer));
                 return BindingElement{std::pair{std::move(*pattern), std::move(ptr)}, std::move(annotation)};
             }
@@ -1469,8 +1467,8 @@ std::optional<Arguments> Arguments::parse(ParserState& state) {
             state.advance();
         }
 
-        if (auto expr = (state.pushTemplate<In(true)>(), AssignmentExpression::parse(state))) {
-            args.arguments.push_back(std::pair{isSpread, std::make_unique<AssignmentExpression>(std::move(*expr))});
+        if (auto expr = (state.pushTemplate<In{true}>(), AssignmentExpression::parse(state))) {
+            args.arguments.emplace_back(std::pair{isSpread, std::make_unique<AssignmentExpression>(std::move(*expr))});
         }
         else {
             state.restorePosition(start);
@@ -1563,7 +1561,7 @@ std::optional<IfStatement> IfStatement::parse(ParserState& state) {
     }
     state.advance();
 
-    auto expr = (state.pushTemplate<In(true)>(), Expression::parseParenthesised(state));
+    auto expr = (state.pushTemplate<In{true}>(), Expression::parseParenthesised(state));
     if (!expr) {
         state.restorePosition(start);
         return std::nullopt;
@@ -1617,7 +1615,7 @@ std::optional<DoWhileStatement> DoWhileStatement::parse(ParserState& state) {
     }
     state.advance();
 
-    auto expr = (state.pushTemplate<In(true)>(), Expression::parseParenthesised(state));
+    auto expr = (state.pushTemplate<In{true}>(), Expression::parseParenthesised(state));
     if (!expr) {
         state.error("Expected expression");
         state.restorePosition(start);
@@ -1643,7 +1641,7 @@ std::optional<WhileStatement> WhileStatement::parse(ParserState& state) {
     }
     state.advance();
 
-    auto expr = (state.pushTemplate<In(true)>(), Expression::parseParenthesised(state));
+    auto expr = (state.pushTemplate<In{true}>(), Expression::parseParenthesised(state));
     if (!expr) {
         state.restorePosition(start);
         return std::nullopt;
@@ -1686,7 +1684,7 @@ std::optional<ForStatement> ForStatement::parse(ParserState& state) {
         throw std::runtime_error("Variable declarations in for loop are not supported");
     }
     if (state.current().kind == lex::Token::Keyword && (state.current().text == "let" || state.current().text == "const")) {
-        if (auto decl = (state.pushTemplate<In(false)>(), LexicalDeclaration::parse(state))) {
+        if (auto decl = (state.pushTemplate<In{false}>(), LexicalDeclaration::parse(state))) {
             forStmt.init = std::move(*decl);
         }
         else {
@@ -1696,7 +1694,7 @@ std::optional<ForStatement> ForStatement::parse(ParserState& state) {
         // semicolon as part of the declaration statement
     }
     else {
-        if (auto expr = (state.pushTemplate<In(false)>(), Expression::parse(state))) {
+        if (auto expr = (state.pushTemplate<In{false}>(), Expression::parse(state))) {
             forStmt.init = std::move(*expr);
         }
         if (state.current().kind != lex::Token::Punctuator || state.current().text != ";") {
@@ -1708,7 +1706,7 @@ std::optional<ForStatement> ForStatement::parse(ParserState& state) {
     }
 
 
-    if (auto cond = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+    if (auto cond = (state.pushTemplate<In{true}>(), Expression::parse(state))) {
         forStmt.condition = std::move(*cond);
     }
 
@@ -1720,7 +1718,7 @@ std::optional<ForStatement> ForStatement::parse(ParserState& state) {
     }
     state.advance();
 
-    if (auto update = (state.pushTemplate<In(true)>(), Expression::parse(state))) {
+    if (auto update = (state.pushTemplate<In{true}>(), Expression::parse(state))) {
         forStmt.update = std::move(*update);
     }
 

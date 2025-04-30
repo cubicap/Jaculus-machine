@@ -990,7 +990,7 @@ void emit(const ast::Declaration& declaration, FunctionEmitter& func) {
         Value v = emit(*expr.items[i], func);
         emitPushFree(v, func);
     }
-    if (expr.items.size() != 0) {
+    if (!expr.items.empty()) {
         Value last = emit(*expr.items.back(), func);
         return materialize(last, func);
     }

@@ -144,7 +144,7 @@ namespace detail {  // FIXME: check conversions
         auto aPrim = toPrimitive(a);
         auto bPrim = toPrimitive(b);
 
-        if (aPrim == bPrim) {
+        if (aPrim == bPrim && aPrim != ValueType::Bool) {
             return aPrim;
         }
         if (!isNumeric(aPrim) || !isNumeric(bPrim)) {
@@ -233,10 +233,10 @@ inline ValueType commonUpcast(ValueType a, ValueType b) {
     if (detail::anyAny(a, b) || detail::anyObject(a, b)) {
         return ValueType::Any;
     }
-    if (a == ValueType::F64 || b == ValueType::F64) {
-        return ValueType::F64;
+    if (isNumeric(a) && isNumeric(b)) {
+        return detail::numericUpcast(a, b);
     }
-    return ValueType::I32;
+    assert(false && "Invalid commonUpcast");
 }
 
 

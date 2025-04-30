@@ -448,6 +448,25 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    addNativeFunction(ctx, builtins, "__convertI32", { ValueType::Any }, ValueType::I32,
+        +[](RuntimeContext* ctx_, JSValue a) {
+            int32_t res;
+            if (JS_ToInt32(ctx_->ctx, &res, a)) {
+                // TODO: handle error
+            }
+            return res;
+        }
+    );
+    addNativeFunction(ctx, builtins, "__convertF64", { ValueType::Any }, ValueType::F64,
+        +[](RuntimeContext* ctx_, JSValue a) {
+            double res;
+            if (JS_ToFloat64(ctx_->ctx, &res, a)) {
+                // TODO: handle error
+            }
+            return res;
+        }
+    );
+
     return builtins;
 }
 
