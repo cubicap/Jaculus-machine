@@ -302,6 +302,15 @@ inline void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Te
     }
 }
 
+inline void generatePow(CompileContext& cc, Temp a, Temp b, Temp res) {
+    assert(a.type == b.type && a.type == res.type);
+    switch (a.type) {
+        case ValueType::F64:  insertCall(cc.ctx, cc.fun, cc.builtins, "__powF64", { cc.regs.at(a.id), cc.regs.at(b.id), cc.regs.at(res.id) });  break;
+        default:
+            assert(false && "Invalid type for pow");
+    }
+}
+
 inline MIR_insn_code_t chooseBitwise(Opcode op, ValueType type) {
     assert(type == ValueType::I32);  // TODO: support doubles
     switch (op) {
@@ -437,7 +446,8 @@ inline MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pa
                         generateArithmetic(cc, op->op, op->a, op->b, op->res);
                         break;
                     case Opcode::Pow:
-                        throw std::runtime_error("Pow is not supported");
+                        generatePow(cc, op->a, op->b, op->res);
+                        break;
                     case Opcode::LShift:  case Opcode::RShift:  case Opcode::URShift:
                     case Opcode::BitAnd:  case Opcode::BitOr:   case Opcode::BitXor:
                         assert(isIntegral(op->b.type) && op->res.type == op->a.type);

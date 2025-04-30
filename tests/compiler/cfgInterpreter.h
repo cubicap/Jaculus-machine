@@ -441,6 +441,49 @@ namespace detail {
         }
     };
 
+    template<typename T>
+    struct exponentiates;
+    template<>
+    struct exponentiates<JSValue> {
+        JSContext* ctx;
+        JSValue operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::pow(ctx, a, b);
+        }
+    };
+
+    template<>
+    struct exponentiates<double> {
+        JSContext* ctx;
+        decltype(auto) operator()(double a, double b) {
+            return std::pow(a, b);
+        }
+    };
+
+    template<>
+    struct exponentiates<int32_t> {
+        JSContext* ctx;
+        decltype(auto) operator()(int32_t a, int32_t b) {
+            int32_t res = 1;
+            while (b) {
+                if (b & 1) {
+                    res *= a;
+                }
+                a *= a;
+                b >>= 1;
+            }
+            return res;
+        }
+    };
+
+    template<typename T>
+        requires NotAny<T>
+    struct exponentiates<T> {
+        JSContext* ctx;
+        T operator()(T a, T b) {
+            throw std::runtime_error("Invalid exponentiation arguments");
+        }
+    };
+
 
     template<typename T>
     struct equal_to {
@@ -849,6 +892,7 @@ public:
             case Opcode::Sub: evalBinopResType<detail::minus>(ctx, op); break;
             case Opcode::Mul: evalBinopResType<detail::multiplies>(ctx, op); break;
             case Opcode::Div: evalBinopResType<detail::divides>(ctx, op); break;
+            case Opcode::Pow: evalBinopResType<detail::exponentiates>(ctx, op); break;
             case Opcode::Eq: evalRelational<detail::equal_to>(ctx, op); break;
             case Opcode::Neq: evalRelational<detail::not_equal_to>(ctx, op); break;
             case Opcode::Gt: evalRelational<detail::greater>(ctx, op); break;
@@ -870,7 +914,6 @@ public:
             case Opcode::GetMember: evalGetMember(ctx, op); break;
             case Opcode::SetMember: evalSetMember(ctx, op); break;
             case Opcode::BoolNot: evalBoolNot(ctx, op); break;
-            case Opcode::Pow:
             case Opcode::BitNot:
                 throw std::runtime_error("Not implemented (operation) " + std::to_string(static_cast<int>(op.op)));
         }

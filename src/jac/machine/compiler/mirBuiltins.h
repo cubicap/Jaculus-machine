@@ -448,6 +448,12 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    addNativeFunction(ctx, builtins, "__powF64", { ValueType::F64, ValueType::F64 }, ValueType::F64,
+        +[](RuntimeContext* ctx_, double a, double b) {
+            return std::pow(a, b);
+        }
+    );
+
     addNativeFunction(ctx, builtins, "__convertI32", { ValueType::Any }, ValueType::I32,
         +[](RuntimeContext* ctx_, JSValue a) {
             int32_t res;

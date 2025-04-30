@@ -1180,4 +1180,29 @@ TEST_CASE("Operators", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"1", "2", "2", "3"});
     }
+
+    SECTION("Exponentiation") {
+        machine.initialize();
+        std::string code(R"(
+            function funInt(a: int32, b: int32): int32 {
+                return a ** b;
+            }
+            function funFloat(a: float64, b: float64): float64 {
+                return a ** b;
+            }
+            function funAny(a: any, b: any): any {
+                return a ** b;
+            }
+
+            report(funInt(2, 3));
+            report(funFloat(2.25, 0.5));
+            report(funAny(2, 3));
+            report(funAny(9, 0.5));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{
+            "8", "1.5", "8", "3"
+        });
+    }
 }

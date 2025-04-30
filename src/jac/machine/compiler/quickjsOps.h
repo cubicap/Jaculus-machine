@@ -162,5 +162,24 @@ inline JSValue rem(JSContext* ctx, JSValue op1, JSValue op2) {
     return res;
 }
 
+inline JSValue pow(JSContext* ctx, JSValue op1, JSValue op2) {
+    JSValue res;
+
+    double d1, d2, r;
+    if (JS_ToFloat64(ctx, &d1, op1)) {
+        goto exception;
+    }
+    if (JS_ToFloat64(ctx, &d2, op2)) {
+        goto exception;
+    }
+    r = std::pow(d1, d2);
+    res = JS_NewFloat64(ctx, r);
+    return res;
+
+exception:
+    // TODO: handle error
+    return JS_UNDEFINED;
+}
+
 
 }  // namespace jac::quickjs_ops

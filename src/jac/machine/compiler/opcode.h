@@ -69,7 +69,7 @@ enum class Opcode {
     Mul,        // a a -> a
     Div,        // a a -> a
     Rem,        // a a -> a
-    Pow,        // a a -> a
+    Pow,        // float64 float64 -> float64
     LShift,     // int32 int32 -> int32
     RShift,     // int32 int32 -> int32
     URShift,    // int32 int32 -> int32
@@ -192,13 +192,18 @@ namespace detail {  // FIXME: check conversions
         return toNumber(a);
     }
 
+    template<ValueType T>
+    inline ValueType alwaysRes(ValueType, ValueType) {
+        return T;
+    }
+
     const std::unordered_map<Opcode, ResMapping> opResults = {
         { Opcode::Add, additiveRes },
         { Opcode::Sub, subtractiveRes },
         { Opcode::Mul, subtractiveRes },
         { Opcode::Div, subtractiveRes },
         { Opcode::Rem, subtractiveRes },
-        { Opcode::Pow, subtractiveRes },
+        { Opcode::Pow, alwaysRes<ValueType::F64> },
         { Opcode::LShift, bitwiseRes },
         { Opcode::RShift, bitwiseRes },
         { Opcode::URShift, bitwiseRes },
