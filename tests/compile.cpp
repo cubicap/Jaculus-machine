@@ -777,6 +777,23 @@ TEST_CASE("Any", "[aot]") {
             "1"
         });
     }
+
+    SECTION("Any-boolean") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: any): boolean {
+                return a;
+            }
+
+            report(fun(1));
+            report(fun(0));
+            report(fun(true));
+            report(fun(false));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"true", "false", "true", "false"});
+    }
 }
 
 
@@ -1017,7 +1034,7 @@ TEST_CASE("Operators", "[aot]") {
 
     Machine machine;
 
-    SECTION("Arithmetic") {
+    SECTION("Arithmetic int32") {
         machine.initialize();
         std::string code(R"(
             function fun(a: int32, b: int32): int32 {
@@ -1029,6 +1046,20 @@ TEST_CASE("Operators", "[aot]") {
 
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"2"});
+    }
+
+    SECTION("Arithmetic float64") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: float64, b: float64): float64 {
+                return a + b - 2.0 * 4.0 / 2.0 % 3.0;
+            }
+
+            report(fun(1.5, 2.5));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"3"});
     }
 
     SECTION("Unary") {

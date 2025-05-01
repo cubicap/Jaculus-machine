@@ -1,4 +1,5 @@
 #include "cfgEmit.h"
+#include "opcode.h"
 
 
 namespace jac::cfg {
@@ -276,6 +277,7 @@ void emitPushFree(Value val, FunctionEmitter& func) {
         ropRType = emitCastAndFree(rhs, resType, func);
     }
     else {
+        assert(isComparison(op));
         ValueType commonType = commonUpcast(lhs.type(), rhs.type());
         lopRType = emitCastAndFree(lhs, commonType, func);
         ropRType = emitCastAndFree(rhs, commonType, func);

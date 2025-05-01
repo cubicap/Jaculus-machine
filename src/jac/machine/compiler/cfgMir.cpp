@@ -27,100 +27,35 @@ auto getJSTag(ValueType type) {
         case ValueType::Bool:   return JS_TAG_BOOL;
         case ValueType::Object: return JS_TAG_OBJECT;
         default:
-            throw std::runtime_error("Invalid type");
+            assert(false && "Invalid JS tag");
     }
 }
 
-MIR_insn_code_t chooseComparison(Opcode op, ValueType type) {
-    assert(type != ValueType::Void);
-    switch (op) {
-        case Opcode::Eq:  switch (type) {
-            case ValueType::I32:    return MIR_EQS;
-            case ValueType::F64: return MIR_DEQ;
-            case ValueType::Bool:   return MIR_EQS;
-            default: assert(false && "Invalid Eq operand type");
-        }
-        case Opcode::Neq:  switch (type) {
-            case ValueType::I32:    return MIR_NES;
-            case ValueType::F64: return MIR_DNE;
-            case ValueType::Bool:   return MIR_NES;
-            default: assert(false && "Invalid Neq operand type");
-        }
-        case Opcode::Gt:  switch (type) {
-            case ValueType::I32:    return MIR_GTS;
-            case ValueType::F64: return MIR_DGT;
-            default: assert(false && "Invalid Gt operand type");
-        }
-        case Opcode::Gte:  switch (type) {
-            case ValueType::I32:    return MIR_GES;
-            case ValueType::F64: return MIR_DGE;
-            default: assert(false && "Invalid Gte operand type");
-        }
-        case Opcode::Lt:  switch (type) {
-            case ValueType::I32:    return MIR_LTS;
-            case ValueType::F64: return MIR_DLT;
-            default: assert(false && "Invalid Lt operand type");
-        }
-        case Opcode::Lte:  switch (type) {
-            case ValueType::I32:    return MIR_LES;
-            case ValueType::F64: return MIR_DLE;
-            default: assert(false && "Invalid Lte operand type");
-        }
-        default:
-            assert(false && "Invalid comparison operation");
-    }
-}
-
-MIR_insn_code_t chooseMove(ValueType type) {
+MIR_insn_code_t chooseSimpleMove(ValueType type) {
     switch (type) {
         case ValueType::I32:  case ValueType::Bool:  case ValueType::Object:
             return MIR_MOV;
         case ValueType::F64:
             return MIR_DMOV;
         default:
-            throw std::runtime_error("Set type not implemented");
+            assert(false && "Invalid simple move type");
     }
 }
 
-MIR_insn_code_t chooseConversion(ValueType from, ValueType to) {
-    if (from == to) {
-        return chooseMove(from);
-    }
-    switch (from) {
-        case ValueType::I32:
-            switch (to) {
-                case ValueType::F64:    return MIR_I2D;
-                case ValueType::Bool:
-                default: throw std::runtime_error("Conversion not implemented");
-            }
-        case ValueType::F64:
-            switch (to) {
-                case ValueType::I32:    return MIR_D2I;
-                default: throw std::runtime_error("Conversion not implemented");
-            }
-        case ValueType::Bool:
-            switch (to) {
-                case ValueType::I32:    return MIR_MOV;
-                case ValueType::F64:    return MIR_I2D;
-                default: throw std::runtime_error("Conversion not implemented");
-            }
+const char* chooseArithmeticBuiltin(Opcode op) {
+    switch (op) {
+        case Opcode::Add:  return "__add";
+        case Opcode::Sub:  return "__sub";
+        case Opcode::Mul:  return "__mul";
+        case Opcode::Div:  return "__div";
+        case Opcode::Rem:  return "__rem";
         default:
-            throw std::runtime_error("Conversion not implemented");
+            assert(false && "Invalid arithmetic operation");
     }
-}
-
-void generateCheckException(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t flagAddr, MIR_label_t exceptionLabel) {
-    auto flag = MIR_new_mem_op(ctx, MIR_T_I32, 0, flagAddr, 0, 0);
-    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_BNES, MIR_new_label_op(ctx, exceptionLabel), flag, MIR_new_int_op(ctx, 0)));
-}
-
-void generateCheckExceptionJSValue(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t valAddr, MIR_label_t exceptionLabel) {
-    auto tag = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), valAddr, 0, 0);
-    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, exceptionLabel), tag, MIR_new_int_op(ctx, JS_TAG_EXCEPTION)));
 }
 
 // if res is not void, the last arg is the return target
-void insertCall(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, std::string ident, std::vector<std::variant<MIR_reg_t, MIR_op_t>> ops, bool mayThrow) {
+void generateCall(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, std::string ident, std::vector<std::variant<MIR_reg_t, MIR_op_t>> ops, bool mayThrow) {
     auto func = builtins.fn(ident);
     auto args = func.args;
     auto res = func.ret;
@@ -132,7 +67,7 @@ void insertCall(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, std::stri
 
     bool retArg = hasRetArg(res);
     if ((args.size() + (res != ValueType::Void)) != ops.size()) {
-        throw std::runtime_error("Invalid number of arguments");
+        assert(false && "Invalid number of arguments");
     }
 
     auto getOp = [&ctx](auto op) {
@@ -142,13 +77,13 @@ void insertCall(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, std::stri
         if (auto v = std::get_if<MIR_op_t>(&op)) {
             return *v;
         }
-        throw std::runtime_error("Invalid argument type");
+        assert(false && "Invalid argument type");
     };
     auto getReg = [](auto op) {
         if (auto reg = std::get_if<MIR_reg_t>(&op)) {
             return *reg;
         }
-        throw std::runtime_error("Invalid argument type");
+        assert(false && "Invalid argument type");
     };
 
     std::vector<MIR_op_t> callArgs;
@@ -174,8 +109,19 @@ void insertCall(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, std::stri
     MIR_append_insn(ctx, fun, MIR_new_insn_arr(ctx, MIR_CALL, callArgs.size(), callArgs.data()));
 }
 
+
+void generateCheckException(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t flagAddr, MIR_label_t exceptionLabel) {
+    auto flag = MIR_new_mem_op(ctx, MIR_T_I32, 0, flagAddr, 0, 0);
+    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_BNES, MIR_new_label_op(ctx, exceptionLabel), flag, MIR_new_int_op(ctx, 0)));
+}
+
+void generateCheckExceptionJSValue(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t valAddr, MIR_label_t exceptionLabel) {
+    auto tag = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), valAddr, 0, 0);
+    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, exceptionLabel), tag, MIR_new_int_op(ctx, JS_TAG_EXCEPTION)));
+}
+
 void generateThrowError(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, const char* msg, ErrorType type) {
-    insertCall(ctx, fun, builtins, "__throwError", { MIR_new_int_op(ctx, reinterpret_cast<uint64_t>(msg)), MIR_new_int_op(ctx, static_cast<int32_t>(type)) }, true);  // NOLINT
+    generateCall(ctx, fun, builtins, "__throwError", { MIR_new_int_op(ctx, reinterpret_cast<uint64_t>(msg)), MIR_new_int_op(ctx, static_cast<int32_t>(type)) }, true);  // NOLINT
 }
 
 void generateConvertFromJSVal(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, MIR_reg_t srcAddr, MIR_reg_t dstReg, ValueType type, MIR_label_t invalidConversionLabel) {
@@ -195,14 +141,14 @@ void generateConvertFromJSVal(MIR_context_t ctx, MIR_item_t fun, Builtins& built
     insert(MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, same)));
 
     insert(same);
-    insert(MIR_new_insn(ctx, chooseMove(type), dstOp, srcL));
+    insert(MIR_new_insn(ctx, chooseSimpleMove(type), dstOp, srcL));
     insert(MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, end)));
 
     insert(different);
     switch (type) {
         case ValueType::Bool:    [[fallthrough]];
-        case ValueType::I32:     insertCall(ctx, fun, builtins, "__convertI32", { srcAddr, dstReg }, true);   break;
-        case ValueType::F64:     insertCall(ctx, fun, builtins, "__convertF64", { srcAddr, dstReg }, true);   break;
+        case ValueType::I32:     generateCall(ctx, fun, builtins, "__convertI32", { srcAddr, dstReg }, true);   break;
+        case ValueType::F64:     generateCall(ctx, fun, builtins, "__convertF64", { srcAddr, dstReg }, true);   break;
         case ValueType::Object:
             insert(MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, invalidConversionLabel)));
             break;
@@ -221,7 +167,7 @@ void generateConvertToJSVal(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t src, MI
     auto dstL = MIR_new_mem_op(ctx, getMIRRegType(type),   0, dstAddr, 0, 0);
     auto dstH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), dstAddr, 0, 0);
 
-    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, chooseMove(type), dstL, MIR_new_reg_op(ctx, src)));
+    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, chooseSimpleMove(type), dstL, MIR_new_reg_op(ctx, src)));
     MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_MOV, dstH, MIR_new_int_op(ctx, getJSTag(type))));
 }
 
@@ -242,8 +188,13 @@ struct CompileContext {
     MIR_label_t invalidConversionLabel;
 
     Builtins& builtins;
+    const std::map<std::string, std::pair<MIR_item_t, MIR_item_t>>& prototypes;
 
-    CompileContext(MIR_context_t ctx_, Builtins& builtins_): ctx(ctx_), builtins(builtins_) {}
+    CompileContext(MIR_context_t ctx_, Builtins& builtins_, const std::map<std::string, std::pair<MIR_item_t, MIR_item_t>>& prototypes_):
+        ctx(ctx_),
+        builtins(builtins_),
+        prototypes(prototypes_)
+    {}
 
     auto label(BasicBlockPtr block) {
         auto it = labels.find(block);
@@ -322,112 +273,535 @@ struct CompileContext {
     }
 };
 
-MIR_insn_code_t chooseSimpleArithmetic(Opcode op, ValueType type) {
-    switch (op) {
-        case Opcode::Add:  switch (type) {  // TODO: support strings
-            case ValueType::I32:    return MIR_ADDS;
-            case ValueType::F64: return MIR_DADD;
-            default: assert(false && "Invalid Add operand type");
-        }
-        case Opcode::Sub:  switch (type) {
-            case ValueType::I32:    return MIR_SUBS;
-            case ValueType::F64: return MIR_DSUB;
-            default: assert(false && "Invalid Sub operand type");
-        }
-        case Opcode::Mul:  switch (type) {
-            case ValueType::I32:    return MIR_MULS;
-            case ValueType::F64: return MIR_DMUL;
-            default: assert(false && "Invalid Mul operand type");
-        }
-        case Opcode::Div:  switch (type) {
-            case ValueType::I32:    return MIR_DIVS;
-            case ValueType::F64: return MIR_DDIV;
-            default: assert(false && "Invalid Div operand type");
-        }
-        case Opcode::Rem:  switch (type) {
-            case ValueType::I32:    return MIR_MODS;
-            case ValueType::F64: throw std::runtime_error("fmod is not supported");
-            default: assert(false && "Invalid Rem operand type");
-        }
-        case Opcode::UnMinus: switch (type) {
-            case ValueType::I32:    return MIR_NEGS;
-            case ValueType::F64: return MIR_DNEG;
-            default: assert(false && "Invalid UnMinus operand type");
-        }
-        default:
-            assert(false && "Invalid arithmetic operation");
-    }
-}
-
-const char* chooseArithmeticBuiltin(Opcode op) {
-    switch (op) {
-        case Opcode::Add:  return "__add";
-        case Opcode::Sub:  return "__sub";
-        case Opcode::Mul:  return "__mul";
-        case Opcode::Div:  return "__div";
-        case Opcode::Rem:  return "__rem";
-        default:
-            assert(false && "Invalid arithmetic operation");
-    }
-}
-
 void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
     assert(a.type == b.type && a.type == res.type);
     if (a.type == ValueType::Any) {
-        insertCall(cc.ctx, cc.fun, cc.builtins, chooseArithmeticBuiltin(op), { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) }, true);
+        generateCall(cc.ctx, cc.fun, cc.builtins, chooseArithmeticBuiltin(op), { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) }, true);
         cc.checkException();
+        return;
     }
-    else {
-        cc.insert(MIR_new_insn(cc.ctx, chooseSimpleArithmetic(op, a.type), cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
+
+    MIR_insn_code_t code;
+
+    switch (op) {
+        case Opcode::Add:  switch (a.type) {
+            case ValueType::I32:  code = MIR_ADDS; break;
+            case ValueType::F64:  code = MIR_DADD; break;
+            default: assert(false && "Invalid Add operand type");
+        } break;
+        case Opcode::Sub:  switch (a.type) {
+            case ValueType::I32:  code = MIR_SUBS; break;
+            case ValueType::F64:  code = MIR_DSUB; break;
+            default: assert(false && "Invalid Sub operand type");
+        } break;
+        case Opcode::Mul:  switch (a.type) {
+            case ValueType::I32:  code = MIR_MULS; break;
+            case ValueType::F64:  code = MIR_DMUL; break;
+            default: assert(false && "Invalid Mul operand type");
+        } break;
+        case Opcode::Div:  switch (a.type) {
+            case ValueType::I32:  code = MIR_DIVS; break;
+            case ValueType::F64:  code = MIR_DDIV; break;
+            default: assert(false && "Invalid Div operand type");
+        } break;
+        case Opcode::Rem:  switch (a.type) {
+            case ValueType::I32:  code = MIR_MODS; break;
+            case ValueType::F64:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__remF64", { cc.regOp(a.id), cc.regOp(b.id), cc.regOp(res.id) }, false);
+                return;
+            default: assert(false && "Invalid Rem operand type");
+        } break;
+        default:
+            assert(false && "Invalid arithmetic operation");
     }
+
+    cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
 }
 
 void generatePow(CompileContext& cc, Temp a, Temp b, Temp res) {
-    assert(a.type == b.type && a.type == res.type);
-    switch (a.type) {
-        case ValueType::F64:  insertCall(cc.ctx, cc.fun, cc.builtins, "__powF64", { cc.regs.at(a.id), cc.regs.at(b.id), cc.regs.at(res.id) }, false);  break;
-        default:
-            assert(false && "Invalid type for pow");
-    }
+    assert(a.type == ValueType::F64 && b.type == ValueType::F64 && res.type == ValueType::F64);
+    generateCall(cc.ctx, cc.fun, cc.builtins, "__powF64", { cc.regs.at(a.id), cc.regs.at(b.id), cc.regs.at(res.id) }, false);
 }
 
-MIR_insn_code_t chooseBitwise(Opcode op, ValueType type) {
-    assert(type == ValueType::I32);  // TODO: support doubles
+void generateBitwise(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
+    assert(a.type == ValueType::I32 && b.type == ValueType::I32 && res.type == ValueType::I32);
+
+    MIR_insn_code_t code;
     switch (op) {
-        case Opcode::LShift:   return MIR_LSHS;
-        case Opcode::RShift:   return MIR_RSHS;
-        case Opcode::URShift:  return MIR_URSHS;
-        case Opcode::BitAnd:   return MIR_ANDS;
-        case Opcode::BitOr:    return MIR_ORS;
-        case Opcode::BitXor:   return MIR_XORS;
+        case Opcode::LShift:   code = MIR_LSHS;   break;
+        case Opcode::RShift:   code = MIR_RSHS;   break;
+        case Opcode::URShift:  code = MIR_URSHS;  break;
+        case Opcode::BitAnd:   code = MIR_ANDS;   break;
+        case Opcode::BitOr:    code = MIR_ORS;    break;
+        case Opcode::BitXor:   code = MIR_XORS;   break;
         default:
             assert(false && "Invalid bitwise operation");
     }
+    cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
 }
 
-void createBoolConv(CompileContext cc, Temp a, Temp res, bool inverted) {
-    switch (a.type) {
-        case ValueType::I32:  case ValueType::Bool:
-            cc.insert(MIR_new_insn(cc.ctx, MIR_EQS,
-                cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, !inverted)));
-            break;
-        case ValueType::F64:
-            cc.insert(MIR_new_insn(cc.ctx, MIR_DNE,
-                cc.regOp(res.id), cc.regOp(a.id), MIR_new_double_op(cc.ctx, !inverted)));
-            break;
-        default:
-            throw std::runtime_error("BoolNot type not implemented");
+void generateRelational(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
+    assert(a.type == b.type && res.type == ValueType::Bool);
+
+    if (isNumeric(a.type)) {
+        MIR_insn_code_t code;
+        switch (op) {
+            case Opcode::Eq:  switch (a.type) {
+                case ValueType::I32:  [[fallthrough]];
+                case ValueType::Bool: code = MIR_EQS; break;
+                case ValueType::F64:  code = MIR_DEQ; break;
+                default: assert(false && "Invalid Eq operand type");
+            } break;
+            case Opcode::Neq:  switch (a.type) {
+                case ValueType::I32:  [[fallthrough]];
+                case ValueType::Bool: code = MIR_NES; break;
+                case ValueType::F64:  code = MIR_DNE; break;
+                default: assert(false && "Invalid Neq operand type");
+            } break;
+            case Opcode::Gt:  switch (a.type) {
+                case ValueType::I32:  [[fallthrough]];
+                case ValueType::Bool: code = MIR_GTS; break;
+                case ValueType::F64:  code = MIR_DGT; break;
+                default: assert(false && "Invalid Gt operand type");
+            } break;
+            case Opcode::Gte:  switch (a.type) {
+                case ValueType::I32:  [[fallthrough]];
+                case ValueType::Bool: code = MIR_GES; break;
+                case ValueType::F64:  code = MIR_DGE; break;
+                default: assert(false && "Invalid Gte operand type");
+            } break;
+            case Opcode::Lt:  switch (a.type) {
+                case ValueType::I32:  [[fallthrough]];
+                case ValueType::Bool: code = MIR_LTS; break;
+                case ValueType::F64:  code = MIR_DLT; break;
+                default: assert(false && "Invalid Lt operand type");
+            } break;
+            case Opcode::Lte:  switch (a.type) {
+                case ValueType::I32:  [[fallthrough]];
+                case ValueType::Bool: code = MIR_LES; break;
+                case ValueType::F64:  code = MIR_DLE; break;
+                default: assert(false && "Invalid Lte operand type");
+            } break;
+            default:
+                assert(false && "Invalid comparison operation");
+        }
+
+        cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
+    }
+    else if (a.type == ValueType::Any) {
+        throw std::runtime_error("Relational operation not implemented for Any");
+    }
+    else {
+        assert(false && "Invalid comparison operand type");
     }
 }
 
+void generateBoolConv(CompileContext cc, Temp a, Temp res, bool inverted) {
+    if (a.type == ValueType::Bool && !inverted) {
+        cc.insert(MIR_new_insn(cc.ctx, MIR_MOV, cc.regOp(res.id), cc.regOp(a.id)));
+        return;
+    }
+    if (a.type == ValueType::Any) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__boolConv", { cc.jsValAddr(a.id), cc.regOp(res.id) }, true);
+        cc.checkException();
+        return;
+    }
+    if (!inverted) {
+        switch (a.type) {
+            case ValueType::I32:  case ValueType::Bool:
+                cc.insert(MIR_new_insn(cc.ctx, MIR_NES, cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, 0)));
+                break;
+            case ValueType::F64:
+                cc.insert(MIR_new_insn(cc.ctx, MIR_DNE, cc.regOp(res.id), cc.regOp(a.id), MIR_new_double_op(cc.ctx, 0)));
+                break;
+            case ValueType::Object:  // Object is never null
+                cc.insert(MIR_new_insn(cc.ctx, MIR_NE, cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, 0)));
+                break;
+            default:
+                throw std::runtime_error("BoolNot type not implemented");
+        }
+    }
+    else {
+        switch (a.type) {
+            case ValueType::I32:  case ValueType::Bool:
+                cc.insert(MIR_new_insn(cc.ctx, MIR_EQS, cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, 0)));
+                break;
+            case ValueType::F64:
+                cc.insert(MIR_new_insn(cc.ctx, MIR_DEQ, cc.regOp(res.id), cc.regOp(a.id), MIR_new_double_op(cc.ctx, 0)));
+                break;
+            case ValueType::Object:  // Object is never null
+                cc.insert(MIR_new_insn(cc.ctx, MIR_EQ, cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, 0)));
+                break;
+            default:
+                throw std::runtime_error("BoolNot type not implemented");
+        }
+    }
+}
+
+void generateSet(CompileContext& cc, Temp a, Temp res) {
+    if (a.type == ValueType::Any && res.type == ValueType::Any) {
+        auto baseSrc = cc.jsValAddr(a.id);
+        auto baseDst = cc.jsValAddr(res.id);
+        cc.copyJSVal(baseSrc, baseDst);
+        return;
+    }
+    if (a.type == ValueType::Any) {
+        cc.fromJSVal(cc.jsValAddr(a.id), res);
+        return;
+    }
+    if (res.type == ValueType::Any) {
+        cc.toJSVal(a, cc.jsValAddr(res.id));
+        return;
+    }
+    if (res.type == ValueType::Bool) {
+        generateBoolConv(cc, a, res, false);
+        return;
+    }
+
+    // reg -> reg copy
+    MIR_insn_code_t code;
+    if (a.type == res.type) {
+        code = chooseSimpleMove(a.type);
+    }
+    else {
+        switch (a.type) {
+            case ValueType::I32:
+                switch (res.type) {
+                    case ValueType::F64:  code = MIR_I2D;  break;
+                    default: throw std::runtime_error("Conversion not implemented");
+                } break;
+            case ValueType::F64:
+                switch (res.type) {
+                    case ValueType::I32:  code = MIR_D2I;  break;
+                    default: throw std::runtime_error("Conversion not implemented");
+                } break;
+            case ValueType::Bool:
+                switch (res.type) {
+                    case ValueType::I32:  code = MIR_MOV;  break;
+                    case ValueType::F64:  code = MIR_I2D;  break;
+                    default: throw std::runtime_error("Conversion not implemented");
+                } break;
+            default:
+                throw std::runtime_error("Conversion not implemented");
+        }
+    }
+    cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id)));
+}
+
+void generateGetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
+    assert(res.type == ValueType::Any);
+    if (a.type == ValueType::Object && b.type == ValueType::StringConst) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberObjCStr", { cc.regs.at(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
+        cc.checkException();
+    }
+    else if (a.type == ValueType::Object && b.type == ValueType::I32) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberObjI32", { cc.regs.at(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
+        cc.checkException();
+    }
+    else {
+        throw std::runtime_error("Unsupported GetMember operands");
+    }
+}
+
+void generateSetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
+    MIR_reg_t srcAddr;
+    std::optional<MIR_reg_t> startBlock;
+    if (b.type == ValueType::Any) {
+        srcAddr = cc.jsValAddr(b.id);
+    }
+    else {
+        srcAddr = cc.scratch("_addr", MIR_T_I64);
+        startBlock = cc.scratch("_bstart", MIR_T_I64);
+        cc.insert(MIR_new_insn(cc.ctx, MIR_BSTART, MIR_new_reg_op(cc.ctx, *startBlock)));
+        cc.insert(MIR_new_insn(cc.ctx, MIR_ALLOCA,
+            MIR_new_reg_op(cc.ctx, srcAddr),
+            MIR_new_int_op(cc.ctx, sizeof(JSValue)))
+        );
+        cc.toJSVal(b, srcAddr);
+    }
+    if (a.type == ValueType::StringConst && res.type == ValueType::Object) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberObjCStr", { cc.regs.at(res.id), cc.regs.at(a.id), srcAddr }, true);
+        cc.checkException();
+    }
+    else if (a.type == ValueType::I32 && res.type == ValueType::Object) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberObjI32", { cc.regs.at(res.id), cc.regs.at(a.id), srcAddr }, true);
+        cc.checkException();
+    }
+    else {
+        throw std::runtime_error("Unsupported SetMember operands");
+    }
+
+    if (startBlock) {
+        cc.insert(MIR_new_insn(cc.ctx, MIR_BEND, MIR_new_reg_op(cc.ctx, *startBlock)));
+    }
+}
+
+void generateBitNot(CompileContext& cc, Temp a, Temp res) {
+    assert(a.type == ValueType::I32 && res.type == ValueType::I32);
+    cc.insert(MIR_new_insn(cc.ctx, MIR_XORS, cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, -1)));
+}
+
+void generateUnMinus(CompileContext& cc, Temp a, Temp res) {
+    assert(a.type == res.type);
+
+    if (!isNumeric(a.type)) {
+        throw std::runtime_error("Unsupported UnMinus operand");
+    }
+
+    MIR_insn_code_t code;
+    switch (a.type) {
+        case ValueType::I32:   [[fallthrough]];
+        case ValueType::Bool:  code = MIR_NEGS; break;
+        case ValueType::F64:   code = MIR_DNEG; break;
+        default: assert(false && "Invalid UnMinus operand type");
+    }
+    cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id)));
+}
+
+void generateDup(CompileContext& cc, Temp a) {
+    if (a.type == ValueType::Any) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__dupVal", { cc.jsValAddr(a.id) }, false);
+    }
+    else if (a.type == ValueType::Object) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__dupObj", { cc.regs.at(a.id) }, false);
+    }
+    else {
+        assert((isNumeric(a.type) || a.type == ValueType::StringConst) && "Invalid Dup operand type");
+    }
+}
+
+void generatePushFree(CompileContext& cc, Temp a) {
+    if (a.type == ValueType::Any) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__pushFreeVal", { cc.jsValAddr(a.id) }, false);
+    }
+    else if (a.type == ValueType::Object) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__pushFreeObj", { cc.regs.at(a.id) }, false);
+    }
+    else {
+        assert((isNumeric(a.type) || a.type == ValueType::StringConst) && "Invalid PushFree operand type");
+    }
+}
 
 bool isRegType(ValueType type) {
     return type != ValueType::Any && type != ValueType::Void;
 }
 
 
+void generateInstruction(CompileContext& cc, Operation& insn) {
+    if (isRegType(insn.res.type)) {
+        cc.reg(insn.res.id, insn.res.type);
+    }
+    switch (insn.op) {
+        // Binary
+        case Opcode::Add:  case Opcode::Sub:  case Opcode::Mul:
+        case Opcode::Div:  case Opcode::Rem:
+            generateArithmetic(cc, insn.op, insn.a, insn.b, insn.res);
+            break;
+        case Opcode::Pow:
+            generatePow(cc, insn.a, insn.b, insn.res);
+            break;
+        case Opcode::LShift:  case Opcode::RShift:  case Opcode::URShift:
+        case Opcode::BitAnd:  case Opcode::BitOr:   case Opcode::BitXor:
+            generateBitwise(cc, insn.op, insn.a, insn.b, insn.res);
+            break;
+        case Opcode::Eq:  case Opcode::Neq:
+        case Opcode::Gt:  case Opcode::Gte:
+        case Opcode::Lt:  case Opcode::Lte:
+            generateRelational(cc, insn.op, insn.a, insn.b, insn.res);
+            break;
+        case Opcode::GetMember:
+            generateGetMember(cc, insn.a, insn.b, insn.res);
+            break;
+        case Opcode::SetMember:
+            generateSetMember(cc, insn.a, insn.b, insn.res);
+            break;
+        // Unary
+        case Opcode::Set:
+            generateSet(cc, insn.a, insn.res);
+            break;
+        case Opcode::BoolNot:
+            generateBoolConv(cc, insn.a, insn.res, true);
+            break;
+        case Opcode::BitNot:
+            generateBitNot(cc, insn.a, insn.res);
+            break;
+        case Opcode::UnPlus:
+            assert(isNumeric(insn.res.type));
+            generateSet(cc, insn.a, insn.res);
+            break;
+        case Opcode::UnMinus:
+            generateUnMinus(cc, insn.a, insn.res);
+            break;
+        case Opcode::Dup:
+            generateDup(cc, insn.a);
+            break;
+        case Opcode::PushFree:
+            generatePushFree(cc, insn.a);
+            break;
+        default:
+            assert(false && "Invalid operation");
+    }
+}
+
+void generateInstruction(CompileContext& cc, ConstInit& init) {
+    auto reg = MIR_new_reg_op(cc.ctx, cc.reg(init.id, init.type()));
+    std::visit([&](auto val) {
+        if constexpr (std::is_same_v<std::decay_t<decltype(val)>, int32_t>) {
+            auto vOp = MIR_new_int_op(cc.ctx, val);
+            cc.insert(MIR_new_insn(cc.ctx, MIR_MOV, reg, vOp));
+        }
+        else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, double>) {
+            auto vOp = MIR_new_double_op(cc.ctx, val);
+            cc.insert(MIR_new_insn(cc.ctx, MIR_DMOV, reg, vOp));
+        }
+        else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, bool>) {
+            auto vOp = MIR_new_int_op(cc.ctx, val);
+            cc.insert(MIR_new_insn(cc.ctx, MIR_MOV, reg, vOp));
+        }
+        else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, std::string>) {
+            auto strDup = std::make_unique<char[]>(val.size() + 1);
+            std::copy(val.begin(), val.end(), strDup.get());
+            strDup[val.size()] = '\0';
+            auto vOp = MIR_new_int_op(cc.ctx, reinterpret_cast<uint64_t>(strDup.get()));  // NOLINT
+            cc.insert(MIR_new_insn(cc.ctx, MIR_MOV, reg, vOp));
+            cc.builtins.rtCtx->stringConsts.emplace_back(std::move(strDup));
+        }
+    }, init.value);
+}
+
+void generateInstruction(CompileContext& cc, Call& call) {
+    std::vector<MIR_op_t> args;
+    if (call.isNative()) {
+        if (call.res.type != ValueType::Void && call.res.type != ValueType::Any) {
+            cc.reg(call.res.id, call.res.type);
+        }
+        auto [proto, forward] = cc.prototypes.at(std::get<Identifier>(call.obj));
+        args.push_back(MIR_new_ref_op(cc.ctx, proto));
+        args.push_back(MIR_new_ref_op(cc.ctx, forward));
+        if (call.res.type != ValueType::Void && call.res.type != ValueType::Any) {
+            args.push_back(cc.regOp(call.res.id));
+        }
+        for (auto& arg : call.args) {
+            auto [type, size] = getMIRArgType(arg.type);
+            if (MIR_blk_type_p(type)) {
+                args.push_back(MIR_new_mem_op(cc.ctx, type, size, cc.jsValAddr(arg.id), 0, 0));
+            }
+            else {
+                args.push_back(cc.regOp(arg.id));
+        }
+        }
+        if (call.res.type == ValueType::Any) {
+            args.push_back(MIR_new_reg_op(cc.ctx, cc.jsValAddr(call.res.id)));
+        }
+        cc.insert(MIR_new_insn_arr(cc.ctx, MIR_CALL, args.size(), args.data()));
+        cc.checkException();
+    }
+    else {
+        assert(!call.args.empty());
+
+        auto startBlock = cc.scratch("_bstart", MIR_T_I64);
+        cc.insert(MIR_new_insn(cc.ctx, MIR_BSTART, MIR_new_reg_op(cc.ctx, startBlock)));
+
+        auto argsStart = cc.scratch("_args", MIR_T_I64);
+        auto argCount = cc.scratch("_argCount", MIR_T_I64);
+        cc.insert(MIR_new_insn(cc.ctx, MIR_MOV, MIR_new_reg_op(cc.ctx, argCount), MIR_new_int_op(cc.ctx, call.args.size() - 1)));
+        cc.insert(MIR_new_insn(cc.ctx, MIR_ALLOCA,
+            MIR_new_reg_op(cc.ctx, argsStart),
+            MIR_new_int_op(cc.ctx, sizeof(JSValue) * std::max(call.args.size() - 1, static_cast<size_t>(1))))
+        );
+        for (size_t i = 1; i < call.args.size(); ++i) {
+            auto arg = call.args[i];
+            auto addr = cc.calcOff(argsStart, i - 1, sizeof(JSValue));
+            cc.toJSVal(arg, addr);
+        }
+
+        auto funObj = std::get<Temp>(call.obj);
+        auto thisArg = call.args[0];
+        if (funObj.type == ValueType::Any) {
+            auto funReg = cc.jsValAddr(funObj.id);
+            if (thisArg.type == ValueType::Any) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
+            }
+            else if (thisArg.type == ValueType::Object) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
+            }
+            else if (thisArg.type == ValueType::Void) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyUndefined", { funReg, argCount, argsStart }, true);
+            }
+            else {
+                assert(false && "Invalid call operand type");
+            }
+        }
+        else if (funObj.type == ValueType::Object) {
+            auto funReg = cc.regs.at(funObj.id);
+            if (thisArg.type == ValueType::Any) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
+            }
+            else if (thisArg.type == ValueType::Object) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
+            }
+            else if (thisArg.type == ValueType::Void) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjUndefined", { funReg, argCount, argsStart }, true);
+            }
+            else {
+                assert(false && "Invalid call operand type");
+            }
+        }
+        else {
+            assert(false && "Invalid call operand type");
+        }
+
+        cc.copyJSVal(argsStart, cc.jsValAddr(call.res.id));
+
+        cc.insert(MIR_new_insn(cc.ctx, MIR_BEND, MIR_new_reg_op(cc.ctx, startBlock)));
+        cc.checkExceptionJSValue(cc.jsValAddr(call.res.id));
+    }
+}
+
+void generateTerminator(CompileContext& cc, Terminal& jump, Function& cfg) {
+    switch (jump.type) {
+        case Terminal::None:
+            assert(false && "Invalid terminator");
+        case Terminal::Branch: {
+            auto cond = jump.value;
+            assert(cond->type == ValueType::Bool);
+            cc.insert(MIR_new_insn(cc.ctx, MIR_BTS, cc.labelOp(jump.target), cc.regOp(cond->id)));
+            cc.insert(MIR_new_insn(cc.ctx, MIR_JMP, cc.labelOp(jump.other)));
+        } break;
+        case Terminal::Jump: {
+            cc.insert(MIR_new_insn(cc.ctx, MIR_JMP, cc.labelOp(jump.target)));
+        } break;
+        case Terminal::Return:
+            generateCall(cc.ctx, cc.fun, cc.builtins, "__exitStackFrame", {}, false);
+            cc.insert(MIR_new_ret_insn(cc.ctx, 0));
+            break;
+        case Terminal::ReturnValue:
+            generateCall(cc.ctx, cc.fun, cc.builtins, "__exitStackFrame", {}, false);
+            if (hasRetArg(cfg.ret)) {
+                auto res = jump.value;
+                assert(res->type == cfg.ret);
+                auto addr = cc.jsValAddr(res->id);
+                auto resReg = MIR_reg(cc.ctx, "res", cc.func);
+                cc.copyJSVal(addr, resReg);
+                cc.insert(MIR_new_ret_insn(cc.ctx, 0));
+            }
+            else {
+                cc.insert(MIR_new_ret_insn(cc.ctx, 1, cc.regOp(jump.value->id)));
+            }
+            break;
+        case Terminal::Throw:
+            assert(jump.value->type == ValueType::Any);
+            generateCall(cc.ctx, cc.fun, cc.builtins, "__throwVal", { cc.jsValAddr(jump.value->id) }, true);
+            cc.checkException();
+            break;
+        default:
+            std::cout << "Jump type not implemented: " << static_cast<int>(jump.type) << std::endl;
+    }
+}
+
+
 MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_item_t, MIR_item_t>>& prototypes, Function& cfg, Builtins& builtins) {
-    CompileContext cc(ctx, builtins);
+    CompileContext cc(ctx, builtins, prototypes);
     cc.stackSlots = allocateStackSlots(cfg);
 
     {
@@ -462,305 +836,16 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
     cc.allocaPtr = MIR_new_func_reg(ctx, cc.func, MIR_T_I64, "allocaPtr");
     MIR_append_insn(ctx, cc.fun, MIR_new_insn(ctx, MIR_ALLOCA, MIR_new_reg_op(ctx, cc.allocaPtr), MIR_new_int_op(ctx, sizeof(JSValue) * cc.stackSlots.size())));
 
-    insertCall(ctx, cc.fun, builtins, "__enterStackFrame", {}, false);
-
-    auto regOp = [&cc](TmpId id) {
-        return cc.regOp(id);
-    };
+    generateCall(ctx, cc.fun, builtins, "__enterStackFrame", {}, false);
 
     for (auto& block : cfg.blocks) {
         MIR_append_insn(ctx, cc.fun, cc.label(block.get()));
 
         for (auto statement : block->statements) {
-            if (auto op = std::get_if<Operation>(&statement.op)) {
-                if (isRegType(op->res.type)) {
-                    cc.reg(op->res.id, op->res.type);
-                }
-                switch (op->op) {
-                    // Binary
-                    case Opcode::Add:  case Opcode::Sub:  case Opcode::Mul:
-                    case Opcode::Div:  case Opcode::Rem:
-                        generateArithmetic(cc, op->op, op->a, op->b, op->res);
-                        break;
-                    case Opcode::Pow:
-                        generatePow(cc, op->a, op->b, op->res);
-                        break;
-                    case Opcode::LShift:  case Opcode::RShift:  case Opcode::URShift:
-                    case Opcode::BitAnd:  case Opcode::BitOr:   case Opcode::BitXor:
-                        assert(isIntegral(op->b.type) && op->res.type == op->a.type);
-                        cc.insert(MIR_new_insn(ctx, chooseBitwise(op->op, op->a.type),
-                            regOp(op->res.id), regOp(op->a.id), regOp(op->b.id)));
-                        break;
-                    case Opcode::Eq:  case Opcode::Neq:
-                    case Opcode::Gt:  case Opcode::Gte:
-                    case Opcode::Lt:  case Opcode::Lte:
-                        assert(op->a.type == op->b.type && op->res.type == ValueType::Bool);
-                        cc.insert(MIR_new_insn(ctx, chooseComparison(op->op, op->a.type),
-                            regOp(op->res.id), regOp(op->a.id), regOp(op->b.id)));
-                        break;
-                    case Opcode::GetMember:
-                        assert(op->res.type == ValueType::Any);
-                        if (op->a.type == ValueType::Object && op->b.type == ValueType::StringConst) {
-                            insertCall(ctx, cc.fun, builtins, "__getMemberObjCStr", { cc.regs.at(op->a.id), cc.regs.at(op->b.id), cc.jsValAddr(op->res.id) }, true);
-                            cc.checkException();
-                        }
-                        else if (op->a.type == ValueType::Object && op->b.type == ValueType::I32) {
-                            insertCall(ctx, cc.fun, builtins, "__getMemberObjI32", { cc.regs.at(op->a.id), cc.regs.at(op->b.id), cc.jsValAddr(op->res.id) }, true);
-                            cc.checkException();
-                        }
-                        else {
-                            throw std::runtime_error("GetMember is not fully supported");
-                        }
-                        break;
-                    case Opcode::SetMember: {
-                        MIR_reg_t srcAddr;
-                        std::optional<MIR_reg_t> startBlock;
-                        if (op->b.type == ValueType::Any) {
-                            srcAddr = cc.jsValAddr(op->b.id);
-                        }
-                        else {
-                            srcAddr = cc.scratch("_addr", MIR_T_I64);
-                            startBlock = cc.scratch("_bstart", MIR_T_I64);
-                            cc.insert(MIR_new_insn(ctx, MIR_BSTART, MIR_new_reg_op(ctx, *startBlock)));
-                            cc.insert(MIR_new_insn(ctx, MIR_ALLOCA,
-                                MIR_new_reg_op(ctx, srcAddr),
-                                MIR_new_int_op(ctx, sizeof(JSValue)))
-                            );
-                            cc.toJSVal(op->b, srcAddr);
-                        }
-                        if (op->a.type == ValueType::StringConst && op->res.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__setMemberObjCStr", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), srcAddr }, true);
-                            cc.checkException();
-                        }
-                        else if (op->a.type == ValueType::I32 && op->res.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__setMemberObjI32", { cc.regs.at(op->res.id), cc.regs.at(op->a.id), srcAddr }, true);
-                            cc.checkException();
-                        }
-                        else {
-                            throw std::runtime_error("SetMember is not fully supported");
-                        }
-
-                        if (startBlock) {
-                            cc.insert(MIR_new_insn(ctx, MIR_BEND, MIR_new_reg_op(ctx, *startBlock)));
-                        }
-                    } break;
-                    // Unary
-                    case Opcode::Set: {
-                        if (op->a.type == ValueType::Any && op->res.type == ValueType::Any) {
-                            auto baseSrc = cc.jsValAddr(op->a.id);
-                            auto baseDst = cc.jsValAddr(op->res.id);
-                            cc.copyJSVal(baseSrc, baseDst);
-                            break;
-                        }
-                        else if (op->a.type == ValueType::Any) {
-                            cc.fromJSVal(cc.jsValAddr(op->a.id), op->res);
-                            break;
-                        }
-                        else if (op->res.type == ValueType::Any) {
-                            cc.toJSVal(op->a, cc.jsValAddr(op->res.id));
-                            break;
-                        }
-                        else if (op->res.type == ValueType::Bool) {
-                            createBoolConv(cc, op->a, op->res, false);
-                            break;
-                        }
-                        cc.insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
-                    } break;
-                    case Opcode::UnPlus:
-                        cc.insert(MIR_new_insn(ctx, chooseConversion(op->a.type, op->res.type), regOp(op->res.id), regOp(op->a.id)));
-                        break;
-                    case Opcode::BoolNot:
-                        createBoolConv(cc, op->a, op->res, true);
-                        break;
-                    case Opcode::BitNot: {
-                        assert(op->a.type == op->res.type && op->a.type == ValueType::I32);
-                        cc.insert(MIR_new_insn(ctx, MIR_XORS,
-                            regOp(op->res.id), regOp(op->a.id), MIR_new_int_op(ctx, -1)));
-                    } break;
-                    case Opcode::UnMinus: {
-                        assert(op->a.type == op->res.type);
-                        cc.insert(MIR_new_insn(ctx, chooseSimpleArithmetic(op->op, op->a.type),
-                            regOp(op->res.id), regOp(op->a.id)));
-                    } break;
-                    case Opcode::Dup:
-                        if (op->a.type == ValueType::Any) {
-                            insertCall(ctx, cc.fun, builtins, "__dupVal", { cc.jsValAddr(op->a.id) }, false);
-                        }
-                        else if (op->a.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__dupObj", { cc.regs.at(op->a.id) }, false);
-                        }
-                        else if (!isNumeric(op->a.type)) {
-                            throw std::runtime_error("Dup is not fully supported");
-                        }
-                        break;
-                    case Opcode::PushFree:
-                        if (op->a.type == ValueType::Any) {
-                            insertCall(ctx, cc.fun, builtins, "__pushFreeVal", { cc.jsValAddr(op->a.id) }, false);
-                        }
-                        else if (op->a.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__pushFreeObj", { cc.regs.at(op->a.id) }, false);
-                        }
-                        else if (!isNumeric(op->a.type) && op->a.type != ValueType::StringConst) {
-                            throw std::runtime_error("PushFree is not fully supported");
-                        }
-                        break;
-                    default:
-                        std::cout << "Opcode not implemented: " << static_cast<int>(op->op) << std::endl;
-                }
-            }
-            else if (auto init = std::get_if<ConstInit>(&statement.op)) {
-                auto reg = MIR_new_reg_op(ctx, cc.reg(init->id, init->type()));
-                std::visit([&](auto val) {
-                    if constexpr (std::is_same_v<std::decay_t<decltype(val)>, int32_t>) {
-                        auto vOp = MIR_new_int_op(ctx, val);
-                        cc.insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
-                    }
-                    else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, double>) {
-                        auto vOp = MIR_new_double_op(ctx, val);
-                        cc.insert(MIR_new_insn(ctx, MIR_DMOV, reg, vOp));
-                    }
-                    else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, bool>) {
-                        auto vOp = MIR_new_int_op(ctx, val);
-                        cc.insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
-                    }
-                    else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, std::string>) {
-                        auto strDup = std::make_unique<char[]>(val.size() + 1);
-                        std::copy(val.begin(), val.end(), strDup.get());
-                        strDup[val.size()] = '\0';
-                        auto vOp = MIR_new_int_op(ctx, reinterpret_cast<uint64_t>(strDup.get()));  // NOLINT
-                        cc.insert(MIR_new_insn(ctx, MIR_MOV, reg, vOp));
-                        builtins.rtCtx->stringConsts.emplace_back(std::move(strDup));
-                    }
-                }, init->value);
-            }
-            else if (auto call = std::get_if<Call>(&statement.op)) {
-                std::vector<MIR_op_t> args;
-                if (call->isNative()) {
-                    if (call->res.type != ValueType::Void && call->res.type != ValueType::Any) {
-                        cc.reg(call->res.id, call->res.type);
-                    }
-                    auto [proto, forward] = prototypes.at(std::get<Identifier>(call->obj));
-                    args.push_back(MIR_new_ref_op(ctx, proto));
-                    args.push_back(MIR_new_ref_op(ctx, forward));
-                    if (call->res.type != ValueType::Void && call->res.type != ValueType::Any) {
-                        args.push_back(regOp(call->res.id));
-                    }
-                    for (auto& arg : call->args) {
-                        auto [type, size] = getMIRArgType(arg.type);
-                        if (MIR_blk_type_p(type)) {
-                            args.push_back(MIR_new_mem_op(ctx, type, size, cc.jsValAddr(arg.id), 0, 0));
-                        }
-                        else {
-                            args.push_back(regOp(arg.id));
-                    }
-                    }
-                    if (call->res.type == ValueType::Any) {
-                        args.push_back(MIR_new_reg_op(ctx, cc.jsValAddr(call->res.id)));
-                    }
-                    cc.insert(MIR_new_insn_arr(ctx, MIR_CALL, args.size(), args.data()));
-                    cc.checkException();
-                }
-                else {
-                    assert(!call->args.empty());
-
-                    auto startBlock = cc.scratch("_bstart", MIR_T_I64);
-                    cc.insert(MIR_new_insn(ctx, MIR_BSTART, MIR_new_reg_op(ctx, startBlock)));
-
-                    auto argsStart = cc.scratch("_args", MIR_T_I64);
-                    auto argCount = cc.scratch("_argCount", MIR_T_I64);
-                    cc.insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, argCount), MIR_new_int_op(ctx, call->args.size() - 1)));
-                    cc.insert(MIR_new_insn(ctx, MIR_ALLOCA,
-                        MIR_new_reg_op(ctx, argsStart),
-                        MIR_new_int_op(ctx, sizeof(JSValue) * std::max(call->args.size() - 1, static_cast<size_t>(1))))
-                    );
-                    for (size_t i = 1; i < call->args.size(); ++i) {
-                        auto arg = call->args[i];
-                        auto addr = cc.calcOff(argsStart, i - 1, sizeof(JSValue));
-                        cc.toJSVal(arg, addr);
-                    }
-
-                    auto funObj = std::get<Temp>(call->obj);
-                    auto thisArg = call->args[0];
-                    if (funObj.type == ValueType::Any) {
-                        auto funReg = cc.jsValAddr(funObj.id);
-                        if (thisArg.type == ValueType::Any) {
-                            insertCall(ctx, cc.fun, builtins, "__callAnyAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
-                        }
-                        else if (thisArg.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__callAnyObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
-                        }
-                        else if (thisArg.type == ValueType::Void) {
-                            insertCall(ctx, cc.fun, builtins, "__callAnyUndefined", { funReg, argCount, argsStart }, true);
-                        }
-                        else {
-                            throw std::runtime_error("Invalid call operand type");
-                        }
-                    }
-                    else if (funObj.type == ValueType::Object) {
-                        auto funReg = cc.regs.at(funObj.id);
-                        if (thisArg.type == ValueType::Any) {
-                            insertCall(ctx, cc.fun, builtins, "__callObjAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
-                        }
-                        else if (thisArg.type == ValueType::Object) {
-                            insertCall(ctx, cc.fun, builtins, "__callObjObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
-                        }
-                        else if (thisArg.type == ValueType::Void) {
-                            insertCall(ctx, cc.fun, builtins, "__callObjUndefined", { funReg, argCount, argsStart }, true);
-                        }
-                        else {
-                            throw std::runtime_error("Invalid call operand type");
-                        }
-                    }
-                    else {
-                        throw std::runtime_error("Invalid call operand type");
-                    }
-
-                    cc.copyJSVal(argsStart, cc.jsValAddr(call->res.id));
-
-                    cc.insert(MIR_new_insn(ctx, MIR_BEND, MIR_new_reg_op(ctx, startBlock)));
-                    cc.checkExceptionJSValue(cc.jsValAddr(call->res.id));
-                }
-            }
+            std::visit([&](auto&& arg) { generateInstruction(cc, arg); }, statement.op);
         }
 
-        switch (block->jump.type) {
-            case Terminal::None:
-                throw std::runtime_error("Invalid jump");
-            case Terminal::Branch: {
-                auto cond = block->jump.value;
-                assert(cond->type == ValueType::Bool);
-                cc.insert(MIR_new_insn(ctx, MIR_BTS, cc.labelOp(block->jump.target), regOp(cond->id)));
-                cc.insert(MIR_new_insn(ctx, MIR_JMP, cc.labelOp(block->jump.other)));
-            } break;
-            case Terminal::Jump: {
-                cc.insert(MIR_new_insn(ctx, MIR_JMP, cc.labelOp(block->jump.target)));
-            } break;
-            case Terminal::Return:
-                insertCall(ctx, cc.fun, builtins, "__exitStackFrame", {}, false);
-                cc.insert(MIR_new_ret_insn(ctx, 0));
-                break;
-            case Terminal::ReturnValue:
-                insertCall(ctx, cc.fun, builtins, "__exitStackFrame", {}, false);
-                if (hasRetArg(cfg.ret)) {
-                    auto res = block->jump.value;
-                    assert(res->type == cfg.ret);
-                    auto addr = cc.jsValAddr(res->id);
-                    auto resReg = MIR_reg(ctx, "res", cc.func);
-                    cc.copyJSVal(addr, resReg);
-                    cc.insert(MIR_new_ret_insn(ctx, 0));
-                }
-                else {
-                    cc.insert(MIR_new_ret_insn(ctx, 1, regOp(block->jump.value->id)));
-                }
-                break;
-            case Terminal::Throw:
-                assert(block->jump.value->type == ValueType::Any);
-                insertCall(ctx, cc.fun, builtins, "__throwVal", { cc.jsValAddr(block->jump.value->id) }, true);
-                cc.checkException();
-                break;
-            default:
-                std::cout << "Jump type not implemented: " << static_cast<int>(block->jump.type) << std::endl;
-        }
+        generateTerminator(cc, block->jump, cfg);
     }
 
     cc.insert(cc.invalidConversionLabel);
@@ -769,7 +854,7 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
     cc.insert(cc.exceptionLabel);
     auto flagOp = MIR_new_mem_op(ctx, MIR_T_I32, 0, cc.exceptionFlagAddr, 0, 0);
     cc.insert(MIR_new_insn(ctx, MIR_MOV, flagOp, MIR_new_int_op(ctx, 1)));
-    insertCall(ctx, cc.fun, builtins, "__exitStackFrame", {}, false);
+    generateCall(ctx, cc.fun, builtins, "__exitStackFrame", {}, false);
     switch (cfg.ret) {
         case ValueType::Void:
         case ValueType::Any:

@@ -227,7 +227,6 @@ namespace detail {  // FIXME: check conversions
 
 
 inline ValueType resultType(Opcode op, ValueType a, ValueType b) {
-    // FIXME: completely wrong
     return detail::opResults.at(op)(a, b);
 }
 

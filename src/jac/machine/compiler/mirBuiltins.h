@@ -480,6 +480,23 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    addNativeFunction(ctx, builtins, "__remF64", { ValueType::F64, ValueType::F64 }, ValueType::F64, false,
+        +[](RuntimeContext* ctx_, double a, double b) -> double {
+            return std::fmod(a, b);
+        }
+    );
+
+    addNativeFunction(ctx, builtins, "__boolConv", { ValueType::Any }, ValueType::Bool, true,
+        +[](RuntimeContext* ctx_, JSValue a) -> int32_t {
+            int res = JS_ToBool(ctx_->ctx, a);
+            if (res < 0) {
+                ctx_->exceptionFlag = 1;
+                return 0;
+            }
+            return res;
+        }
+    );
+
     return builtins;
 }
 
