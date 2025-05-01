@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -181,15 +182,13 @@ inline bool hasRetArg(ValueType ret) {
 
 
 // output arguments to prevent relocation of the strings
-inline void getArgs(std::vector<ValueType> args, ValueType res, std::vector<std::string>& argNamesOut, std::vector<MIR_var_t>& argsOut) {
+inline void getArgs(const auto& args, ValueType res, std::vector<std::string>& argNamesOut, std::vector<MIR_var_t>& argsOut) {
     bool retArg = hasRetArg(res);
 
     argNamesOut.reserve(args.size() + retArg);
     argsOut.reserve(argsOut.size() + args.size() + retArg);
-    int i = 0;
-    for (const auto& arg : args) {
-        argNamesOut.emplace_back("_" + std::to_string(i));
-        i++;
+    for (const auto& [arg, name] : args) {
+        argNamesOut.emplace_back(name);
         auto [type, size] = getMIRArgType(arg);
         MIR_var_t var = {
             .type = type,
@@ -200,10 +199,9 @@ inline void getArgs(std::vector<ValueType> args, ValueType res, std::vector<std:
     }
 
     if (retArg) {
-        argNamesOut.emplace_back("res");
         MIR_var_t var = {
             .type = MIR_T_P,
-            .name = argNamesOut.back().c_str()
+            .name = "res"
         };
         argsOut.emplace_back(var);
     }
@@ -263,7 +261,10 @@ inline MIR_item_t getProto(MIR_context_t ctx, Builtins& builtins, std::vector<Va
 
     std::vector<std::string> argNames;
     std::vector<MIR_var_t> mirArgs{ { .type = MIR_T_P, .name = "rtCtx" }};
-    getArgs(args, res, argNames, mirArgs);
+    getArgs(std::views::transform(
+        std::views::iota(static_cast<size_t>(0), args.size()),
+        [&](auto i) { return std::pair{ args[i], "arg" + std::to_string(i) }; }
+    ), res, argNames, mirArgs);
 
     std::string name = "_proto_" + sgn;
 
