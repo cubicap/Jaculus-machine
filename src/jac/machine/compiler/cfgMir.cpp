@@ -907,8 +907,6 @@ MIR_item_t compileCaller(MIR_context_t ctx, Builtins& builtins, Function& cfg, M
     insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, VAL_DISP, resReg, 0, 0), MIR_new_int_op(ctx, 0)));
     insert(MIR_new_ret_insn(ctx, 0));
 
-    MIR_output(ctx, stdout);
-
     return caller;
 }
 
