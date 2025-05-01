@@ -1206,3 +1206,44 @@ TEST_CASE("Operators", "[aot]") {
         });
     }
 }
+
+
+TEST_CASE("Exceptions", "[aot]") {
+    using Machine = jac::ComposeMachine<
+        jac::MachineBase,
+        jac::AotEvalFeature,
+        TestReportFeature
+    >;
+
+    Machine machine;
+
+    SECTION("Pass") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(x: any): void {
+                x();
+            }
+
+            function throws(): void {
+                throw new Error("test");
+            }
+
+            fun(throws);
+        )");
+
+        evalCodeThrows(machine, code, "test", jac::EvalFlags::Global);
+    }
+
+    SECTION("Invalid conversion") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(x: any): void {
+                let a: object = x;
+            }
+
+            fun(42);
+        )");
+
+        evalCodeThrows(machine, code, "test", jac::EvalFlags::Global);
+    }
+}

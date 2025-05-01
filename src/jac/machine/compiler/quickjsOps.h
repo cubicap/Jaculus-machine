@@ -9,7 +9,7 @@
 namespace jac::quickjs_ops {
 
 
-inline JSValue add(JSContext* ctx, JSValue op1, JSValue op2) {
+inline JSValue add(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
     JSValue res;
 
     if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
@@ -29,6 +29,9 @@ inline JSValue add(JSContext* ctx, JSValue op1, JSValue op2) {
         JSValue fn = JS_Eval(ctx, code.data(), code.size(), "<builtin_add>", JS_EVAL_TYPE_GLOBAL);
         res = JS_Call(ctx, fn, JS_UNDEFINED, 2, args);
         JS_FreeValue(ctx, fn);
+        if (JS_IsException(res)) {
+            *exceptionFlag = 1;
+        }
     }
 
     return res;
@@ -42,7 +45,7 @@ enum class ArithOpcode {
     Mod
 };
 
-static int js_binary_arith_slow(JSContext *ctx, JSValue op1, JSValue op2, JSValue* res, ArithOpcode op) {
+static void js_binary_arith_slow(JSContext *ctx, JSValue op1, JSValue op2, JSValue* res, ArithOpcode op, int32_t* exceptionFlag) {
     double d1, d2, r;
 
     if (JS_ToFloat64(ctx, &d1, op1)) {
@@ -69,13 +72,14 @@ static int js_binary_arith_slow(JSContext *ctx, JSValue op1, JSValue op2, JSValu
         abort();
     }
     *res = JS_NewFloat64(ctx, r);
-    return 0;
+    return;
  exception:
-    return -1;
+    *exceptionFlag = 1;
+    *res = JS_EXCEPTION;
 }
 
 
-inline JSValue sub(JSContext* ctx, JSValue op1, JSValue op2) {
+inline JSValue sub(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
     JSValue res;
 
     if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
@@ -89,13 +93,12 @@ inline JSValue sub(JSContext* ctx, JSValue op1, JSValue op2) {
                                    JS_VALUE_GET_FLOAT64(op2));
     } else {
     binary_arith_slow:
-        int ok = js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Sub);
-        // TODO: handle error
+        js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Sub, exceptionFlag);
     }
     return res;
 }
 
-inline JSValue mul(JSContext* ctx, JSValue op1, JSValue op2) {
+inline JSValue mul(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
     JSValue res;
 
     double d;
@@ -120,13 +123,12 @@ inline JSValue mul(JSContext* ctx, JSValue op1, JSValue op2) {
     mul_fp_res:
         res = __JS_NewFloat64(ctx, d);
     } else {
-        int ok = js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Mul);
-        // TODO: handle error
+        js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Sub, exceptionFlag);
     }
     return res;
 }
 
-inline JSValue div(JSContext* ctx, JSValue op1, JSValue op2) {
+inline JSValue div(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
     JSValue res;
 
     if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
@@ -135,13 +137,12 @@ inline JSValue div(JSContext* ctx, JSValue op1, JSValue op2) {
         v2 = JS_VALUE_GET_INT(op2);
         res = JS_NewFloat64(ctx, (double)v1 / (double)v2);
     } else {
-        int ok = js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Div);
-        // TODO: handle error
+        js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Sub, exceptionFlag);
     }
     return res;
 }
 
-inline JSValue rem(JSContext* ctx, JSValue op1, JSValue op2) {
+inline JSValue rem(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
     JSValue res;
 
     if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
@@ -156,13 +157,12 @@ inline JSValue rem(JSContext* ctx, JSValue op1, JSValue op2) {
         res = JS_NewInt32(ctx, r);
     } else {
     binary_arith_slow:
-        int ok = js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Mod);
-        // TODO: handle error
+        js_binary_arith_slow(ctx, op1, op2, &res, ArithOpcode::Sub, exceptionFlag);
     }
     return res;
 }
 
-inline JSValue pow(JSContext* ctx, JSValue op1, JSValue op2) {
+inline JSValue pow(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
     JSValue res;
 
     double d1, d2, r;
@@ -177,8 +177,8 @@ inline JSValue pow(JSContext* ctx, JSValue op1, JSValue op2) {
     return res;
 
 exception:
-    // TODO: handle error
-    return JS_UNDEFINED;
+    *exceptionFlag = 1;
+    return JS_EXCEPTION;
 }
 
 

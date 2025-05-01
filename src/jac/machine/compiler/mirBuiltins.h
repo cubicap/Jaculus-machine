@@ -16,6 +16,15 @@
 namespace jac::cfg::mir_emit {
 
 
+enum class ErrorType : int32_t {
+    SyntaxError,
+    TypeError,
+    ReferenceError,
+    RangeError,
+    InternalError
+};
+
+
 // an implementation of stack as a linked list with expanding blocks
 // to reduce allocations and reallocations
 template<typename T>
@@ -76,10 +85,10 @@ public:
     }
 };
 
-
-
 struct RuntimeContext {
     JSContext* ctx;
+    int32_t exceptionFlag = 0;
+
     std::vector<BlockStack<JSValue>> freeStackFrames;
     std::vector<std::unique_ptr<char[]>> stringConsts;
 };
@@ -107,6 +116,7 @@ struct NativeFunction {
     MIR_item_t prototype;
     std::vector<ValueType> args;
     ValueType ret;
+    bool mayThrow;
 };
 
 
@@ -119,7 +129,7 @@ struct Builtins {
     NativeFunction fn(std::string name) {
         auto it = functions.find(name);
         if (it == functions.end()) {
-            throw std::runtime_error("Function not found");
+            throw std::runtime_error("Function not found " + name);
         }
         return it->second;
     }
@@ -272,45 +282,7 @@ inline MIR_item_t getProto(MIR_context_t ctx, Builtins& builtins, std::vector<Va
 }
 
 
-// if res is not void, the last arg is the return target
-inline void insertCall(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, std::string ident, std::vector<MIR_reg_t> ops) {
-    auto func = builtins.fn(ident);
-    auto args = func.args;
-    auto res = func.ret;
-    auto proto = func.prototype;
-    auto callable = func.func;
-    auto rtCtx = builtins.rtCtx;
-
-    bool retArg = hasRetArg(res);
-    if ((args.size() + (res != ValueType::Void)) != ops.size()) {
-        throw std::runtime_error("Invalid number of arguments");
-    }
-
-    std::vector<MIR_op_t> callArgs;
-    callArgs.push_back(MIR_new_ref_op(ctx, proto));
-    callArgs.push_back(MIR_new_ref_op(ctx, callable));
-    if (res != ValueType::Void && !retArg) {
-        callArgs.push_back(MIR_new_reg_op(ctx, ops.back()));
-    }
-
-    callArgs.push_back(MIR_new_int_op(ctx, reinterpret_cast<int64_t>(rtCtx)));  // NOLINT
-    for (size_t i = 0; i < args.size(); ++i) {
-        auto [type, size] = getMIRArgType(args[i]);
-        if (MIR_blk_type_p(type)) {
-            callArgs.push_back(MIR_new_mem_op(ctx, type, size, ops[i], 0, 0));
-        }
-        else {
-            callArgs.push_back(MIR_new_reg_op(ctx, ops[i]));
-        }
-    }
-    if (retArg) {
-        callArgs.push_back(MIR_new_reg_op(ctx, ops.back()));
-    }
-    MIR_append_insn(ctx, fun, MIR_new_insn_arr(ctx, MIR_CALL, callArgs.size(), callArgs.data()));
-}
-
-
-inline void addNativeFunction(MIR_context_t ctx, Builtins& builtins, std::string name, std::vector<ValueType> args, ValueType ret, auto func) {
+inline void addNativeFunction(MIR_context_t ctx, Builtins& builtins, std::string name, std::vector<ValueType> args, ValueType ret, bool mayThrow, auto func) {
     auto proto = getProto(ctx, builtins, args, ret);
     MIR_load_external(ctx, name.c_str(), reinterpret_cast<void*>(func));  // NOLINT
     auto funcItem = MIR_new_import(ctx, name.c_str());
@@ -319,7 +291,8 @@ inline void addNativeFunction(MIR_context_t ctx, Builtins& builtins, std::string
         .func = funcItem,
         .prototype = proto,
         .args = args,
-        .ret = ret
+        .ret = ret,
+        .mayThrow = mayThrow
     });
 }
 
@@ -332,144 +305,171 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         .functions = {}
     };
 
-    addNativeFunction(ctx, builtins, "__dupVal", { ValueType::Any }, ValueType::Void,
+    addNativeFunction(ctx, builtins, "__dupVal", { ValueType::Any }, ValueType::Void, false,
         +[](RuntimeContext* ctx_, JSValue a) {
             JS_DupValue(ctx_->ctx, a);
         }
     );
-    addNativeFunction(ctx, builtins, "__pushFreeVal", { ValueType::Any }, ValueType::Void, pushFreeImpl);
-    addNativeFunction(ctx, builtins, "__dupObj", { ValueType::Object }, ValueType::Void,
+    addNativeFunction(ctx, builtins, "__pushFreeVal", { ValueType::Any }, ValueType::Void, false, pushFreeImpl);
+    addNativeFunction(ctx, builtins, "__dupObj", { ValueType::Object }, ValueType::Void, false,
         +[](RuntimeContext* ctx_, JSObject* obj) {
             JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
             JS_DupValue(ctx_->ctx, val);
         }
     );
-    addNativeFunction(ctx, builtins, "__pushFreeObj", { ValueType::Object }, ValueType::Void,
+    addNativeFunction(ctx, builtins, "__pushFreeObj", { ValueType::Object }, ValueType::Void, false,
         +[](RuntimeContext* ctx_, JSObject* obj) {
             JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
             pushFreeImpl(ctx_, val);
         }
     );
 
-    addNativeFunction(ctx, builtins, "__enterStackFrame", {}, ValueType::Void,
+    addNativeFunction(ctx, builtins, "__enterStackFrame", {}, ValueType::Void, false,
         +[](RuntimeContext* ctx_) {
             pushFreeStackFrame(ctx_);
         }
     );
-    addNativeFunction(ctx, builtins, "__exitStackFrame", {}, ValueType::Void,
+    addNativeFunction(ctx, builtins, "__exitStackFrame", {}, ValueType::Void, false,
         +[](RuntimeContext* ctx_) {
             popFreeStackFrame(ctx_);
         }
     );
 
-    addNativeFunction(ctx, builtins, "__getMemberObjCStr", { ValueType::Object, ValueType::StringConst }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__getMemberObjCStr", { ValueType::Object, ValueType::StringConst }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, const char* name, JSValue* res) {
             JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
             *res = JS_GetPropertyStr(ctx_->ctx, val, name);
+            if (JS_IsException(*res)) {
+                ctx_->exceptionFlag = 1;
+            }
         }
     );
-    addNativeFunction(ctx, builtins, "__setMemberObjCStr", { ValueType::Object, ValueType::StringConst, ValueType::Any }, ValueType::Void,
+    addNativeFunction(ctx, builtins, "__setMemberObjCStr", { ValueType::Object, ValueType::StringConst, ValueType::Any }, ValueType::Void, true,
         +[](RuntimeContext* ctx_, JSObject* obj, const char* name, JSValue val) {
             JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
-            JS_SetPropertyStr(ctx_->ctx, objVal, name, val);
+            if (JS_SetPropertyStr(ctx_->ctx, objVal, name, val) < 0) {
+                ctx_->exceptionFlag = 1;
+            }
         }
     );
-    addNativeFunction(ctx, builtins, "__getMemberObjI32", { ValueType::Object, ValueType::I32 }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__getMemberObjI32", { ValueType::Object, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, int32_t index, JSValue* res) {
             JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
             *res = JS_GetPropertyUint32(ctx_->ctx, val, index);
+            if (JS_IsException(*res)) {
+                ctx_->exceptionFlag = 1;
+            }
         }
     );
-    addNativeFunction(ctx, builtins, "__setMemberObjI32", { ValueType::Object, ValueType::I32, ValueType::Any }, ValueType::Void,
+    addNativeFunction(ctx, builtins, "__setMemberObjI32", { ValueType::Object, ValueType::I32, ValueType::Any }, ValueType::Void, true,
         +[](RuntimeContext* ctx_, JSObject* obj, int32_t index, JSValue val) {
             JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
-            JS_SetPropertyUint32(ctx_->ctx, objVal, index, val);
+            if (JS_SetPropertyUint32(ctx_->ctx, objVal, index, val) < 0) {
+                ctx_->exceptionFlag = 1;
+            }
         }
     );
 
     static constexpr auto callAnyAny = +[](RuntimeContext* ctx_, JSValue obj, JSValue this_, int32_t argc, JSValue* argv) {
         JSValue res = JS_Call(ctx_->ctx, obj, this_, argc, argv);
         if (JS_IsException(res)) {
-            // TODO: handle exception
+            ctx_->exceptionFlag = 1;
+            return;
         }
         argv[0] = res;
     };
 
-    addNativeFunction(ctx, builtins, "__callAnyAny", { ValueType::Any, ValueType::Any, ValueType::I32 }, ValueType::Any, callAnyAny);
-    addNativeFunction(ctx, builtins, "__callObjAny", { ValueType::Object, ValueType::Any, ValueType::I32 }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__callAnyAny", { ValueType::Any, ValueType::Any, ValueType::I32 }, ValueType::Any, true, callAnyAny);
+    addNativeFunction(ctx, builtins, "__callObjAny", { ValueType::Object, ValueType::Any, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, JSValue this_, int32_t argc, JSValue* argv) {
             callAnyAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), this_, argc, argv);
         }
     );
-    addNativeFunction(ctx, builtins, "__callAnyObj", { ValueType::Any, ValueType::Object, ValueType::I32 }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__callAnyObj", { ValueType::Any, ValueType::Object, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue obj, JSObject* this_, int32_t argc, JSValue* argv) {
             callAnyAny(ctx_, obj, JS_MKPTR(JS_TAG_OBJECT, this_), argc, argv);
         }
     );
-    addNativeFunction(ctx, builtins, "__callObjObj", { ValueType::Object, ValueType::Object, ValueType::I32 }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__callObjObj", { ValueType::Object, ValueType::Object, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, JSObject* this_, int32_t argc, JSValue* argv) {
             callAnyAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), JS_MKPTR(JS_TAG_OBJECT, this_), argc, argv);
         }
     );
-    addNativeFunction(ctx, builtins, "__callAnyUndefined", { ValueType::Any, ValueType::I32 }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__callAnyUndefined", { ValueType::Any, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue obj, int32_t argc, JSValue* argv) {
             callAnyAny(ctx_, obj, JS_UNDEFINED, argc, argv);
         }
     );
-    addNativeFunction(ctx, builtins, "__callObjUndefined", { ValueType::Object, ValueType::I32 }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__callObjUndefined", { ValueType::Object, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, int32_t argc, JSValue* argv) {
             callAnyAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), JS_UNDEFINED, argc, argv);
         }
     );
 
-    addNativeFunction(ctx, builtins, "__add", { ValueType::Any, ValueType::Any }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__add", { ValueType::Any, ValueType::Any }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
-            *res = quickjs_ops::add(ctx_->ctx, a, b);
+            *res = quickjs_ops::add(ctx_->ctx, a, b, &ctx_->exceptionFlag);
         }
     );
-    addNativeFunction(ctx, builtins, "__sub", { ValueType::Any, ValueType::Any }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__sub", { ValueType::Any, ValueType::Any }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
-            *res = quickjs_ops::sub(ctx_->ctx, a, b);
+            *res = quickjs_ops::sub(ctx_->ctx, a, b, &ctx_->exceptionFlag);
         }
     );
-    addNativeFunction(ctx, builtins, "__mul", { ValueType::Any, ValueType::Any }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__mul", { ValueType::Any, ValueType::Any }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
-            *res = quickjs_ops::mul(ctx_->ctx, a, b);
+            *res = quickjs_ops::mul(ctx_->ctx, a, b, &ctx_->exceptionFlag);
         }
     );
-    addNativeFunction(ctx, builtins, "__div", { ValueType::Any, ValueType::Any }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__div", { ValueType::Any, ValueType::Any }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
-            *res = quickjs_ops::div(ctx_->ctx, a, b);
+            *res = quickjs_ops::div(ctx_->ctx, a, b, &ctx_->exceptionFlag);
         }
     );
-    addNativeFunction(ctx, builtins, "__rem", { ValueType::Any, ValueType::Any }, ValueType::Any,
+    addNativeFunction(ctx, builtins, "__rem", { ValueType::Any, ValueType::Any }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
-            *res = quickjs_ops::rem(ctx_->ctx, a, b);
+            *res = quickjs_ops::rem(ctx_->ctx, a, b, &ctx_->exceptionFlag);
         }
     );
 
-    addNativeFunction(ctx, builtins, "__powF64", { ValueType::F64, ValueType::F64 }, ValueType::F64,
-        +[](RuntimeContext* ctx_, double a, double b) {
+    addNativeFunction(ctx, builtins, "__powF64", { ValueType::F64, ValueType::F64 }, ValueType::F64, false,
+        +[](RuntimeContext* ctx_, double a, double b) -> double {
             return std::pow(a, b);
         }
     );
 
-    addNativeFunction(ctx, builtins, "__convertI32", { ValueType::Any }, ValueType::I32,
-        +[](RuntimeContext* ctx_, JSValue a) {
+    addNativeFunction(ctx, builtins, "__convertI32", { ValueType::Any }, ValueType::I32, true,
+        +[](RuntimeContext* ctx_, JSValue a) -> int32_t {
             int32_t res;
             if (JS_ToInt32(ctx_->ctx, &res, a)) {
-                // TODO: handle error
+                ctx_->exceptionFlag = 1;
+                return 0;
             }
             return res;
         }
     );
-    addNativeFunction(ctx, builtins, "__convertF64", { ValueType::Any }, ValueType::F64,
-        +[](RuntimeContext* ctx_, JSValue a) {
+    addNativeFunction(ctx, builtins, "__convertF64", { ValueType::Any }, ValueType::F64, true,
+        +[](RuntimeContext* ctx_, JSValue a) -> double {
             double res;
             if (JS_ToFloat64(ctx_->ctx, &res, a)) {
-                // TODO: handle error
+                ctx_->exceptionFlag = 1;
+                return 0;
             }
             return res;
+        }
+    );
+
+    addNativeFunction(ctx, builtins, "__throwError", { ValueType::StringConst, ValueType::I32 }, ValueType::Void, true,
+        +[](RuntimeContext* ctx_, const char* msg, int32_t type) {
+            switch (static_cast<ErrorType>(type)) {
+                case ErrorType::SyntaxError:     JS_ThrowSyntaxError(ctx_->ctx, "%s", msg);     break;
+                case ErrorType::TypeError:       JS_ThrowTypeError(ctx_->ctx, "%s", msg);       break;
+                case ErrorType::ReferenceError:  JS_ThrowReferenceError(ctx_->ctx, "%s", msg);  break;
+                case ErrorType::RangeError:      JS_ThrowRangeError(ctx_->ctx, "%s", msg);      break;
+                case ErrorType::InternalError:   JS_ThrowInternalError(ctx_->ctx, "%s", msg);   break;
+                default: throw std::runtime_error("Invalid error type");
+            }
+            ctx_->exceptionFlag = 1;
         }
     );
 

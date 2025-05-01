@@ -375,7 +375,8 @@ namespace detail {
     struct plus<JSValue> {
         JSContext* ctx;
         JSValue operator()(JSValue a, JSValue b) {
-            return jac::quickjs_ops::add(ctx, a, b);
+            int32_t err;
+            return jac::quickjs_ops::add(ctx, a, b, &err);
         }
     };
     template<typename T>
@@ -393,7 +394,8 @@ namespace detail {
     struct minus<JSValue> {
         JSContext* ctx;
         JSValue operator()(JSValue a, JSValue b) {
-            return jac::quickjs_ops::sub(ctx, a, b);
+            int32_t err;
+            return jac::quickjs_ops::sub(ctx, a, b, &err);
         }
     };
     template<typename T>
@@ -411,7 +413,8 @@ namespace detail {
     struct multiplies<JSValue> {
         JSContext* ctx;
         JSValue operator()(JSValue a, JSValue b) {
-            return jac::quickjs_ops::mul(ctx, a, b);
+            int32_t err;
+            return jac::quickjs_ops::mul(ctx, a, b, &err);
         }
     };
     template<typename T>
@@ -429,7 +432,8 @@ namespace detail {
     struct divides<JSValue> {
         JSContext* ctx;
         JSValue operator()(JSValue a, JSValue b) {
-            return jac::quickjs_ops::div(ctx, a, b);
+            int32_t err;
+            return jac::quickjs_ops::div(ctx, a, b, &err);
         }
     };
     template<typename T>
@@ -447,7 +451,8 @@ namespace detail {
     struct exponentiates<JSValue> {
         JSContext* ctx;
         JSValue operator()(JSValue a, JSValue b) {
-            return jac::quickjs_ops::pow(ctx, a, b);
+            int32_t err;
+            return jac::quickjs_ops::pow(ctx, a, b, &err);
         }
     };
 
@@ -772,7 +777,8 @@ class CFGInterpreter {
             setReg(op.res.id, Float64{ std::fmod(*std::get<Float64>(getReg(op.a.id)), *std::get<Float64>(getReg(op.b.id))) });
         }
         else if (op.res.type == ValueType::Any) {
-            setReg(op.res.id, Any{ jac::quickjs_ops::rem(ctx, *std::get<Any>(getReg(op.a.id)), *std::get<Any>(getReg(op.b.id))) });
+            int32_t err;
+            setReg(op.res.id, Any{ jac::quickjs_ops::rem(ctx, *std::get<Any>(getReg(op.a.id)), *std::get<Any>(getReg(op.b.id)), &err) });
         }
         else {
             throw std::runtime_error("Invalid result type");
