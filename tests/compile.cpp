@@ -1246,4 +1246,17 @@ TEST_CASE("Exceptions", "[aot]") {
 
         evalCodeThrows(machine, code, "test", jac::EvalFlags::Global);
     }
+
+    SECTION("Throw") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(x: any): void {
+                throw x;
+            }
+
+            fun(42);
+        )");
+
+        evalCodeThrows(machine, code, "test", jac::EvalFlags::Global);
+    }
 }

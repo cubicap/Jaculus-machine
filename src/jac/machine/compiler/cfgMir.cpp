@@ -754,7 +754,10 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
                 }
                 break;
             case Terminal::Throw:
-                throw std::runtime_error("Throw is not supported");
+                assert(block->jump.value->type == ValueType::Any);
+                insertCall(ctx, cc.fun, builtins, "__throwVal", { cc.jsValAddr(block->jump.value->id) }, true);
+                cc.checkException();
+                break;
             default:
                 std::cout << "Jump type not implemented: " << static_cast<int>(block->jump.type) << std::endl;
         }

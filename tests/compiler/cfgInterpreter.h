@@ -1109,8 +1109,14 @@ public:
                     }
                     abort();
                 }
-                case Terminal::Throw:
-                    throw std::runtime_error("Not implemented (throw)");
+                case Terminal::Throw: {
+                    auto val = getReg(activeBlock->jump.value->id);
+                    if (auto valPtr = std::get_if<Any>(&val)) {
+                        JS_Throw(ctx, **valPtr);
+                        return JS_EXCEPTION;
+                    }
+                    throw std::runtime_error("Invalid throw type");
+                }
                 case Terminal::None:
                     throw std::runtime_error("Invalid jump (None)");
             }

@@ -473,6 +473,12 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
             ctx_->exceptionFlag = 1;
         }
     );
+    addNativeFunction(ctx, builtins, "__throwVal", { ValueType::Any }, ValueType::Void, true,
+        +[](RuntimeContext* ctx_, JSValue a) {
+            JS_Throw(ctx_->ctx, a);
+            ctx_->exceptionFlag = 1;
+        }
+    );
 
     return builtins;
 }

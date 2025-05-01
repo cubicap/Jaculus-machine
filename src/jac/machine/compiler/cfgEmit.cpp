@@ -1242,6 +1242,13 @@ void emit(const ast::BreakStatement& stmt, FunctionEmitter& func) {
     }
 }
 
+void emit(const ast::ThrowStatement& stmt, FunctionEmitter& func) {
+    RValue val = emit(stmt.expression, func);
+    RValue anyVal = emitCastAndFree(val, ValueType::Any, func);
+
+    func.getActiveBlock()->jump = Terminal::throw_(anyVal);
+}
+
 
 bool emit(const ast::Block& block, FunctionEmitter& func);
 
@@ -1290,8 +1297,9 @@ bool emit(const ast::Statement& statement, FunctionEmitter& func) {
         bool operator()(const ast::LabeledStatement&) {
             throw IRGenError("Labeled statements are not supported");
         }
-        bool operator()(const ast::ThrowStatement&) {
-            throw IRGenError("Throw statements are not supported");
+        bool operator()(const ast::ThrowStatement& stmt) {
+            emit(stmt, func);
+            return true;
         }
         bool operator()(const ast::TryStatement&) {
             throw IRGenError("Try statements are not supported");
