@@ -115,6 +115,11 @@ void generateCheckException(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t flagAdd
     MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_BNES, MIR_new_label_op(ctx, exceptionLabel), flag, MIR_new_int_op(ctx, 0)));
 }
 
+void generateSetExceptionFlag(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t flagAddr, int value) {
+    auto flag = MIR_new_mem_op(ctx, MIR_T_I32, 0, flagAddr, 0, 0);
+    MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_MOV, flag, MIR_new_int_op(ctx, value)));
+}
+
 void generateCheckExceptionJSValue(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t valAddr, MIR_label_t exceptionLabel) {
     auto tag = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), valAddr, 0, 0);
     MIR_append_insn(ctx, fun, MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, exceptionLabel), tag, MIR_new_int_op(ctx, JS_TAG_EXCEPTION)));
@@ -852,8 +857,7 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
     generateThrowError(ctx, cc.fun, builtins, "Invalid conversion", ErrorType::TypeError);
 
     cc.insert(cc.exceptionLabel);
-    auto flagOp = MIR_new_mem_op(ctx, MIR_T_I32, 0, cc.exceptionFlagAddr, 0, 0);
-    cc.insert(MIR_new_insn(ctx, MIR_MOV, flagOp, MIR_new_int_op(ctx, 1)));
+    generateSetExceptionFlag(ctx, cc.fun, cc.exceptionFlagAddr, 1);
     generateCall(ctx, cc.fun, builtins, "__exitStackFrame", {}, false);
     switch (cfg.ret) {
         case ValueType::Void:
@@ -906,6 +910,7 @@ MIR_item_t compileCaller(MIR_context_t ctx, Builtins& builtins, Function& cfg, M
     MIR_label_t exceptionLabel = MIR_new_label(ctx);
     MIR_reg_t exceptionFlagAddr = MIR_new_func_reg(ctx, callerFunc, MIR_T_I64, "exFlagAddr");
     insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, exceptionFlagAddr), MIR_new_int_op(ctx, reinterpret_cast<int64_t>(&builtins.rtCtx->exceptionFlag))));  // NOLINT
+    generateSetExceptionFlag(ctx, caller, exceptionFlagAddr, 0);
 
     std::vector<MIR_op_t> argOps;
     MIR_reg_t argcReg = MIR_reg(ctx, "argc", callerFunc);
