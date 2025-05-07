@@ -6,6 +6,8 @@
 #include <jac/features/aotEvalFeature.h>
 #include <jac/features/basicStreamFeature.h>
 #include <jac/features/evalFeature.h>
+#include <jac/features/eventLoopFeature.h>
+#include <jac/features/eventQueueFeature.h>
 #include <jac/features/stdioFeature.h>
 #include <jac/features/util/ostreamjs.h>
 #include <jac/machine/class.h>
@@ -17,13 +19,19 @@ using MachineInterp = jac::ComposeMachine<
     jac::MachineBase,
     jac::EvalFeature,
     jac::BasicStreamFeature,
-    jac::StdioFeature
+    jac::StdioFeature,
+    jac::EventQueueFeature,
+    jac::EventLoopFeature,
+    jac::EventLoopTerminal
 >;
 using MachineAot = jac::ComposeMachine<
     jac::MachineBase,
     jac::AotEvalFeature,
     jac::BasicStreamFeature,
-    jac::StdioFeature
+    jac::StdioFeature,
+    jac::EventQueueFeature,
+    jac::EventLoopFeature,
+    jac::EventLoopTerminal
 >;
 
 
@@ -38,12 +46,12 @@ void run(std::string& code, const auto& defines) {
     }
 
     try {
-        auto val = machine.eval(code, "main.js", jac::EvalFlags::Module);
+        machine.evalModuleWithEventLoop(code, "main.js");
     } catch (jac::Exception& e) {
-        std::cout << "Exception: " << e.what() << std::endl;
-        std::cout << "Stack: " << e.stackTrace() << std::endl;
+        std::cerr << "Exception: " << e.what() << std::endl;
+        std::cerr << "Stack: " << e.stackTrace() << std::endl;
     } catch (std::exception& e) {
-        std::cout << "Exception: " << e.what() << std::endl;
+        std::cerr << "Exception: " << e.what() << std::endl;
     }
 }
 
