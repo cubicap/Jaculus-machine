@@ -794,6 +794,40 @@ TEST_CASE("Any", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"true", "false", "true", "false"});
     }
+
+    SECTION("Compare") {
+        machine.initialize();
+        std::string code(R"(
+            function lt(a: any, b: any): boolean {
+                return a < b;
+            }
+            function le(a: any, b: any): boolean {
+                return a <= b;
+            }
+            function gt(a: any, b: any): boolean {
+                return a > b;
+            }
+            function ge(a: any, b: any): boolean {
+                return a >= b;
+            }
+            function eq(a: any, b: any): boolean {
+                return a == b;
+            }
+            function ne(a: any, b: any): boolean {
+                return a != b;
+            }
+
+            report(lt("1", 2));
+            report(le("1", 2));
+            report(gt("1", 2));
+            report(ge("1", 2));
+            report(eq("1", 2));
+            report(ne("1", 2));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"true", "true", "false", "false", "false", "true"});
+    }
 }
 
 

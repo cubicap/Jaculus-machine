@@ -491,7 +491,18 @@ namespace detail {
 
 
     template<typename T>
-    struct equal_to {
+    struct equal_to;
+    template<>
+    struct equal_to<JSValue> {
+        JSContext* ctx;
+        decltype(auto) operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::equal(ctx, a, b, nullptr);
+        }
+    };
+
+    template<typename T>
+        requires NotAny<T>
+    struct equal_to<T> {
         JSContext* ctx;
         decltype(auto) operator()(T a, T b) {
             return std::equal_to<T>{}(a, b);
@@ -499,7 +510,18 @@ namespace detail {
     };
 
     template<typename T>
-    struct not_equal_to {
+    struct not_equal_to;
+    template<>
+    struct not_equal_to<JSValue> {
+        JSContext* ctx;
+        decltype(auto) operator()(JSValue a, JSValue b) {
+            return !jac::quickjs_ops::equal(ctx, a, b, nullptr);
+        }
+    };
+
+    template<typename T>
+        requires NotAny<T>
+    struct not_equal_to<T> {
         JSContext* ctx;
         decltype(auto) operator()(T a, T b) {
             return std::not_equal_to<T>{}(a, b);
@@ -507,7 +529,18 @@ namespace detail {
     };
 
     template<typename T>
-    struct greater {
+    struct greater;
+    template<>
+    struct greater<JSValue> {
+        JSContext* ctx;
+        decltype(auto) operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::greater(ctx, a, b, nullptr);
+        }
+    };
+
+    template<typename T>
+        requires NotAny<T>
+    struct greater<T> {
         JSContext* ctx;
         decltype(auto) operator()(T a, T b) {
             return std::greater<T>{}(a, b);
@@ -515,7 +548,18 @@ namespace detail {
     };
 
     template<typename T>
-    struct greater_equal {
+    struct greater_equal;
+    template<>
+    struct greater_equal<JSValue> {
+        JSContext* ctx;
+        decltype(auto) operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::greaterEq(ctx, a, b, nullptr);
+        }
+    };
+
+    template<typename T>
+        requires NotAny<T>
+    struct greater_equal<T> {
         JSContext* ctx;
         decltype(auto) operator()(T a, T b) {
             return std::greater_equal<T>{}(a, b);
@@ -523,7 +567,18 @@ namespace detail {
     };
 
     template<typename T>
-    struct less {
+    struct less;
+    template<>
+    struct less<JSValue> {
+        JSContext* ctx;
+        decltype(auto) operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::less(ctx, a, b, nullptr);
+        }
+    };
+
+    template<typename T>
+        requires NotAny<T>
+    struct less<T> {
         JSContext* ctx;
         decltype(auto) operator()(T a, T b) {
             return std::less<T>{}(a, b);
@@ -531,7 +586,18 @@ namespace detail {
     };
 
     template<typename T>
-    struct less_equal {
+    struct less_equal;
+    template<>
+    struct less_equal<JSValue> {
+        JSContext* ctx;
+        decltype(auto) operator()(JSValue a, JSValue b) {
+            return jac::quickjs_ops::lessEq(ctx, a, b, nullptr);
+        }
+    };
+
+    template<typename T>
+        requires NotAny<T>
+    struct less_equal<T> {
         JSContext* ctx;
         decltype(auto) operator()(T a, T b) {
             return std::less_equal<T>{}(a, b);
@@ -754,6 +820,9 @@ class CFGInterpreter {
                 break;
             case ValueType::Bool:
                 evalBinop<Op, Boolean, Boolean>(ctx, op);
+                break;
+            case ValueType::Any:
+                evalBinop<Op, Any, Boolean>(ctx, op);
                 break;
             default:
                 throw std::runtime_error("Not implemented (common upcast)");

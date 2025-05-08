@@ -394,7 +394,16 @@ void generateRelational(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res)
         cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
     }
     else if (a.type == ValueType::Any) {
-        throw std::runtime_error("Relational operation not implemented for Any");
+        switch (op) {
+            case Opcode::Eq:   generateCall(cc.ctx, cc.fun, cc.builtins, "__eqAny",        { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.regOp(res.id) }, true); break;
+            case Opcode::Neq:  generateCall(cc.ctx, cc.fun, cc.builtins, "__neqAny",       { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.regOp(res.id) }, true); break;
+            case Opcode::Gt:   generateCall(cc.ctx, cc.fun, cc.builtins, "__greaterAny",   { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.regOp(res.id) }, true); break;
+            case Opcode::Gte:  generateCall(cc.ctx, cc.fun, cc.builtins, "__greaterEqAny", { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.regOp(res.id) }, true); break;
+            case Opcode::Lt:   generateCall(cc.ctx, cc.fun, cc.builtins, "__lessAny",      { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.regOp(res.id) }, true); break;
+            case Opcode::Lte:  generateCall(cc.ctx, cc.fun, cc.builtins, "__lessEqAny",    { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.regOp(res.id) }, true); break;
+            default:
+                assert(false && "Invalid comparison operation");
+        }
     }
     else {
         assert(false && "Invalid comparison operand type");
@@ -882,6 +891,7 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
 }
 
 
+// returning composite types from MIR is not supported
 MIR_item_t compileCaller(MIR_context_t ctx, Builtins& builtins, Function& cfg, MIR_item_t callee, MIR_item_t proto) {
     std::string callerName = "_caller_" + cfg.name();
 

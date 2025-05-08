@@ -497,6 +497,37 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    addNativeFunction(ctx, builtins, "__lessAny", { ValueType::Any, ValueType::Any }, ValueType::Bool, true,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b) -> int32_t {
+            return quickjs_ops::less(ctx_->ctx, a, b, &ctx_->exceptionFlag);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__lessEqAny", { ValueType::Any, ValueType::Any }, ValueType::Bool, true,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b) -> int32_t {
+            return quickjs_ops::lessEq(ctx_->ctx, a, b, &ctx_->exceptionFlag);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__greaterAny", { ValueType::Any, ValueType::Any }, ValueType::Bool, true,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b) -> int32_t {
+            return quickjs_ops::greater(ctx_->ctx, a, b, &ctx_->exceptionFlag);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__greaterEqAny", { ValueType::Any, ValueType::Any }, ValueType::Bool, true,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b) -> int32_t {
+            return quickjs_ops::greaterEq(ctx_->ctx, a, b, &ctx_->exceptionFlag);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__eqAny", { ValueType::Any, ValueType::Any }, ValueType::Bool, true,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b) -> int32_t {
+            return quickjs_ops::equal(ctx_->ctx, a, b, &ctx_->exceptionFlag);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__neqAny", { ValueType::Any, ValueType::Any }, ValueType::Bool, true,
+        +[](RuntimeContext* ctx_, JSValue a, JSValue b) -> int32_t {
+            return !quickjs_ops::equal(ctx_->ctx, a, b, &ctx_->exceptionFlag);
+        }
+    );
+
     return builtins;
 }
 

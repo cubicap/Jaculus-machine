@@ -182,4 +182,78 @@ exception:
 }
 
 
+inline bool evalCmp(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag, const std::string_view code, const std::string_view name) {
+    JSValue args[2] = { op1, op2 };
+    JSValue fn = JS_Eval(ctx, code.data(), code.size(), name.data(), JS_EVAL_TYPE_GLOBAL);
+    JSValue res = JS_Call(ctx, fn, JS_UNDEFINED, 2, args);
+    JS_FreeValue(ctx, fn);
+    if (JS_IsException(res)) {
+        *exceptionFlag = 1;
+    }
+    bool result = JS_ToBool(ctx, res);
+    JS_FreeValue(ctx, res);
+    return result;
+}
+
+inline bool less(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
+    if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
+        return JS_VALUE_GET_INT(op1) < JS_VALUE_GET_INT(op2);
+    }
+    if (JS_VALUE_IS_BOTH_FLOAT(op1, op2)) {
+        return JS_VALUE_GET_FLOAT64(op1) < JS_VALUE_GET_FLOAT64(op2);
+    }
+    constexpr std::string_view code("(a, b) => a < b");
+    constexpr std::string_view name("<builtin_less>");
+    return evalCmp(ctx, op1, op2, exceptionFlag, code, name);
+}
+
+inline bool lessEq(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
+    if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
+        return JS_VALUE_GET_INT(op1) <= JS_VALUE_GET_INT(op2);
+    }
+    if (JS_VALUE_IS_BOTH_FLOAT(op1, op2)) {
+        return JS_VALUE_GET_FLOAT64(op1) <= JS_VALUE_GET_FLOAT64(op2);
+    }
+    constexpr std::string_view code("(a, b) => a <= b");
+    constexpr std::string_view name("<builtin_lessEq>");
+    return evalCmp(ctx, op1, op2, exceptionFlag, code, name);
+}
+
+inline bool greater(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
+    if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
+        return JS_VALUE_GET_INT(op1) > JS_VALUE_GET_INT(op2);
+    }
+    if (JS_VALUE_IS_BOTH_FLOAT(op1, op2)) {
+        return JS_VALUE_GET_FLOAT64(op1) > JS_VALUE_GET_FLOAT64(op2);
+    }
+    constexpr std::string_view code("(a, b) => a > b");
+    constexpr std::string_view name("<builtin_greater>");
+    return evalCmp(ctx, op1, op2, exceptionFlag, code, name);
+}
+
+inline bool greaterEq(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
+    if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
+        return JS_VALUE_GET_INT(op1) >= JS_VALUE_GET_INT(op2);
+    }
+    if (JS_VALUE_IS_BOTH_FLOAT(op1, op2)) {
+        return JS_VALUE_GET_FLOAT64(op1) >= JS_VALUE_GET_FLOAT64(op2);
+    }
+    constexpr std::string_view code("(a, b) => a >= b");
+    constexpr std::string_view name("<builtin_greaterEq>");
+    return evalCmp(ctx, op1, op2, exceptionFlag, code, name);
+}
+
+inline bool equal(JSContext* ctx, JSValue op1, JSValue op2, int32_t* exceptionFlag) {
+    if (JS_VALUE_IS_BOTH_INT(op1, op2)) {
+        return JS_VALUE_GET_INT(op1) == JS_VALUE_GET_INT(op2);
+    }
+    if (JS_VALUE_IS_BOTH_FLOAT(op1, op2)) {
+        return JS_VALUE_GET_FLOAT64(op1) == JS_VALUE_GET_FLOAT64(op2);
+    }
+    constexpr std::string_view code("(a, b) => a == b");
+    constexpr std::string_view name("<builtin_equal>");
+    return evalCmp(ctx, op1, op2, exceptionFlag, code, name);
+}
+
+
 }  // namespace jac::quickjs_ops
