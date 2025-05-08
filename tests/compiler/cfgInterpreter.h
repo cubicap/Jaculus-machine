@@ -677,10 +677,17 @@ namespace detail {
     struct GetMbrVisitor {
         JSContext* ctx;
 
-        RegVal operator()(JSValue val, StringConst id) {
-            JSAtom atom = JS_NewAtom(ctx, (*id).c_str());
+        RegVal operator()(JSValue val, Any id) {
+            JSAtom atom = JS_ValueToAtom(ctx, *id);
+            if (atom == JS_ATOM_NULL) {
+                throw std::runtime_error("Invalid member access");
+            }
             JSValue res = JS_GetProperty(ctx, val, atom);
             JS_FreeAtom(ctx, atom);
+            return Any{ res };
+        }
+        RegVal operator()(JSValue val, StringConst id) {
+            JSValue res = JS_GetPropertyStr(ctx, val, (*id).c_str());
             return Any{ res };
         }
         RegVal operator()(JSValue val, Int32 id) {
@@ -704,12 +711,19 @@ namespace detail {
     struct SetMbrVisitor {
         JSContext* ctx;
 
-        int operator()(StringConst id, JSValue val, JSValue parent) {
+        int operator()(Any id, JSValue val, JSValue parent) {
+            JSAtom atom = JS_ValueToAtom(ctx, *id);
+            if (atom == JS_ATOM_NULL) {
+                throw std::runtime_error("Invalid member access");
+            }
             JS_DupValue(ctx, val);
-            JSAtom atom = JS_NewAtom(ctx, (*id).c_str());
             auto res = JS_SetProperty(ctx, parent, atom, val);
             JS_FreeAtom(ctx, atom);
-
+            return res;
+        }
+        int operator()(StringConst id, JSValue val, JSValue parent) {
+            JS_DupValue(ctx, val);
+            auto res = JS_SetPropertyStr(ctx, parent, (*id).c_str(), val);
             return res;
         }
         int operator()(Int32 id, JSValue val, JSValue parent) {

@@ -336,42 +336,114 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    static constexpr auto getMemberCStr = [](RuntimeContext* ctx_, JSValue obj, const char* id, JSValue* res) {
+        *res = JS_GetPropertyStr(ctx_->ctx, obj, id);
+        if (JS_IsException(*res)) {
+            ctx_->exceptionFlag = 1;
+        }
+    };
+    static constexpr auto getMemberI32 = [](RuntimeContext* ctx_, JSValue obj, int32_t id, JSValue* res) {
+        *res = JS_GetPropertyUint32(ctx_->ctx, obj, id);
+        if (JS_IsException(*res)) {
+            ctx_->exceptionFlag = 1;
+        }
+    };
+    static constexpr auto getMemberAny = [](RuntimeContext* ctx_, JSValue obj, JSValue id, JSValue* res) {
+        JSAtom atom = JS_ValueToAtom(ctx_->ctx, id);
+        if (atom == JS_ATOM_NULL) {
+            ctx_->exceptionFlag = 1;
+            return;
+        }
+        *res = JS_GetProperty(ctx_->ctx, obj, atom);
+        if (JS_IsException(*res)) {
+            ctx_->exceptionFlag = 1;
+        }
+        JS_FreeAtom(ctx_->ctx, atom);
+    };
+    static constexpr auto setMemberCStr = [](RuntimeContext* ctx_, JSValue obj, const char* id, JSValue val) {
+        if (JS_SetPropertyStr(ctx_->ctx, obj, id, val) < 0) {
+            ctx_->exceptionFlag = 1;
+        }
+    };
+    static constexpr auto setMemberI32 = [](RuntimeContext* ctx_, JSValue obj, int32_t id, JSValue val) {
+        if (JS_SetPropertyUint32(ctx_->ctx, obj, id, val) < 0) {
+            ctx_->exceptionFlag = 1;
+        }
+    };
+    static constexpr auto setMemberAny = [](RuntimeContext* ctx_, JSValue obj, JSValue id, JSValue val) {
+        JSAtom atom = JS_ValueToAtom(ctx_->ctx, id);
+        if (atom == JS_ATOM_NULL) {
+            ctx_->exceptionFlag = 1;
+            return;
+        }
+        if (JS_SetProperty(ctx_->ctx, obj, atom, val) < 0) {
+            ctx_->exceptionFlag = 1;
+        }
+        JS_FreeAtom(ctx_->ctx, atom);
+    };
     addNativeFunction(ctx, builtins, "__getMemberObjCStr", { ValueType::Object, ValueType::StringConst }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, const char* name, JSValue* res) {
-            JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
-            *res = JS_GetPropertyStr(ctx_->ctx, val, name);
-            if (JS_IsException(*res)) {
-                ctx_->exceptionFlag = 1;
-            }
-        }
-    );
-    addNativeFunction(ctx, builtins, "__setMemberObjCStr", { ValueType::Object, ValueType::StringConst, ValueType::Any }, ValueType::Void, true,
-        +[](RuntimeContext* ctx_, JSObject* obj, const char* name, JSValue val) {
-            JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
-            if (JS_SetPropertyStr(ctx_->ctx, objVal, name, val) < 0) {
-                ctx_->exceptionFlag = 1;
-            }
+            getMemberCStr(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), name, res);
         }
     );
     addNativeFunction(ctx, builtins, "__getMemberObjI32", { ValueType::Object, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, int32_t index, JSValue* res) {
-            JSValue val = JS_MKPTR(JS_TAG_OBJECT, obj);
-            *res = JS_GetPropertyUint32(ctx_->ctx, val, index);
-            if (JS_IsException(*res)) {
-                ctx_->exceptionFlag = 1;
-            }
+            getMemberI32(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), index, res);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__getMemberObjAny", { ValueType::Object, ValueType::Any }, ValueType::Any, true,
+        +[](RuntimeContext* ctx_, JSObject* obj, JSValue id, JSValue* res) {
+            getMemberAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), id, res);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__getMemberAnyCStr", { ValueType::Any, ValueType::StringConst }, ValueType::Any, true,
+        +[](RuntimeContext* ctx_, JSValue obj, const char* name, JSValue* res) {
+            getMemberCStr(ctx_, obj, name, res);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__getMemberAnyI32", { ValueType::Any, ValueType::I32 }, ValueType::Any, true,
+        +[](RuntimeContext* ctx_, JSValue obj, int32_t index, JSValue* res) {
+            getMemberI32(ctx_, obj, index, res);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__getMemberAnyAny", { ValueType::Any, ValueType::Any }, ValueType::Any, true,
+        +[](RuntimeContext* ctx_, JSValue obj, JSValue id, JSValue* res) {
+            getMemberAny(ctx_, obj, id, res);
+        }
+    );
+
+    addNativeFunction(ctx, builtins, "__setMemberObjCStr", { ValueType::Object, ValueType::StringConst, ValueType::Any }, ValueType::Void, true,
+        +[](RuntimeContext* ctx_, JSObject* obj, const char* name, JSValue val) {
+            setMemberCStr(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), name, val);
         }
     );
     addNativeFunction(ctx, builtins, "__setMemberObjI32", { ValueType::Object, ValueType::I32, ValueType::Any }, ValueType::Void, true,
         +[](RuntimeContext* ctx_, JSObject* obj, int32_t index, JSValue val) {
-            JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, obj);
-            if (JS_SetPropertyUint32(ctx_->ctx, objVal, index, val) < 0) {
-                ctx_->exceptionFlag = 1;
-            }
+            setMemberI32(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), index, val);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__setMemberObjAny", { ValueType::Object, ValueType::Any, ValueType::Any }, ValueType::Void, true,
+        +[](RuntimeContext* ctx_, JSObject* obj, JSValue id, JSValue val) {
+            setMemberAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), id, val);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__setMemberAnyCStr", { ValueType::Any, ValueType::StringConst, ValueType::Any }, ValueType::Void, true,
+        +[](RuntimeContext* ctx_, JSValue obj, const char* name, JSValue val) {
+            setMemberCStr(ctx_, obj, name, val);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__setMemberAnyI32", { ValueType::Any, ValueType::I32, ValueType::Any }, ValueType::Void, true,
+        +[](RuntimeContext* ctx_, JSValue obj, int32_t index, JSValue val) {
+            setMemberI32(ctx_, obj, index, val);
+        }
+    );
+    addNativeFunction(ctx, builtins, "__setMemberAnyAny", { ValueType::Any, ValueType::Any, ValueType::Any }, ValueType::Void, true,
+        +[](RuntimeContext* ctx_, JSValue obj, JSValue id, JSValue val) {
+            setMemberAny(ctx_, obj, id, val);
         }
     );
 
-    static constexpr auto callAnyAny = +[](RuntimeContext* ctx_, JSValue obj, JSValue this_, int32_t argc, JSValue* argv) {
+    static constexpr auto callAnyAny = [](RuntimeContext* ctx_, JSValue obj, JSValue this_, int32_t argc, JSValue* argv) {
         JSValue res = JS_Call(ctx_->ctx, obj, this_, argc, argv);
         if (JS_IsException(res)) {
             ctx_->exceptionFlag = 1;
@@ -380,7 +452,7 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         argv[0] = res;
     };
 
-    addNativeFunction(ctx, builtins, "__callAnyAny", { ValueType::Any, ValueType::Any, ValueType::I32 }, ValueType::Any, true, callAnyAny);
+    addNativeFunction(ctx, builtins, "__callAnyAny", { ValueType::Any, ValueType::Any, ValueType::I32 }, ValueType::Any, true, +callAnyAny);
     addNativeFunction(ctx, builtins, "__callObjAny", { ValueType::Object, ValueType::Any, ValueType::I32 }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSObject* obj, JSValue this_, int32_t argc, JSValue* argv) {
             callAnyAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), this_, argc, argv);

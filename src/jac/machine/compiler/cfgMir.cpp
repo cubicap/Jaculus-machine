@@ -504,17 +504,36 @@ void generateSet(CompileContext& cc, Temp a, Temp res) {
 
 void generateGetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
     assert(res.type == ValueType::Any);
-    if (a.type == ValueType::Object && b.type == ValueType::StringConst) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberObjCStr", { cc.regs.at(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
-        cc.checkException();
+
+    switch (a.type) {
+        case ValueType::Any: switch (b.type) {
+            case ValueType::I32:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberAnyI32", { cc.jsValAddr(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
+                break;
+            case ValueType::StringConst:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberAnyCStr", { cc.jsValAddr(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
+                break;
+            case ValueType::Any:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberAnyAny", { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) }, true);
+                break;
+            default: assert(false && "Invalid GetMember operand type");
+        } break;
+        case ValueType::Object: switch (b.type) {
+            case ValueType::I32:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberObjI32", { cc.regs.at(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
+                break;
+            case ValueType::StringConst:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberObjCStr", { cc.regs.at(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
+                break;
+            case ValueType::Any:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberObjAny", { cc.regs.at(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) }, true);
+                break;
+            default: assert(false && "Invalid GetMember operand type");
+        } break;
+        default:
+            assert(false && "Invalid GetMember operand type");
     }
-    else if (a.type == ValueType::Object && b.type == ValueType::I32) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__getMemberObjI32", { cc.regs.at(a.id), cc.regs.at(b.id), cc.jsValAddr(res.id) }, true);
-        cc.checkException();
-    }
-    else {
-        throw std::runtime_error("Unsupported GetMember operands");
-    }
+    cc.checkException();
 }
 
 void generateSetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
@@ -533,17 +552,36 @@ void generateSetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
         );
         cc.toJSVal(b, srcAddr);
     }
-    if (a.type == ValueType::StringConst && res.type == ValueType::Object) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberObjCStr", { cc.regs.at(res.id), cc.regs.at(a.id), srcAddr }, true);
-        cc.checkException();
+
+    switch (res.type) {
+        case ValueType::Any: switch (a.type) {
+            case ValueType::I32:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberAnyI32", { cc.jsValAddr(res.id), cc.regs.at(a.id), srcAddr }, true);
+                break;
+            case ValueType::StringConst:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberAnyCStr", { cc.jsValAddr(res.id), cc.regs.at(a.id), srcAddr }, true);
+                break;
+            case ValueType::Any:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberAnyAny", { cc.jsValAddr(res.id), cc.jsValAddr(a.id), srcAddr }, true);
+                break;
+            default: assert(false && "Invalid SetMember operand type");
+        } break;
+        case ValueType::Object: switch (a.type) {
+            case ValueType::I32:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberObjI32", { cc.regs.at(res.id), cc.regs.at(a.id), srcAddr }, true);
+                break;
+            case ValueType::StringConst:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberObjCStr", { cc.regs.at(res.id), cc.regs.at(a.id), srcAddr }, true);
+                break;
+            case ValueType::Any:
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberObjAny", { cc.regs.at(res.id), cc.jsValAddr(a.id), srcAddr }, true);
+                break;
+            default: assert(false && "Invalid SetMember operand type");
+        } break;
+        default:
+            assert(false && "Invalid SetMember operand type");
     }
-    else if (a.type == ValueType::I32 && res.type == ValueType::Object) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__setMemberObjI32", { cc.regs.at(res.id), cc.regs.at(a.id), srcAddr }, true);
-        cc.checkException();
-    }
-    else {
-        throw std::runtime_error("Unsupported SetMember operands");
-    }
+    cc.checkException();
 
     if (startBlock) {
         cc.insert(MIR_new_insn(cc.ctx, MIR_BEND, MIR_new_reg_op(cc.ctx, *startBlock)));

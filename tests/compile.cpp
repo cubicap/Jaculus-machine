@@ -844,6 +844,61 @@ TEST_CASE("Any", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"2", "3.5", "2"});
     }
+
+    SECTION("Member get") {
+        machine.initialize();
+        std::string code(R"(
+            function str(a: any): any {
+                return a.x;
+            }
+            function num(a: any): any {
+                return a[1];
+            }
+            function any(a: any, b: any): any {
+                return a[b];
+            }
+
+            let o = new Object();
+            o.x = 1234;
+            let p = new Object();
+            p[1] = 5678;
+            report(str(o));
+            report(num(p));
+            report(any(o, "x"));
+            report(any(p, 1));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"1234", "5678", "1234", "5678"});
+    }
+
+    SECTION("Member set") {
+        machine.initialize();
+        std::string code(R"(
+            function str(a: any): void {
+                a.x = 12;
+            }
+            function num(a: any): void {
+                a[1] = 23;
+            }
+            function any(a: any, b: any): void {
+                a[b] = 56;
+            }
+
+            let o = new Object();
+            str(o);
+            num(o);
+            any(o, "y");
+            any(o, 7);
+            report(o.x);
+            report(o[1]);
+            report(o.y);
+            report(o[7]);
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"12", "23", "56", "56"});
+    }
 }
 
 
