@@ -638,10 +638,16 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
     }
 
     RValue lop = materialize(val, func);
-    if (lop.type() != ValueType::I32 && lop.type() != ValueType::F64) {
+    RValue rop;
+    if (lop.type() == ValueType::I32) {
+        rop = emitConst(static_cast<int32_t>(1), func);
+    }
+    else if (lop.type() == ValueType::F64) {
+        rop = emitConst(static_cast<double>(1), func);
+    }
+    else {
         throw IRGenError("Unsupported type for update expression");
     }
-    RValue rop = emitConst(static_cast<int32_t>(1), func);
     emitPushFree(rop, func);
 
     RValue valPre;
@@ -707,12 +713,20 @@ Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
     Opcode op = it->second;
 
     RValue argR = materialize(arg, func);
-    emitPushFree(argR, func);
-    RValue res = { Temp::create(argR.type()) };
+    auto resType = resultType(op, argR.type(), ValueType::Void);
+
+    RValue argConv = emitCastAndFree(argR, resType, func);
+
+    if (op == Opcode::UnPlus) {
+        return { argConv };
+    }
+
+    emitPushFree(argConv, func);
+    RValue res = { Temp::create(resType) };
 
     func.emitStatement({Operation{
         .op = op,
-        .a = argR,
+        .a = argConv,
         .res = res
     }});
 

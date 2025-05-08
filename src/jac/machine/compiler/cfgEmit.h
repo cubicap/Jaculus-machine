@@ -2,12 +2,10 @@
 
 #include "ast.h"
 #include "cfg.h"
-#include "opcode.h"
 
-#include <type_traits>
-#include <unordered_map>
-#include <variant>
-#include <vector>
+#include <map>
+#include <stdexcept>
+#include <string>
 
 
 namespace jac::cfg {
@@ -15,8 +13,7 @@ namespace jac::cfg {
 
 class IRGenError : public std::runtime_error {
 public:
-    explicit IRGenError(const std::string& message)
-        : std::runtime_error(message) {}
+    explicit IRGenError(const std::string& message): std::runtime_error(message) {}
 };
 
 
