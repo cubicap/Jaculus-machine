@@ -1019,18 +1019,15 @@ bool emit(const ast::Statement& statement, FunctionEmitter& func);
 
 void emit(const ast::IfStatement& stmt, FunctionEmitter& func) {
     auto preBlock = func.getActiveBlock();
-    auto condBlock = func.createBlock();
     auto ifBlock = func.createBlock();
     auto elseBlock = func.createBlock();  // XXX: set to null if no else block
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Terminal::jump(condBlock);
     ifBlock->jump = Terminal::jump(postBlock);
     elseBlock->jump = Terminal::jump(postBlock);
 
     // condition block
-    func.setActiveBlock(condBlock);
     RValue cond = emit(stmt.expression, func);
     RValue res = emitCastAndFree(cond, ValueType::Bool, func);
     emitPushFree(res, func);
