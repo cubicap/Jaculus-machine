@@ -239,7 +239,7 @@ struct CompileContext {
         return addr;
     }
 
-    auto jsValAddr(TmpId id) -> MIR_reg_t{
+    MIR_reg_t jsValAddr(TmpId id) {
         auto it = stackSlots.find(id);
         if (it == stackSlots.end()) {
             return regs.at(id);

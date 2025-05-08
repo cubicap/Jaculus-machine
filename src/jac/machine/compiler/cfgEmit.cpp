@@ -646,7 +646,9 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         rop = emitConst(static_cast<double>(1), func);
     }
     else {
-        throw IRGenError("Unsupported type for update expression");
+        lop = emitCastAndFree(lop, ValueType::Any, func);
+        RValue off = emitConst(static_cast<int32_t>(1), func);
+        rop = emitCastAndFree(off, ValueType::Any, func);
     }
     emitPushFree(rop, func);
 

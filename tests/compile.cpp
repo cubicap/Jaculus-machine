@@ -828,6 +828,22 @@ TEST_CASE("Any", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"true", "true", "false", "false", "false", "true"});
     }
+
+    SECTION("UpdateAny") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(a: any): any {
+                return ++a;
+            }
+
+            report(fun(1));
+            report(fun(2.5));
+            report(fun(true));
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"2", "3.5", "2"});
+    }
 }
 
 
