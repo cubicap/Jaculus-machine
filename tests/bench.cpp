@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <fstream>
+#include <chrono>
 #include <iostream>
 #include <string>
 
@@ -36,7 +37,11 @@ using MachineAot = jac::ComposeMachine<
 
 
 template<typename Machine>
-void run(std::string& code, const auto& defines) {
+auto run(std::string& code, const auto& defines) {
+    auto start = std::chrono::high_resolution_clock::now();
+    decltype(start) initialized;
+    decltype(start) finished;
+
     Machine machine;
     initializeIo(machine);
     machine.initialize();
@@ -46,24 +51,41 @@ void run(std::string& code, const auto& defines) {
     }
 
     try {
-        machine.evalModuleWithEventLoop(code, "main.js");
+        jac::Value bytecode = machine.eval(code, "main.js", jac::EvalFlags::CompileOnly | jac::EvalFlags::Global);
+        machine.resetWatchdog();
+        initialized = std::chrono::high_resolution_clock::now();
+        jac::Value res(machine.context(), JS_EvalFunction(machine.context(), bytecode.loot().second));
+        finished = std::chrono::high_resolution_clock::now();
     } catch (jac::Exception& e) {
         std::cerr << "Exception: " << e.what() << std::endl;
         std::cerr << "Stack: " << e.stackTrace() << std::endl;
     } catch (std::exception& e) {
         std::cerr << "Exception: " << e.what() << std::endl;
     }
+
+    return std::make_pair(initialized - start, finished - initialized);
 }
 
 
 template<typename Machine>
 void repeat(std::string& code, int count, const auto& defines) {
+    using Duration = decltype(run<Machine>(code, defines).first);
+
+    auto initSum = Duration::zero();
+    auto runSum = Duration::zero();
+
     for (int i = 0; i < count; ++i) {
         std::cerr << '\r' << i << " / " << count << ' ' << std::flush;
-        run<Machine>(code, defines);
+        auto [init, runtime] = run<Machine>(code, defines);
+
+        initSum += init;
+        runSum += runtime;
     }
 
     std::cerr << '\r' << count << " / " << count << std::endl;
+
+    std::cout << std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(initSum).count() / count << ";"
+              << std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(runSum).count() / count << ";" << std::endl;
 }
 
 
