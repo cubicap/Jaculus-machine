@@ -1409,4 +1409,30 @@ TEST_CASE("Exceptions", "[aot]") {
 
         evalCodeThrows(machine, code, "test", jac::EvalFlags::Global);
     }
+
+    SECTION("I32 div by zero") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(x: int32): int32 {
+                return 42 / x;
+            }
+
+            fun(0);
+        )");
+
+        evalCodeThrows(machine, code, "test", jac::EvalFlags::Global);
+    }
+
+    SECTION("I32 rem by zero") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(x: int32): int32 {
+                return 42 % x;
+            }
+
+            fun(0);
+        )");
+
+        evalCodeThrows(machine, code, "test", jac::EvalFlags::Global);
+    }
 }

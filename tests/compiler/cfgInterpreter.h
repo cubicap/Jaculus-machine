@@ -439,6 +439,16 @@ namespace detail {
             return jac::quickjs_ops::div(ctx, a, b, &err);
         }
     };
+    template<>
+    struct divides<int32_t> {
+        JSContext* ctx;
+        decltype(auto) operator()(int32_t a, int32_t b) {
+            if (b == 0) {
+                throw std::runtime_error("Division by zero");
+            }
+            return a / b;
+        }
+    };
     template<typename T>
         requires NotAny<T>
     struct divides<T> {
@@ -857,6 +867,9 @@ class CFGInterpreter {
 
     void evalRem(JSContext* ctx, const Operation& op) {
         if (op.res.type == ValueType::I32) {
+            if (*std::get<Int32>(getReg(op.b.id)) == 0) {
+                throw std::runtime_error("Division by zero");
+            }
             setReg(op.res.id, Int32{ *std::get<Int32>(getReg(op.a.id)) % *std::get<Int32>(getReg(op.b.id)) });
         }
         else if (op.res.type == ValueType::F64) {

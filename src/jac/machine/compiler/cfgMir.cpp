@@ -196,6 +196,7 @@ struct CompileContext {
     MIR_reg_t exceptionFlagAddr;
     MIR_label_t exceptionLabel;
     MIR_label_t invalidConversionLabel;
+    MIR_label_t divisionByZeroLabel;
 
     Builtins& builtins;
     const std::map<std::string, std::pair<MIR_item_t, MIR_item_t>>& prototypes;
@@ -291,8 +292,11 @@ void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res)
         return;
     }
 
-    MIR_insn_code_t code;
+    if (a.type == ValueType::I32 && (op == Opcode::Div || op == Opcode::Rem)) {
+        cc.insert(MIR_new_insn(cc.ctx, MIR_BFS, MIR_new_label_op(cc.ctx, cc.divisionByZeroLabel), cc.regOp(b.id)));
+    }
 
+    MIR_insn_code_t code;
     switch (op) {
         case Opcode::Add:  switch (a.type) {
             case ValueType::I32:  code = MIR_ADDS; break;
@@ -889,6 +893,7 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
     cc.insert(MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, cc.exceptionFlagAddr), MIR_new_int_op(ctx, reinterpret_cast<int64_t>(&builtins.rtCtx->exceptionFlag))));  // NOLINT
     cc.exceptionLabel = MIR_new_label(ctx);
     cc.invalidConversionLabel = MIR_new_label(ctx);
+    cc.divisionByZeroLabel = MIR_new_label(ctx);
 
     cc.allocaPtr = MIR_new_func_reg(ctx, cc.func, MIR_T_I64, "allocaPtr");
     MIR_append_insn(ctx, cc.fun, MIR_new_insn(ctx, MIR_ALLOCA, MIR_new_reg_op(ctx, cc.allocaPtr), MIR_new_int_op(ctx, sizeof(JSValue) * cc.stackSlots.size())));
@@ -905,8 +910,13 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
         generateTerminator(cc, block->jump, cfg);
     }
 
+    cc.insert(cc.divisionByZeroLabel);
+    generateThrowError(ctx, cc.fun, builtins, "Division by zero", ErrorType::RangeError);
+    cc.insert(MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, cc.exceptionLabel)));
+
     cc.insert(cc.invalidConversionLabel);
     generateThrowError(ctx, cc.fun, builtins, "Invalid conversion", ErrorType::TypeError);
+    cc.insert(MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, cc.exceptionLabel)));
 
     cc.insert(cc.exceptionLabel);
     generateSetExceptionFlag(ctx, cc.fun, cc.exceptionFlagAddr, 1);
