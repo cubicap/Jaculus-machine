@@ -479,6 +479,22 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    static constexpr auto callCtorAny = [](RuntimeContext* ctx_, JSValue obj, int32_t argc, JSValue* argv) {
+        JSValue res = JS_CallConstructor(ctx_->ctx, obj, argc, argv);
+        if (JS_IsException(res)) {
+            ctx_->exceptionFlag = 1;
+            return;
+        }
+        argv[0] = res;
+    };
+
+    addNativeFunction(ctx, builtins, "__callCtorAny", { ValueType::Any, ValueType::I32 }, ValueType::Any, true, +callCtorAny);
+    addNativeFunction(ctx, builtins, "__callCtorObj", { ValueType::Object, ValueType::I32 }, ValueType::Any, true,
+        +[](RuntimeContext* ctx_, JSObject* obj, int32_t argc, JSValue* argv) {
+            callCtorAny(ctx_, JS_MKPTR(JS_TAG_OBJECT, obj), argc, argv);
+        }
+    );
+
     addNativeFunction(ctx, builtins, "__add", { ValueType::Any, ValueType::Any }, ValueType::Any, true,
         +[](RuntimeContext* ctx_, JSValue a, JSValue b, JSValue* res) {
             *res = quickjs_ops::add(ctx_->ctx, a, b, &ctx_->exceptionFlag);

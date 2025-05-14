@@ -99,7 +99,12 @@ inline void print(std::ostream& os, const ConstInit& init) {
 
 inline void print(std::ostream& os, const Call& call) {
     print(os, call.res);
-    os << " ← call ";
+    if (call.isConstructor) {
+        os << " ← ctor ";
+    }
+    else {
+        os << " ← call ";
+    }
     struct visitor {
         std::ostream& os;
         void operator()(const Identifier& id) const {

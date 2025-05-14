@@ -430,6 +430,46 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
 }
 
 
+[[nodiscard]] RValue emitCallObj(Value obj, const ast::Arguments& args_, FunctionEmitter& func, bool isConstructor) {
+    RValue res = { Temp::create(ValueType::Any) };
+
+    RValue objR = materialize(obj, func);
+    emitPushFree(objR, func);
+
+    std::vector<Temp> args;
+    args.reserve(args_.arguments.size() + 1);
+    if (obj.isRValue() || isConstructor) {
+        args.push_back(Temp::undefined());
+    }
+    else {
+        args.push_back(obj.asLVRef().self);
+    }
+    for (const auto& [ spread, expr ] : args_.arguments) {
+        if (spread) {
+            throw IRGenError("Spread arguments are not supported");
+        }
+        Value arg = emit(*expr, func);
+        RValue argR = materialize(arg, func);
+
+        if (argR.type() == ValueType::StringConst) {
+            argR = emitCastAndFree(argR, ValueType::Any, func);
+        }
+        emitPushFree(argR, func);
+
+        args.push_back(argR);
+    }
+
+    func.emitStatement({Call{
+        .obj = objR,
+        .isConstructor = isConstructor,
+        .args = args,
+        .res = res
+    }});
+
+    return { res };
+}
+
+
 [[nodiscard]] LVRef mbrAccess(Value obj, RValue acc, FunctionEmitter& func) {
     RValue objR;
     if (obj.isRValue()) {
@@ -475,44 +515,17 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
             throw IRGenError("Import calls are not supported");
         }
         Value operator()(const std::pair<ast::MemberExpression, ast::Arguments>& call) {
-            if (auto ident = memberGetIdentifier(call.first); ident) {
+            const auto& [mem, args_] = call;
+
+            if (auto ident = memberGetIdentifier(mem); ident) {
                 if (!func.getLocal(*ident)) {
-                    return { emitCallNative(*ident, call.second, func) };
+                    return { emitCallNative(*ident, args_, func) };
                 }
             }
 
-            Value obj = emit(call.first, func);
-            RValue objR = materialize(obj, func);
-            emitPushFree(objR, func);
+            Value obj = emit(mem, func);
+            return { emitCallObj(obj, args_, func, false) };
 
-            RValue res = { Temp::create(ValueType::Any) };
-
-            std::vector<Temp> args;
-            args.reserve(call.second.arguments.size() + 1);
-            if (obj.isRValue()) {
-                args.push_back(Temp::undefined());
-            }
-            else {
-                args.push_back(obj.asLVRef().self);
-            }
-            for (const auto& [ spread, expr ] : call.second.arguments) {
-                if (spread) {
-                    throw IRGenError("Spread arguments are not supported");
-                }
-                Value arg = emit(*expr, func);
-                auto argR = materialize(arg, func);
-                emitPushFree(argR, func);
-
-                args.push_back(argR);
-            }
-
-            func.emitStatement({Call{
-                .obj = objR,
-                .args = args,
-                .res = res
-            }});
-
-            return { res };
         }
         Value operator()(const std::pair<ast::CallExpressionPtr, ast::Arguments>&) { // call
             throw IRGenError("Call -> args are not supported");
@@ -583,8 +596,11 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
             throw IRGenError("Member -> template literals are not supported");
         }
 
-        Value operator()(const std::pair<ast::MemberExpressionPtr, ast::Arguments>&) { // new
-            throw IRGenError("New expressions are not supported");
+        Value operator()(const std::pair<ast::MemberExpressionPtr, ast::Arguments>& ctorCall) { // new
+            const auto& [mem, args_] = ctorCall;
+
+            Value obj = emit(*mem, func);
+            return { emitCallObj(obj, args_, func, true) };
         }
     };
 

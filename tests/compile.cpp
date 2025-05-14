@@ -1391,6 +1391,20 @@ TEST_CASE("Operators", "[aot]") {
             "8", "1.5", "8", "3"
         });
     }
+
+    SECTION("New") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(ctor: any): any {
+                return new ctor("test");
+            }
+
+            report(fun(Error).message);
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"test"});
+    }
 }
 
 

@@ -148,6 +148,7 @@ struct ConstInit {
 
 struct Call {
     std::variant<Identifier, Temp> obj;  // native/object
+    bool isConstructor = false;
     std::vector<Temp> args;
     Temp res;
 

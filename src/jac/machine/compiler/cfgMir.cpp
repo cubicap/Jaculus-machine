@@ -776,43 +776,61 @@ void generateInstruction(CompileContext& cc, Call& call) {
         for (size_t i = 1; i < call.args.size(); ++i) {
             auto arg = call.args[i];
             auto addr = cc.calcOff(argsStart, i - 1, sizeof(JSValue));
-            cc.toJSVal(arg, addr);
+            if (arg.type == ValueType::Any) {
+                cc.copyJSVal(cc.jsValAddr(arg.id), addr);
+            }
+            else {
+                cc.toJSVal(arg, addr);
+            }
         }
 
         auto funObj = std::get<Temp>(call.obj);
         auto thisArg = call.args[0];
-        if (funObj.type == ValueType::Any) {
-            auto funReg = cc.jsValAddr(funObj.id);
-            if (thisArg.type == ValueType::Any) {
-                generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
+        if (!call.isConstructor) {
+            if (funObj.type == ValueType::Any) {
+                auto funReg = cc.jsValAddr(funObj.id);
+                if (thisArg.type == ValueType::Any) {
+                    generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
+                }
+                else if (thisArg.type == ValueType::Object) {
+                    generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
+                }
+                else if (thisArg.type == ValueType::Void) {
+                    generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyUndefined", { funReg, argCount, argsStart }, true);
+                }
+                else {
+                    assert(false && "Invalid call operand type");
+                }
             }
-            else if (thisArg.type == ValueType::Object) {
-                generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
-            }
-            else if (thisArg.type == ValueType::Void) {
-                generateCall(cc.ctx, cc.fun, cc.builtins, "__callAnyUndefined", { funReg, argCount, argsStart }, true);
-            }
-            else {
-                assert(false && "Invalid call operand type");
-            }
-        }
-        else if (funObj.type == ValueType::Object) {
-            auto funReg = cc.regs.at(funObj.id);
-            if (thisArg.type == ValueType::Any) {
-                generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
-            }
-            else if (thisArg.type == ValueType::Object) {
-                generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
-            }
-            else if (thisArg.type == ValueType::Void) {
-                generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjUndefined", { funReg, argCount, argsStart }, true);
+            else if (funObj.type == ValueType::Object) {
+                auto funReg = cc.regs.at(funObj.id);
+                if (thisArg.type == ValueType::Any) {
+                    generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjAny", { funReg, cc.jsValAddr(thisArg.id), argCount, argsStart }, true);
+                }
+                else if (thisArg.type == ValueType::Object) {
+                    generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjObj", { funReg, cc.regs.at(thisArg.id), argCount, argsStart }, true);
+                }
+                else if (thisArg.type == ValueType::Void) {
+                    generateCall(cc.ctx, cc.fun, cc.builtins, "__callObjUndefined", { funReg, argCount, argsStart }, true);
+                }
+                else {
+                    assert(false && "Invalid call operand type");
+                }
             }
             else {
                 assert(false && "Invalid call operand type");
             }
         }
         else {
-            assert(false && "Invalid call operand type");
+            if (funObj.type == ValueType::Any) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callCtorAny", { cc.jsValAddr(funObj.id), argCount, argsStart }, true);
+            }
+            else if (funObj.type == ValueType::Object) {
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__callCtorObj", { cc.regs.at(funObj.id), argCount, argsStart }, true);
+            }
+            else {
+                assert(false && "Invalid call operand type");
+            }
         }
 
         cc.copyJSVal(argsStart, cc.jsValAddr(call.res.id));

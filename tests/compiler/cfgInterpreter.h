@@ -388,10 +388,6 @@ inline RegVal unwrapAny(JSContext* ctx, Any v, ValueType type) {
         case ValueType::Any: {
             return Any{ v };
         }
-        case ValueType::StringConst: {
-            if (JS_VALUE_GET_TAG(*v) != JS_TAG_STRING) { throw std::runtime_error("Not a String"); }
-            return StringConst{ reinterpret_cast<const char*>(JS_VALUE_GET_PTR(*v)) };  // NOLINT
-        }
         case ValueType::Void: {
             throw std::runtime_error("Invalid type");
         }
@@ -985,7 +981,7 @@ class CFGInterpreter {
         setReg(call.res.id, unwrapAny(ctx, Any{ res }, call.res.type));
     }
 
-    void evalCallFn(JSContext* ctx, const Call& call) {
+    void evalCallObj(JSContext* ctx, const Call& call) {
         auto obj = getReg(std::get<Temp>(call.obj).id);
 
         std::vector<JSValue> args;
@@ -1003,15 +999,29 @@ class CFGInterpreter {
         }
 
         JSValue res;
-        if (std::holds_alternative<Any>(obj)) {
-            res = JS_Call(ctx, *std::get<Any>(obj), thisVal, args.size(), args.data());
-        }
-        else if (std::holds_alternative<ObjectPtr>(obj)) {
-            JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, *std::get<ObjectPtr>(obj));
-            res = JS_Call(ctx, objVal, thisVal, args.size(), args.data());
+        if (!call.isConstructor) {
+            if (std::holds_alternative<Any>(obj)) {
+                res = JS_Call(ctx, *std::get<Any>(obj), thisVal, args.size(), args.data());
+            }
+            else if (std::holds_alternative<ObjectPtr>(obj)) {
+                JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, *std::get<ObjectPtr>(obj));
+                res = JS_Call(ctx, objVal, thisVal, args.size(), args.data());
+            }
+            else {
+                throw std::runtime_error("Invalid call operand type");
+            }
         }
         else {
-            throw std::runtime_error("Invalid call operand type");
+            if (std::holds_alternative<Any>(obj)) {
+                res = JS_CallConstructor(ctx, *std::get<Any>(obj), args.size(), args.data());
+            }
+            else if (std::holds_alternative<ObjectPtr>(obj)) {
+                JSValue objVal = JS_MKPTR(JS_TAG_OBJECT, *std::get<ObjectPtr>(obj));
+                res = JS_CallConstructor(ctx, objVal, args.size(), args.data());
+            }
+            else {
+                throw std::runtime_error("Invalid call operand type");
+            }
         }
         setReg(call.res.id, Any{ res });
     }
@@ -1095,7 +1105,7 @@ public:
                     self.evalCallNative(ctx, call);
                 }
                 else {
-                    self.evalCallFn(ctx, call);
+                    self.evalCallObj(ctx, call);
                 }
             }
         };
