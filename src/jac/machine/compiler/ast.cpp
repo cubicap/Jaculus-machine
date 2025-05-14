@@ -1158,16 +1158,16 @@ std::optional<MemberExpression> MemberExpression::parse(ParserState& state) {
 
 
 std::optional<NewExpression> NewExpression::parse(ParserState& state) {
-    if (state.current().kind != lex::Token::Keyword && state.current().text == "new") {
+    if (auto member = MemberExpression::parse(state)) {
+        return NewExpression{std::move(*member)};
+    }
+    if (state.current().kind == lex::Token::Keyword && state.current().text == "new") {
         state.advance();
         if (auto expr = NewExpression::parse(state)) {
             auto ptr = std::make_unique<NewExpression>(std::move(*expr));
             return NewExpression{std::move(ptr)};
         }
         state.backtrack();
-    }
-    if (auto member = MemberExpression::parse(state)) {
-        return NewExpression{std::move(*member)};
     }
 
     return std::nullopt;
@@ -1332,8 +1332,7 @@ std::optional<Script> Script::parse(ParserState& state) {
 
 
 std::optional<UpdateExpression> UpdateExpression::parse(ParserState& state) {
-    // TODO: handle situations like multiple ++ or -- operators
-    // TODO: check that "AssignmentTargetType" is simple
+    // TODO: check that "AssignmentTargetType" is simple while parsing
     if (state.current().kind == lex::Token::Punctuator) {
         std::string_view op = state.current().text;
         if (op == "++" || op == "--") {

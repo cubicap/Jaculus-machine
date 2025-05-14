@@ -1405,6 +1405,20 @@ TEST_CASE("Operators", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"test"});
     }
+
+    SECTION("New argless") {
+        machine.initialize();
+        std::string code(R"(
+            function fun(ctor: any): any {
+                return new ctor;
+            }
+
+            report(fun(Error).message);
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{""});
+    }
 }
 
 

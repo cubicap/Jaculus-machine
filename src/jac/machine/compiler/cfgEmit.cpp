@@ -615,8 +615,9 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         Value operator()(const ast::MemberExpression& member) {
             return emit(member, func);
         }
-        Value operator()(const ast::NewExpressionPtr&) {
-            throw IRGenError("New expressions are not supported");
+        Value operator()(const ast::NewExpressionPtr& new_) {
+            Value obj = emit(*new_, func);
+            return { emitCallObj(obj, ast::Arguments{}, func, true) };
         }
     };
 
