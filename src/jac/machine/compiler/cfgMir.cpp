@@ -284,6 +284,30 @@ struct CompileContext {
     }
 };
 
+void generateDup(CompileContext& cc, Temp a) {
+    if (a.type == ValueType::Any) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__dupVal", { cc.jsValAddr(a.id) }, false);
+    }
+    else if (a.type == ValueType::Object) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__dupObj", { cc.regs.at(a.id) }, false);
+    }
+    else {
+        assert((isNumeric(a.type) || a.type == ValueType::StringConst) && "Invalid Dup operand type");
+    }
+}
+
+void generatePushFree(CompileContext& cc, Temp a) {
+    if (a.type == ValueType::Any) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__pushFreeVal", { cc.jsValAddr(a.id) }, false);
+    }
+    else if (a.type == ValueType::Object) {
+        generateCall(cc.ctx, cc.fun, cc.builtins, "__pushFreeObj", { cc.regs.at(a.id) }, false);
+    }
+    else {
+        assert((isNumeric(a.type) || a.type == ValueType::StringConst) && "Invalid PushFree operand type");
+    }
+}
+
 void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
     assert(a.type == b.type && a.type == res.type);
     if (a.type == ValueType::Any) {
@@ -473,6 +497,9 @@ void generateSet(CompileContext& cc, Temp a, Temp res) {
         return;
     }
     if (res.type == ValueType::Any) {
+        if (a.type == ValueType::Object) {
+            generateDup(cc, a);
+        }
         cc.toJSVal(a, cc.jsValAddr(res.id));
         return;
     }
@@ -617,30 +644,6 @@ void generateUnMinus(CompileContext& cc, Temp a, Temp res) {
         default: assert(false && "Invalid UnMinus operand type");
     }
     cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id)));
-}
-
-void generateDup(CompileContext& cc, Temp a) {
-    if (a.type == ValueType::Any) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__dupVal", { cc.jsValAddr(a.id) }, false);
-    }
-    else if (a.type == ValueType::Object) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__dupObj", { cc.regs.at(a.id) }, false);
-    }
-    else {
-        assert((isNumeric(a.type) || a.type == ValueType::StringConst) && "Invalid Dup operand type");
-    }
-}
-
-void generatePushFree(CompileContext& cc, Temp a) {
-    if (a.type == ValueType::Any) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__pushFreeVal", { cc.jsValAddr(a.id) }, false);
-    }
-    else if (a.type == ValueType::Object) {
-        generateCall(cc.ctx, cc.fun, cc.builtins, "__pushFreeObj", { cc.regs.at(a.id) }, false);
-    }
-    else {
-        assert((isNumeric(a.type) || a.type == ValueType::StringConst) && "Invalid PushFree operand type");
-    }
 }
 
 bool isRegType(ValueType type) {
