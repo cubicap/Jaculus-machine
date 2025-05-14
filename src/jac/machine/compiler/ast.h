@@ -452,30 +452,7 @@ struct Expression {
 
     static std::optional<Expression> parse(ParserState& state);
 
-    static std::optional<Expression> parseParenthesised(ParserState& state) {
-        auto start = state.getPosition();
-        if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
-            state.error("Expected (");
-            return std::nullopt;
-        }
-        state.advance();
-
-        auto expr = parse(state);
-        if (!expr) {
-            state.error("Expected expression");
-            state.restorePosition(start);
-            return std::nullopt;
-        }
-
-        if (state.current().kind != lex::Token::Punctuator || state.current().text != ")") {
-            state.error("Expected )");
-            state.restorePosition(start);
-            return std::nullopt;
-        }
-        state.advance();
-
-        return expr;
-    }
+    static std::optional<Expression> parseParenthesised(ParserState& state);
 };
 
 struct Block {
@@ -832,7 +809,6 @@ struct ObjectLiteral {
     std::vector<PropertyDefinition> properties;
 };
 
-// XXX: why are the following in the grammar twice?
 struct FunctionExpression {
     std::optional<BindingIdentifier> name;  // BindingIdentifier[-Yield, -Await]
     FormalParameters parameters;            // FormalParameters[-Yield, -Await]

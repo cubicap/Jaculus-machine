@@ -1553,6 +1553,30 @@ std::optional<Expression> Expression::parse(ParserState& state) {
     return expr;
 }
 
+std::optional<Expression> Expression::parseParenthesised(ParserState& state) {
+    auto start = state.getPosition();
+    if (state.current().kind != lex::Token::Punctuator || state.current().text != "(") {
+        state.error("Expected (");
+        return std::nullopt;
+    }
+    state.advance();
+
+    auto expr = parse(state);
+    if (!expr) {
+        state.error("Expected expression");
+        state.restorePosition(start);
+        return std::nullopt;
+    }
+
+    if (state.current().kind != lex::Token::Punctuator || state.current().text != ")") {
+        state.error("Expected )");
+        state.restorePosition(start);
+        return std::nullopt;
+    }
+    state.advance();
+
+    return expr;
+}
 
 std::optional<IfStatement> IfStatement::parse(ParserState& state) {
     auto start = state.getPosition();
