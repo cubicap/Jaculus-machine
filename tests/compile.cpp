@@ -1141,6 +1141,28 @@ TEST_CASE("Object", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
     }
+
+    SECTION("Call expression member access") {
+        machine.initialize();
+        auto code = R"(
+            function id(a: object): object {
+                return a;
+            }
+
+            function test(a: object): any {
+                return id(a).b["a"];
+            }
+
+            let o = new Object();
+            let p = new Object();
+            o.b = p;
+            p.a = 42;
+            report(test(o));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
+    }
 }
 
 

@@ -429,20 +429,44 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
     return res;
 }
 
-[[nodiscard]] RValue emit(const ast::CallExpression& call, FunctionEmitter& func) {
+
+[[nodiscard]] LVRef mbrAccess(Value obj, RValue acc, FunctionEmitter& func) {
+    RValue objR;
+    if (obj.isRValue()) {
+        objR = obj.asRValue();
+        emitPushFree(objR, func);
+    }
+    else {
+        LVRef objLV = obj.asLVRef();
+        if (objLV.isMember()) {
+            objR = materialize(obj, func);
+            emitPushFree(objR, func);
+        }
+        else {
+            objR = { objLV.self };
+        }
+    }
+
+    LVRef res = LVRef::mbr(objR, acc, false);
+
+    return res;
+}
+
+
+[[nodiscard]] Value emit(const ast::CallExpression& call, FunctionEmitter& func) {
     struct visitor {
         FunctionEmitter& func;
 
-        RValue operator()(const ast::SuperCall&) {
+        Value operator()(const ast::SuperCall&) {
             throw IRGenError("Super calls are not supported");
         }
-        RValue operator()(const ast::ImportCall&) {
+        Value operator()(const ast::ImportCall&) {
             throw IRGenError("Import calls are not supported");
         }
-        RValue operator()(const std::pair<ast::MemberExpression, ast::Arguments>& call) {
+        Value operator()(const std::pair<ast::MemberExpression, ast::Arguments>& call) {
             if (auto ident = memberGetIdentifier(call.first); ident) {
                 if (!func.getLocal(*ident)) {
-                    return emitCallNative(*ident, call.second, func);
+                    return { emitCallNative(*ident, call.second, func) };
                 }
             }
 
@@ -450,7 +474,7 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
             RValue objR = materialize(obj, func);
             emitPushFree(objR, func);
 
-            RValue res = { Temp::create(ValueType::Any) };  // TODO: infer type from called function
+            RValue res = { Temp::create(ValueType::Any) };
 
             std::vector<Temp> args;
             args.reserve(call.second.arguments.size() + 1);
@@ -477,21 +501,29 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
                 .res = res
             }});
 
-            return res;
+            return { res };
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::Arguments>&) { // call
+        Value operator()(const std::pair<ast::CallExpressionPtr, ast::Arguments>&) { // call
             throw IRGenError("Call -> args are not supported");
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::Expression>&) { // brackets
-            throw IRGenError("Call -> brackets are not supported");
+        Value operator()(const std::pair<ast::CallExpressionPtr, ast::Expression>& callBracket) { // brackets
+            const auto& [call_, acc] = callBracket;
+            Value obj = emit(*call_, func);
+            RValue accR = emit(acc, func);
+
+            return { mbrAccess(obj, accR, func) };
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::IdentifierName>&) { // .
-            throw IRGenError("Call -> dots are not supported");
+        Value operator()(const std::pair<ast::CallExpressionPtr, ast::IdentifierName>& callDot) { // .
+            const auto& [call_, ident] = callDot;
+            Value obj = emit(*call_, func);
+            RValue identR = emitConst(ident, func);
+
+            return { mbrAccess({ obj }, identR, func) };
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::PrivateIdentifier>&) { // .private
+        Value operator()(const std::pair<ast::CallExpressionPtr, ast::PrivateIdentifier>&) { // .private
             throw IRGenError("Call -> .private are not supported");
         }
-        RValue operator()(const std::pair<ast::CallExpressionPtr, ast::TemplateLiteral>&) { // template
+        Value operator()(const std::pair<ast::CallExpressionPtr, ast::TemplateLiteral>&) { // template
             throw IRGenError("Call -> template literals are not supported");
         }
     };
@@ -499,45 +531,6 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
     return std::visit(visitor{func}, call.value);
 }
 
-
-[[nodiscard]] Value emit(const std::pair<ast::MemberExpressionPtr, ast::IdentifierName>& memDot, FunctionEmitter& func) {
-    const auto& [mem, ident] = memDot;
-    Value obj = emit(*mem, func);
-    RValue objR = materialize(obj, func);
-    emitPushFree(objR, func);
-
-    RValue identR = emitConst(ident, func);
-
-    LVRef res = LVRef::mbr(objR, identR, false);
-
-    return { res };
-}
-
-
-[[nodiscard]] Value emit(const std::pair<ast::MemberExpressionPtr, ast::Expression>& memBracket, FunctionEmitter& func) {
-    const auto& [mem, acc] = memBracket;
-    Value obj = emit(*mem, func);
-    RValue objR;
-    if (obj.isRValue()) {
-        objR = obj.asRValue();
-    }
-    else {
-        LVRef objLV = obj.asLVRef();
-        if (objLV.isMember()) {
-            objR = materialize(obj, func);
-            emitPushFree(objR, func);
-        }
-        else {
-            objR = { objLV.self };
-        }
-    }
-
-    RValue accR = emit(acc, func);
-
-    LVRef res = LVRef::mbr(objR, accR, false);
-
-    return { res };
-}
 
 [[nodiscard]] Value emit(const ast::MemberExpression& member, FunctionEmitter& func) {
     struct visitor {
@@ -556,11 +549,19 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         }
 
         Value operator()(const std::pair<ast::MemberExpressionPtr, ast::Expression>& memBracket) { // brackets
-            return emit(memBracket, func);
+            const auto& [mem, acc] = memBracket;
+            Value obj = emit(*mem, func);
+            RValue accR = emit(acc, func);
+
+            return { mbrAccess(obj, accR, func) };
         }
 
         Value operator()(const std::pair<ast::MemberExpressionPtr, ast::IdentifierName>& memDot) { // .
-            return emit(memDot, func);
+            const auto& [mem, ident] = memDot;
+            Value obj = emit(*mem, func);
+            RValue identR = emitConst(ident, func);
+
+            return { mbrAccess(obj, identR, func) };
         }
 
         Value operator()(const std::pair<ast::MemberExpressionPtr, ast::PrivateIdentifier>&) { // .private

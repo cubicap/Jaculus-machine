@@ -367,6 +367,39 @@ inline Any wrapAny(JSContext* ctx, RegVal v) {
 }
 
 
+inline RegVal unwrapAny(JSContext* ctx, Any v, ValueType type) {
+    switch (type) {
+        case ValueType::I32: {
+            if (JS_VALUE_GET_TAG(*v) != JS_TAG_INT) { throw std::runtime_error("Not an Int32"); }
+            return Int32{ JS_VALUE_GET_INT(*v) };
+        }
+        case ValueType::F64: {
+            if (JS_VALUE_GET_TAG(*v) != JS_TAG_FLOAT64) { throw std::runtime_error("Not a Float64"); }
+            return Float64{ JS_VALUE_GET_FLOAT64(*v) };
+        }
+        case ValueType::Bool: {
+            if (JS_VALUE_GET_TAG(*v) != JS_TAG_BOOL) { throw std::runtime_error("Not a Bool"); }
+            return Boolean{ static_cast<bool>(JS_VALUE_GET_INT(*v)) };
+        }
+        case ValueType::Object: {
+            if (JS_VALUE_GET_TAG(*v) != JS_TAG_OBJECT) { throw std::runtime_error("Not an Object"); }
+            return ObjectPtr{ JS_VALUE_GET_PTR(*v) };
+        }
+        case ValueType::Any: {
+            return Any{ v };
+        }
+        case ValueType::StringConst: {
+            if (JS_VALUE_GET_TAG(*v) != JS_TAG_STRING) { throw std::runtime_error("Not a String"); }
+            return StringConst{ reinterpret_cast<const char*>(JS_VALUE_GET_PTR(*v)) };  // NOLINT
+        }
+        case ValueType::Void: {
+            throw std::runtime_error("Invalid type");
+        }
+    }
+    abort();
+}
+
+
 namespace detail {
 
     template<typename T>
@@ -497,7 +530,7 @@ namespace detail {
         requires NotAny<T>
     struct exponentiates<T> {
         JSContext* ctx;
-        T operator()(T a, T b) {
+        T operator()(T, T) {
             throw std::runtime_error("Invalid exponentiation arguments");
         }
     };
@@ -949,7 +982,7 @@ class CFGInterpreter {
         cfg::interp::CFGInterpreter interp(_compiledHolder);
         JSValue res = interp.run(fn.fn, ctx, JS_UNDEFINED, args.size(), args.data());
 
-        setReg(call.res.id, convert(ctx, Any{ res }, call.res.type));
+        setReg(call.res.id, unwrapAny(ctx, Any{ res }, call.res.type));
     }
 
     void evalCallFn(JSContext* ctx, const Call& call) {
