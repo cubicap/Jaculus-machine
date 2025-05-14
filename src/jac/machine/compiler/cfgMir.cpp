@@ -168,7 +168,12 @@ void generateConvertFromJSVal(MIR_context_t ctx, MIR_item_t fun, Builtins& built
     insert(end);
 }
 
-void generateConvertToJSVal(MIR_context_t ctx, MIR_item_t fun, MIR_reg_t src, MIR_reg_t dstAddr, ValueType type) {
+void generateConvertToJSVal(MIR_context_t ctx, MIR_item_t fun, Builtins& builtins, MIR_reg_t src, MIR_reg_t dstAddr, ValueType type) {
+    if (type == ValueType::StringConst) {
+        generateCall(ctx, fun, builtins, "__newString", { src, dstAddr }, true);
+        return;
+    }
+
     auto dstL = MIR_new_mem_op(ctx, getMIRRegType(type),   0, dstAddr, 0, 0);
     auto dstH = MIR_new_mem_op(ctx, MIR_T_I64, sizeof(int64_t), dstAddr, 0, 0);
 
@@ -263,7 +268,7 @@ struct CompileContext {
     }
 
     auto toJSVal(Temp a, MIR_reg_t dstAddr) {
-        generateConvertToJSVal(ctx, fun, regs.at(a.id), dstAddr, a.type);
+        generateConvertToJSVal(ctx, fun, builtins, regs.at(a.id), dstAddr, a.type);
     }
 
     auto fromJSVal(MIR_reg_t srcAddr, Temp res) {
@@ -1026,7 +1031,7 @@ MIR_item_t compileCaller(MIR_context_t ctx, Builtins& builtins, Function& cfg, M
     auto tagOp = MIR_new_mem_op(ctx, MIR_T_I64, TAG_DISP, resReg, 0, 0);
     switch (cfg.ret) {
         case ValueType::I32:  case ValueType::Bool:  case ValueType::Object:  case ValueType::F64:
-            generateConvertToJSVal(ctx, caller, calleeRes, resReg, cfg.ret);
+            generateConvertToJSVal(ctx, caller, builtins, calleeRes, resReg, cfg.ret);
             break;
         case ValueType::Void:
             insert(MIR_new_insn(ctx, MIR_MOV, tagOp, MIR_new_int_op(ctx, JS_TAG_UNDEFINED)));

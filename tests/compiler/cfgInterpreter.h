@@ -302,6 +302,9 @@ struct ConvertVisitor<Any> {
     Any operator()(Boolean v) {
         return JS_NewBool(ctx, *v);
     }
+    Any operator()(StringConst v) {
+        return JS_NewString(ctx, (*v).c_str());
+    }
     Any operator()(auto) {
         throw std::runtime_error("Invalid conversion to JSValue");
     }

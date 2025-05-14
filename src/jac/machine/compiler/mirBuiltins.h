@@ -600,6 +600,15 @@ inline Builtins generateBuiltins(MIR_context_t ctx, RuntimeContext* rtCtx) {
         }
     );
 
+    addNativeFunction(ctx, builtins, "__newString", { ValueType::StringConst }, ValueType::Any, true,
+        +[](RuntimeContext* ctx_, const char* str, JSValue* res) {
+            *res = JS_NewString(ctx_->ctx, str);
+            if (JS_IsException(*res)) {
+                ctx_->exceptionFlag = 1;
+            }
+        }
+    );
+
     return builtins;
 }
 

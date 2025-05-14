@@ -899,6 +899,20 @@ TEST_CASE("Any", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"12", "23", "56", "56"});
     }
+
+    SECTION("string") {
+        machine.initialize();
+        std::string code(R"(
+            function str(): any {
+                return "hello";
+            }
+
+            report(str());
+        )");
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"hello"});
+    }
 }
 
 
