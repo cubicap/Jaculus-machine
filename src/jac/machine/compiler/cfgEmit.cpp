@@ -447,6 +447,17 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         }
     }
 
+    if (objR.type() != ValueType::Object && objR.type() != ValueType::Any) {
+        RValue conv = { Temp::create(ValueType::Any) };
+        func.emitStatement({Operation{
+            .op = Opcode::Set,
+            .a = objR,
+            .res = conv
+        }});
+        emitPushFree(conv, func);
+        objR = conv;
+    }
+
     LVRef res = LVRef::mbr(objR, acc, false);
 
     return res;

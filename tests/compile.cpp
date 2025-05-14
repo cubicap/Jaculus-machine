@@ -1163,6 +1163,20 @@ TEST_CASE("Object", "[aot]") {
         evalCode(machine, code, "test", jac::EvalFlags::Global);
         REQUIRE(machine.getReports() == std::vector<std::string>{"42"});
     }
+
+    SECTION("I32 toFixed") {
+        machine.initialize();
+        auto code = R"(
+            function test(a: int32): any {
+                return a.toFixed(3);
+            }
+
+            report(test(42));
+        )";
+
+        evalCode(machine, code, "test", jac::EvalFlags::Global);
+        REQUIRE(machine.getReports() == std::vector<std::string>{"42.000"});
+    }
 }
 
 
