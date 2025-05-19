@@ -127,9 +127,9 @@ class AotEvalFeature : public EvalFeature<Next> {
             }
             auto sig = signatures.at(astFunc->name->identifier.name);
             auto cfgFuncEm = jac::cfg::emit(*astFunc, sig, signatures);
-            jac::cfg::removeEmptyBlocks(cfgFuncEm);
 
             auto cfgFunc = cfgFuncEm.output();
+            jac::cfg::removeEmptyBlocks(cfgFunc);
             result.emplace_back(std::move(cfgFunc), astFunc->code);
         }
 
@@ -232,7 +232,7 @@ class AotEvalFeature : public EvalFeature<Next> {
         return results;
     }
 
-    std::string tryAot(std::string_view js, [[maybe_unused]] std::string_view filename, [[maybe_unused]] EvalFlags flags) {
+    std::string tryAot(std::string_view js) {
         jac::ast::Script script = parseScript(js);
 
         jac::ast::traverse::Functions astFunctions;
@@ -276,7 +276,7 @@ public:
      */
     Value eval(std::string code, std::string filename, EvalFlags flags = EvalFlags::Global) {
         try {
-            code = tryAot(code, filename, flags);
+            code = tryAot(code);
         }
         catch (const cfg::IRGenError& e) {
             throw jac::Exception::create(jac::Exception::Type::SyntaxError, "AOT compilation error: " + std::string(e.what()));

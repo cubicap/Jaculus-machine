@@ -388,11 +388,9 @@ inline RegVal unwrapAny(JSContext* ctx, Any v, ValueType type) {
         case ValueType::Any: {
             return Any{ v };
         }
-        case ValueType::Void: {
+        default:
             throw std::runtime_error("Invalid type");
-        }
     }
-    abort();
 }
 
 
@@ -982,7 +980,7 @@ class CFGInterpreter {
     }
 
     void evalCallObj(JSContext* ctx, const Call& call) {
-        auto obj = getReg(std::get<Temp>(call.obj).id);
+        auto obj = getReg(std::get<Reg>(call.obj).id);
 
         std::vector<JSValue> args;
         args.reserve(call.args.size() - 1);
@@ -1051,7 +1049,7 @@ public:
             case Opcode::BitOr: evalBinop<detail::bit_or, Int32, Int32>(ctx, op); break;
             case Opcode::BitXor: evalBinop<detail::bit_xor, Int32, Int32>(ctx, op); break;
             case Opcode::Dup: evalDup(ctx, op); break;
-            case Opcode::PushFree: evalPushFree(ctx, op); break;
+            case Opcode::PushUnref: evalPushFree(ctx, op); break;
             case Opcode::Rem: evalRem(ctx, op); break;
             case Opcode::LShift: evalBitShift<detail::lshift>(ctx, op); break;
             case Opcode::RShift: evalBitShift<detail::rshift>(ctx, op); break;
@@ -1089,7 +1087,7 @@ public:
         setReg(init.id, std::visit(visitor{}, init.value));
     }
 
-    void evalStatement(JSContext* ctx, const Statement& s) {
+    void evalInstruction(JSContext* ctx, const Instruction& s) {
         struct visitor {
             CFGInterpreter& self;
             JSContext* ctx;
@@ -1187,84 +1185,86 @@ public:
 
         BasicBlockPtr activeBlock = func.entry;
         while (activeBlock) {
-            for (auto& statement : activeBlock->statements) {
-                evalStatement(ctx, statement);
+            for (auto& instruction : activeBlock->instructions) {
+                evalInstruction(ctx, instruction);
             }
 
             switch (activeBlock->jump.type) {
-                case Terminal::Jump:
+                case Terminator::Jump:
                     activeBlock = activeBlock->jump.target;
                     break;
-                case Terminal::Branch:
-                    if (*std::get<Boolean>(getReg(activeBlock->jump.value->id))) {
+                case Terminator::Branch:
+                    if (*std::get<Boolean>(getReg(activeBlock->jump.value.id))) {
                         activeBlock = activeBlock->jump.target;
                     }
                     else {
                         activeBlock = activeBlock->jump.other;
                     }
                     break;
-                case Terminal::Return:
-                    return JS_UNDEFINED;
-                case Terminal::ReturnValue: {
-                    auto val = getReg(activeBlock->jump.value->id);
-                    switch (activeBlock->jump.value->type) {
-                        case ValueType::I32: {
-                            if (auto valPtr = std::get_if<Int32>(&val)) {
-                                auto res = *convert<Any>(ctx, val);
-                                valPtr->_free(ctx);
-                                return res;
-                            }
-                            throw std::runtime_error("Invalid return type");
-                        }
-                        case ValueType::F64: {
-                            if (auto valPtr = std::get_if<Float64>(&val)) {
-                                auto res = *convert<Any>(ctx, val);
-                                valPtr->_free(ctx);
-                                return res;
-                            }
-                            throw std::runtime_error("Invalid return type");
-                        }
-                        case ValueType::Bool: {
-                            if (auto valPtr = std::get_if<Boolean>(&val)) {
-                                auto res = *convert<Any>(ctx, val);
-                                valPtr->_free(ctx);
-                                return res;
-                            }
-                            throw std::runtime_error("Invalid return type");
-                        }
-                        case ValueType::Object:
-                            if (auto valPtr = std::get_if<ObjectPtr>(&val)) {
-                                auto res = *convert<Any>(ctx, val);
-                                valPtr->_free(ctx);
-                                return res;
-                            }
-                            throw std::runtime_error("Invalid return type");
-                        case ValueType::Any:
-                            if (!std::holds_alternative<Any>(val)) {
+                case Terminator::Return:
+                    if (activeBlock->jump.value.type == ValueType::Void) {
+                        return JS_UNDEFINED;
+                    }
+                    else {
+                        auto val = getReg(activeBlock->jump.value.id);
+                        switch (activeBlock->jump.value.type) {
+                            case ValueType::I32: {
+                                if (auto valPtr = std::get_if<Int32>(&val)) {
+                                    auto res = *convert<Any>(ctx, val);
+                                    valPtr->_free(ctx);
+                                    return res;
+                                }
                                 throw std::runtime_error("Invalid return type");
                             }
-                            return *std::get<Any>(val);
-                        case ValueType::StringConst:
-                            throw std::runtime_error("Not implemented (return StringConst)");
-                        case ValueType::Void:
-                            throw std::runtime_error("Invalid return type");
+                            case ValueType::F64: {
+                                if (auto valPtr = std::get_if<Float64>(&val)) {
+                                    auto res = *convert<Any>(ctx, val);
+                                    valPtr->_free(ctx);
+                                    return res;
+                                }
+                                throw std::runtime_error("Invalid return type");
+                            }
+                            case ValueType::Bool: {
+                                if (auto valPtr = std::get_if<Boolean>(&val)) {
+                                    auto res = *convert<Any>(ctx, val);
+                                    valPtr->_free(ctx);
+                                    return res;
+                                }
+                                throw std::runtime_error("Invalid return type");
+                            }
+                            case ValueType::Object:
+                                if (auto valPtr = std::get_if<ObjectPtr>(&val)) {
+                                    auto res = *convert<Any>(ctx, val);
+                                    valPtr->_free(ctx);
+                                    return res;
+                                }
+                                throw std::runtime_error("Invalid return type");
+                            case ValueType::Any:
+                                if (!std::holds_alternative<Any>(val)) {
+                                    throw std::runtime_error("Invalid return type");
+                                }
+                                return *std::get<Any>(val);
+                            case ValueType::StringConst:
+                                throw std::runtime_error("Not implemented (return StringConst)");
+                            case ValueType::Void:
+                                throw std::runtime_error("Invalid return type");
+                        }
                     }
                     abort();
-                }
-                case Terminal::Throw: {
-                    auto val = getReg(activeBlock->jump.value->id);
+                case Terminator::Throw: {
+                    auto val = getReg(activeBlock->jump.value.id);
                     if (auto valPtr = std::get_if<Any>(&val)) {
                         JS_Throw(ctx, **valPtr);
                         return JS_EXCEPTION;
                     }
                     throw std::runtime_error("Invalid throw type");
                 }
-                case Terminal::None:
+                case Terminator::None:
                     throw std::runtime_error("Invalid jump (None)");
             }
         }
 
-        throw std::runtime_error("No return statement");
+        abort();
     }
 };
 

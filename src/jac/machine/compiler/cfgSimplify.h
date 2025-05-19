@@ -15,8 +15,6 @@ using Replacements = std::map<BasicBlockPtr, std::list<BasicBlockPtr>>;
 using Mapping = std::map<BasicBlockPtr, BasicBlockPtr>;
 
 
-// FIXME: use some more standard and efficient algorithm
-
 namespace detail {
 
     inline void removeTransitive(Replacements& replacements) {
@@ -47,11 +45,11 @@ namespace detail {
             auto block = stack.top();
             stack.pop();
             seen.insert(block);
-            if (block->jump.type == Terminal::Branch) {
+            if (block->jump.type == Terminator::Branch) {
                 push(block->jump.target);
                 push(block->jump.other);
             }
-            else if (block->jump.type == Terminal::Jump) {
+            else if (block->jump.type == Terminator::Jump) {
                 push(block->jump.target);
             }
         }
@@ -61,17 +59,17 @@ namespace detail {
 }  // namespace detail
 
 
-inline void removeEmptyBlocks(FunctionEmitter& emitter) {
+inline void removeEmptyBlocks(Function& fn) {
     Replacements replacements;
 
-    for (auto& block : emitter.blocks) {
-        if (!block->statements.empty()) {
+    for (auto& block : fn.blocks) {
+        if (!block->instructions.empty()) {
             continue;
         }
-        if (block->jump.type == Terminal::Jump) {
+        if (block->jump.type == Terminator::Jump) {
             replacements[block->jump.target].push_back(block.get());
         }
-        else if (block->jump.type == Terminal::Branch) {
+        else if (block->jump.type == Terminator::Branch) {
             if (block->jump.target == block->jump.other) {
                 replacements[block->jump.target].push_back(block.get());
             }
@@ -92,30 +90,28 @@ inline void removeEmptyBlocks(FunctionEmitter& emitter) {
             target = remap.at(target);
         }
     };
-    for (auto& block : emitter.blocks) {
+    for (auto& block : fn.blocks) {
         replace(block->jump.target);
         replace(block->jump.other);
     }
 
-    if (remap.contains(emitter.getEntry())) {
-        emitter.setEntry(remap.at(emitter.getEntry()));
+    if (remap.contains(fn.entry)) {
+        fn.entry = remap.at(fn.entry);
     }
 
-    for (auto it = emitter.blocks.begin(); it != emitter.blocks.end(); ++it) {
+    for (auto it = fn.blocks.begin(); it != fn.blocks.end(); ++it) {
         if (remap.contains(it->get())) {
-            it = emitter.blocks.erase(it);
+            it = fn.blocks.erase(it);
         }
     }
 
-    {
-        auto reachable = detail::findReachable(emitter.getEntry());
-        for (auto it = emitter.blocks.begin(); it != emitter.blocks.end();) {
-            if (!reachable.contains(it->get())) {
-                it = emitter.blocks.erase(it);
-            }
-            else {
-                ++it;
-            }
+    auto reachable = detail::findReachable(fn.entry);
+    for (auto it = fn.blocks.begin(); it != fn.blocks.end();) {
+        if (!reachable.contains(it->get())) {
+            it = fn.blocks.erase(it);
+        }
+        else {
+            ++it;
         }
     }
 }

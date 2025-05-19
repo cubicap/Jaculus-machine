@@ -9,7 +9,7 @@
 namespace jac::cfg::mir_emit {
 
 
-inline std::string name(TmpId id) {
+inline std::string name(RegId id) {
     return "_" + std::to_string(id);
 }
 

@@ -105,8 +105,9 @@ int main(const int argc, const char* argv[]) {
     auto sig = jac::cfg::getSignature(*fun);
     auto cfg = jac::cfg::emit(*fun, sig, {});
 
-    jac::cfg::removeEmptyBlocks(cfg);
-    jac::cfg::dotprint::print(std::cout, cfg);
+    auto fn = cfg.output();
+    jac::cfg::removeEmptyBlocks(fn);
+    jac::cfg::dotprint::print(std::cout, fn);
 
     return 0;
 }

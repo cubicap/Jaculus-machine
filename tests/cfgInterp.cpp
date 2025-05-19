@@ -45,9 +45,11 @@ jac::cfg::Function compile(const std::string& code) {
     auto sig = jac::cfg::getSignature(*fun);
 
     auto cfg = jac::cfg::emit(*fun, sig, {});
-    jac::cfg::removeEmptyBlocks(cfg);
 
-    return cfg.output();
+    auto res = cfg.output();
+    jac::cfg::removeEmptyBlocks(res);
+
+    return res;
 }
 
 

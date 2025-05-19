@@ -126,15 +126,15 @@ const std::optional<Identifier> memberGetIdentifier(const ast::MemberExpression&
 
 
 void emitDup(RValue val, FunctionEmitter& func) {
-    func.emitStatement({Operation{
+    func.emitInstruction({Operation{
         .op = Opcode::Dup,
         .a = val
     }});
 }
 
 void emitPushFree(RValue val, FunctionEmitter& func) {
-    func.emitStatement({Operation{
-        .op = Opcode::PushFree,
+    func.emitInstruction({Operation{
+        .op = Opcode::PushUnref,
         .a = val
     }});
 }
@@ -147,10 +147,10 @@ void emitPushFree(Value val, FunctionEmitter& func) {
 
 [[nodiscard]] RValue emitConst(auto value, FunctionEmitter& func) {
     ConstInit init = ConstInit{
-        .id = newTmpId(),
+        .id = newRegId(),
         .value = value
     };
-    func.emitStatement(init);
+    func.emitInstruction(init);
     RValue initR = { init.type(), init.id };
     return initR;
 }
@@ -193,8 +193,8 @@ void emitPushFree(Value val, FunctionEmitter& func) {
     if (val.type() == type) {
         return val;
     }
-    RValue res = { Temp::create(type) };
-    func.emitStatement({Operation{
+    RValue res = { Reg::create(type) };
+    func.emitInstruction({Operation{
         .op = Opcode::Set,
         .a = val,
         .res = res
@@ -213,8 +213,8 @@ void emitPushFree(Value val, FunctionEmitter& func) {
     emitPushFree({ *lv.memberIdent }, func);  // XXX: broken if lv is materialized multiple times
 
     // TODO: solve conversion of parent/accessor types
-    RValue res = { Temp::create(lv.type()) };
-    func.emitStatement({Operation{
+    RValue res = { Reg::create(lv.type()) };
+    func.emitInstruction({Operation{
         .op = Opcode::GetMember,
         .a = lv.self,
         .b = *lv.memberIdent,
@@ -241,7 +241,7 @@ void emitPushFree(Value val, FunctionEmitter& func) {
 
         emitPushFree(ident, func);  // XXX: broken if target is used multiple times
 
-        func.emitStatement({Operation{
+        func.emitInstruction({Operation{
             .op = Opcode::SetMember,
             .a = ident,
             .b = value,
@@ -255,7 +255,7 @@ void emitPushFree(Value val, FunctionEmitter& func) {
         }
 
         RValue targetR = giveSimple(target, func);
-        func.emitStatement({Operation{
+        func.emitInstruction({Operation{
             .op = Opcode::Set,
             .a = value,
             .res = targetR
@@ -267,7 +267,7 @@ void emitPushFree(Value val, FunctionEmitter& func) {
 
 [[nodiscard]] RValue emitBinaryArithmetic(RValue lhs, RValue rhs, Opcode op, FunctionEmitter& func) {
     ValueType resType = resultType(op, lhs.type(), rhs.type());
-    RValue res = { Temp::create(resType) };
+    RValue res = { Reg::create(resType) };
 
     RValue lopRType;
     RValue ropRType;
@@ -286,7 +286,7 @@ void emitPushFree(Value val, FunctionEmitter& func) {
     emitPushFree(lopRType, func);
     emitPushFree(ropRType, func);
 
-    func.emitStatement({Operation{
+    func.emitInstruction({Operation{
         .op = op,
         .a = lopRType,
         .b = ropRType,
@@ -314,17 +314,17 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    skipBlock->jump = Terminal::jump(postBlock);
-    elseBlock->jump = Terminal::jump(postBlock);
+    skipBlock->jump = Terminator::jump(postBlock);
+    elseBlock->jump = Terminator::jump(postBlock);
 
     // evaluate lhs
     RValue lhsBool = lhs;
 
     if (kind == ShortCircuitKind::Or) {
-        preBlock->jump = Terminal::branch(lhsBool, skipBlock, elseBlock);
+        preBlock->jump = Terminator::branch(lhsBool, skipBlock, elseBlock);
     }
     else if (kind == ShortCircuitKind::And) {
-        preBlock->jump = Terminal::branch(lhsBool, elseBlock, skipBlock);
+        preBlock->jump = Terminator::branch(lhsBool, elseBlock, skipBlock);
     }
     func.setActiveBlock(skipBlock);
     processRes(lhsBool, true);
@@ -404,9 +404,9 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         throw IRGenError("Function not found: " + ident);
     }
 
-    RValue res = { Temp::create(sig->ret) };
+    RValue res = { Reg::create(sig->ret) };
 
-    std::vector<Temp> args;
+    std::vector<Reg> args;
     args.reserve(args_.arguments.size());
     for (const auto& [ spread, expr ] : args_.arguments) {  // TODO: check arguments count
         if (spread) {
@@ -419,7 +419,7 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         args.push_back(argR);
     }
 
-    func.emitStatement({Call{
+    func.emitInstruction({Call{
         .obj = ident,
         .args = args,
         .res = res
@@ -431,15 +431,15 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
 
 
 [[nodiscard]] RValue emitCallObj(Value obj, const ast::Arguments& args_, FunctionEmitter& func, bool isConstructor) {
-    RValue res = { Temp::create(ValueType::Any) };
+    RValue res = { Reg::create(ValueType::Any) };
 
     RValue objR = materialize(obj, func);
     emitPushFree(objR, func);
 
-    std::vector<Temp> args;
+    std::vector<Reg> args;
     args.reserve(args_.arguments.size() + 1);
     if (obj.isRValue() || isConstructor) {
-        args.push_back(Temp::undefined());
+        args.push_back(Reg::undefined());
     }
     else {
         args.push_back(obj.asLVRef().self);
@@ -459,7 +459,7 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         args.push_back(argR);
     }
 
-    func.emitStatement({Call{
+    func.emitInstruction({Call{
         .obj = objR,
         .isConstructor = isConstructor,
         .args = args,
@@ -488,8 +488,8 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
     }
 
     if (objR.type() != ValueType::Object && objR.type() != ValueType::Any) {
-        RValue conv = { Temp::create(ValueType::Any) };
-        func.emitStatement({Operation{
+        RValue conv = { Reg::create(ValueType::Any) };
+        func.emitInstruction({Operation{
             .op = Opcode::Set,
             .a = objR,
             .res = conv
@@ -683,8 +683,8 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
 
     RValue valPre;
     if (expr.kind == ast::UpdateKind::PostInc || expr.kind == ast::UpdateKind::PostDec) {
-        valPre = { Temp::create(lop.type()) };
-        func.emitStatement({Operation{
+        valPre = { Reg::create(lop.type()) };
+        func.emitInstruction({Operation{
             .op = Opcode::Set,
             .a = lop,
             .res = valPre
@@ -694,12 +694,12 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
         emitPushFree(lop, func);
     }
 
-    RValue valPost = { Temp::create(lop.type()) };
+    RValue valPost = { Reg::create(lop.type()) };
 
     switch (expr.kind) {
         case ast::UpdateKind::PreInc:
         case ast::UpdateKind::PostInc:
-            func.emitStatement({Operation{
+            func.emitInstruction({Operation{
                 .op = Opcode::Add,
                 .a = lop,
                 .b = rop,
@@ -708,7 +708,7 @@ RValue emitShortCircuit(RValue lhs, F evalRhs, G processRes, ShortCircuitKind ki
             break;
         case ast::UpdateKind::PreDec:
         case ast::UpdateKind::PostDec:
-            func.emitStatement({Operation{
+            func.emitInstruction({Operation{
                 .op = Opcode::Sub,
                 .a = lop,
                 .b = rop,
@@ -753,9 +753,9 @@ Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
     }
 
     emitPushFree(argConv, func);
-    RValue res = { Temp::create(resType) };
+    RValue res = { Reg::create(resType) };
 
-    func.emitStatement({Operation{
+    func.emitInstruction({Operation{
         .op = op,
         .a = argConv,
         .res = res
@@ -780,13 +780,13 @@ Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
                 auto lhsRes = emit(*lhs, func);
                 RValue lhsR = materialize(lhsRes, func);
 
-                RValue res = { Temp::create(ValueType::Bool) };
+                RValue res = { Reg::create(ValueType::Bool) };
                 emitShortCircuit(lhsR, [&]() {
                     auto rhsVal = emit(*rhs, func);
                     return materialize(rhsVal, func);
                 },
                 [&](RValue val, bool) {
-                    func.emitStatement({Operation{
+                    func.emitInstruction({Operation{
                         .op = Opcode::Set,
                         .a = val,
                         .res = res
@@ -843,9 +843,9 @@ Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
             auto postBlock = func.createBlock();
 
             postBlock->jump = preBlock->jump;
-            trueBlock->jump = Terminal::jump(postBlock);
-            falseBlock->jump = Terminal::jump(postBlock);
-            preBlock->jump = Terminal::branch(condR, trueBlock, falseBlock);
+            trueBlock->jump = Terminator::jump(postBlock);
+            falseBlock->jump = Terminator::jump(postBlock);
+            preBlock->jump = Terminator::branch(condR, trueBlock, falseBlock);
 
             auto emitBranch = [&](BasicBlockPtr block, const auto& expr) -> std::pair<BasicBlockPtr, RValue> {
                 func.setActiveBlock(block);
@@ -860,15 +860,15 @@ Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
 
             RValue res;
             if (trueRes.type() == falseRes.type()) {
-                res = RValue{ Temp::create(trueRes.type()) };
+                res = RValue{ Reg::create(trueRes.type()) };
             }
             else {
-                res = RValue{ Temp::create(ValueType::Any) };
+                res = RValue{ Reg::create(ValueType::Any) };
             }
 
             auto emitSet = [&](BasicBlockPtr block, RValue resR) {
                 func.setActiveBlock(block);
-                func.emitStatement({Operation{
+                func.emitInstruction({Operation{
                     .op = Opcode::Set,
                     .a = resR,
                     .res = res
@@ -965,7 +965,7 @@ Value emit(const ast::UnaryExpression& expr, FunctionEmitter& func) {
             }
             (void) emitAssign(target.asLVRef(), val, func);
             if (target.asLVRef().isMember()) {
-                func.emitStatement({Operation{
+                func.emitInstruction({Operation{
                     .op = Opcode::Set,
                     .a = val,
                     .res = targetR
@@ -1001,7 +1001,7 @@ void emit(const ast::LexicalDeclaration& lexical, FunctionEmitter& func) {
                 emitPushFree(rhsR, func);
             }
 
-            func.emitStatement({Operation{
+            func.emitInstruction({Operation{
                 .op = Opcode::Set,
                 .a = rhsR,
                 .res = giveSimple(target, func)
@@ -1055,15 +1055,15 @@ void emit(const ast::IfStatement& stmt, FunctionEmitter& func) {
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    ifBlock->jump = Terminal::jump(postBlock);
-    elseBlock->jump = Terminal::jump(postBlock);
+    ifBlock->jump = Terminator::jump(postBlock);
+    elseBlock->jump = Terminator::jump(postBlock);
 
     // condition block
     RValue cond = emit(stmt.expression, func);
     RValue res = emitCastAndFree(cond, ValueType::Bool, func);
     emitPushFree(res, func);
 
-    func.getActiveBlock()->jump = Terminal::branch(res, ifBlock, elseBlock);
+    func.getActiveBlock()->jump = Terminator::branch(res, ifBlock, elseBlock);
 
     // if block
     func.setActiveBlock(ifBlock);
@@ -1086,8 +1086,8 @@ void emit(const ast::DoWhileStatement& stmt, FunctionEmitter& func) {
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Terminal::jump(loopBlock);
-    loopBlock->jump = Terminal::jump(condBlock);
+    preBlock->jump = Terminator::jump(loopBlock);
+    loopBlock->jump = Terminator::jump(condBlock);
 
     // condition block
     func.setActiveBlock(condBlock);
@@ -1095,7 +1095,7 @@ void emit(const ast::DoWhileStatement& stmt, FunctionEmitter& func) {
     RValue res = emitCastAndFree(cond, ValueType::Bool, func);
     emitPushFree(res, func);
 
-    func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
+    func.getActiveBlock()->jump = Terminator::branch(res, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -1116,8 +1116,8 @@ void emit(const ast::WhileStatement& stmt, FunctionEmitter& func) {
     auto postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Terminal::jump(condBlock);
-    loopBlock->jump = Terminal::jump(condBlock);
+    preBlock->jump = Terminator::jump(condBlock);
+    loopBlock->jump = Terminator::jump(condBlock);
 
     // condition block
     func.setActiveBlock(condBlock);
@@ -1125,7 +1125,7 @@ void emit(const ast::WhileStatement& stmt, FunctionEmitter& func) {
     RValue res = emitCastAndFree(cond, ValueType::Bool, func);
     emitPushFree(res, func);
 
-    func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
+    func.getActiveBlock()->jump = Terminator::branch(res, loopBlock, postBlock);
 
     // loop block
     func.setActiveBlock(loopBlock);
@@ -1166,10 +1166,10 @@ void emit(const ast::ForStatement& stmt, FunctionEmitter& func) {
     BasicBlockPtr postBlock = func.createBlock();
 
     postBlock->jump = preBlock->jump;
-    preBlock->jump = Terminal::jump(initBlock);
-    initBlock->jump = Terminal::jump(condBlock);
-    loopBlock->jump = Terminal::jump(updateBlock);
-    updateBlock->jump = Terminal::jump(condBlock);
+    preBlock->jump = Terminator::jump(initBlock);
+    initBlock->jump = Terminator::jump(condBlock);
+    loopBlock->jump = Terminator::jump(updateBlock);
+    updateBlock->jump = Terminator::jump(condBlock);
 
     auto _ = func.pushScope();
 
@@ -1184,10 +1184,10 @@ void emit(const ast::ForStatement& stmt, FunctionEmitter& func) {
         RValue res = emitCastAndFree(cond, ValueType::Bool, func);
         emitPushFree(res, func);
 
-        func.getActiveBlock()->jump = Terminal::branch(res, loopBlock, postBlock);
+        func.getActiveBlock()->jump = Terminator::branch(res, loopBlock, postBlock);
     }
     else {
-        func.getActiveBlock()->jump = Terminal::jump(loopBlock);
+        func.getActiveBlock()->jump = Terminator::jump(loopBlock);
     }
 
     // update block
@@ -1251,7 +1251,7 @@ void emit(const ast::BreakableStatement& stmt, FunctionEmitter& func) {
 
 void emit(const ast::ReturnStatement& stmt, FunctionEmitter& func) {
     if (!stmt.expression) {
-        func.getActiveBlock()->jump = Terminal::ret();
+        func.getActiveBlock()->jump = Terminator::ret();
         return;
     }
 
@@ -1259,7 +1259,7 @@ void emit(const ast::ReturnStatement& stmt, FunctionEmitter& func) {
     RValue argR = materialize(arg, func);
     RValue conv = emitCastAndFree(argR, func.signature->ret, func);
 
-    func.getActiveBlock()->jump = Terminal::retVal(conv);
+    func.getActiveBlock()->jump = Terminator::retVal(conv);
 }
 
 void emit(const ast::ContinueStatement& stmt, FunctionEmitter& func) {
@@ -1267,7 +1267,7 @@ void emit(const ast::ContinueStatement& stmt, FunctionEmitter& func) {
         throw IRGenError("Labeled continue statements are not supported");
     }
     if (auto target = func.getContinueTarget()) {
-        func.getActiveBlock()->jump = Terminal::jump(target);
+        func.getActiveBlock()->jump = Terminator::jump(target);
     }
     else {
         throw IRGenError("Continue statement without target");
@@ -1279,7 +1279,7 @@ void emit(const ast::BreakStatement& stmt, FunctionEmitter& func) {
         throw IRGenError("Labeled break statements are not supported");
     }
     if (auto target = func.getBreakTarget()) {
-        func.getActiveBlock()->jump = Terminal::jump(target);
+        func.getActiveBlock()->jump = Terminator::jump(target);
     }
     else {
         throw IRGenError("Break statement without target");
@@ -1290,7 +1290,7 @@ void emit(const ast::ThrowStatement& stmt, FunctionEmitter& func) {
     RValue val = emit(stmt.expression, func);
     RValue anyVal = emitCastAndFree(val, ValueType::Any, func);
 
-    func.getActiveBlock()->jump = Terminal::throw_(anyVal);
+    func.getActiveBlock()->jump = Terminator::throw_(anyVal);
 }
 
 
@@ -1423,8 +1423,8 @@ FunctionEmitter emit(const ast::FunctionDeclaration& decl, SignaturePtr sig, con
 
     emit(decl.body->statementList, out);
 
-    if (out.getActiveBlock()->jump.type == Terminal::None) {
-        out.getActiveBlock()->jump = Terminal::ret();
+    if (out.getActiveBlock()->jump.type == Terminator::None) {
+        out.getActiveBlock()->jump = Terminator::ret();
     }
 
     return out;

@@ -20,22 +20,22 @@
 namespace jac::cfg {
 
 
-using TmpId = int;
-TmpId newTmpId();
+using RegId = int;
+RegId newRegId();
 
 
 using Identifier = std::string;
 using MemberIdentifier = std::variant<Identifier, int32_t>;
 
 
-struct Temp {
+struct Reg {
     ValueType type;
-    TmpId id;
+    RegId id;
 
-    static Temp create(ValueType type_) {
-        return { type_, newTmpId() };
+    static Reg create(ValueType type_) {
+        return { type_, newRegId() };
     }
-    static Temp undefined() {
+    static Reg undefined() {
         return { ValueType::Void, 0 };
     }
 };
@@ -43,22 +43,22 @@ struct Temp {
 /*
 possible source:
     - literal
-    - operator/function result
+    - operator/call result
     - conversion from LVRef
 */
 struct RValue {
-    Temp tmp;
+    Reg reg;
 
     ValueType type() const {
-        return tmp.type;
+        return reg.type;
     }
 
-    TmpId id() const {
-        return tmp.id;
+    RegId id() const {
+        return reg.id;
     }
 
-    operator Temp() const {
-        return tmp;
+    operator Reg() const {
+        return reg;
     }
 };
 
@@ -68,8 +68,8 @@ possible source:
     - member access
 */
 struct LVRef {
-    Temp self;
-    std::optional<Temp> memberIdent;  // for member access
+    Reg self;
+    std::optional<Reg> memberIdent;  // for member access
     bool _const = false;
 
     bool isMember() const {
@@ -87,17 +87,17 @@ struct LVRef {
         return self.type;
     }
 
-    static LVRef direct(Temp self_, bool isConst) {
+    static LVRef direct(Reg self_, bool isConst) {
         return { self_, std::nullopt, isConst };
     }
 
-    static LVRef mbr(Temp self_, Temp member_, bool isConst) {
+    static LVRef mbr(Reg self_, Reg member_, bool isConst) {
         return { self_, member_, isConst };
     }
 
     LVRef(): self({ ValueType::Void, 0 }) {}
 private:
-    LVRef(Temp self_, std::optional<Temp> memberIdent_, bool isConst):
+    LVRef(Reg self_, std::optional<Reg> memberIdent_, bool isConst):
         self(self_), memberIdent(memberIdent_), _const(isConst)
     {}
 };
@@ -117,16 +117,16 @@ struct Value {
 };
 
 
-struct Operation {  // FIXME: refactor
+struct Operation {
     Opcode op;
 
-    Temp a;
-    Temp b = { ValueType::Void, 0 };
-    Temp res = { ValueType::Void, 0 };
+    Reg a;
+    Reg b = { ValueType::Void, 0 };
+    Reg res = { ValueType::Void, 0 };
 };
 
 struct ConstInit {
-    TmpId id;
+    RegId id;
     std::variant<int32_t, double, bool, std::string> value;
 
     ValueType type() const {
@@ -147,17 +147,17 @@ struct ConstInit {
 };
 
 struct Call {
-    std::variant<Identifier, Temp> obj;  // native/object
+    std::variant<Identifier, Reg> obj;  // native/object
     bool isConstructor = false;
-    std::vector<Temp> args;
-    Temp res;
+    std::vector<Reg> args;
+    Reg res;
 
     bool isNative() const {
         return std::holds_alternative<Identifier>(obj);
     }
 };
 
-struct Statement {  // FIXME: rename, unify
+struct Instruction {
     std::variant<Operation, ConstInit, Call> op;
 
     bool isOperation() const {
@@ -172,7 +172,7 @@ struct Statement {  // FIXME: rename, unify
         return std::get<Call>(op);
     }
 
-    Temp res() {
+    Reg res() {
         if (auto op_ = std::get_if<Operation>(&op)) {
             return { op_->res.type, op_->res.id };
         }
@@ -189,59 +189,58 @@ struct Statement {  // FIXME: rename, unify
 struct BasicBlock;
 using BasicBlockPtr = BasicBlock*;
 
-struct Terminal {
+struct Terminator {
     enum Type {
         Jump,
         Branch,
         Return,
-        ReturnValue,
         Throw,
         None  // invalid jump type used for initialization
     };
 
     Type type;
-    std::optional<Temp> value;
+    Reg value;
     BasicBlockPtr target;
     BasicBlockPtr other;
 
-    static Terminal jump(BasicBlockPtr target) {
+    static Terminator jump(BasicBlockPtr target) {
         return { Jump, {}, target, nullptr };
     }
 
-    static Terminal branch(RValue condition, BasicBlockPtr target, BasicBlockPtr other) {
-        return { Branch, condition.tmp, target, other };
+    static Terminator branch(RValue condition, BasicBlockPtr target, BasicBlockPtr other) {
+        return { Branch, condition.reg, target, other };
     }
 
-    static Terminal ret() {
-        return { Return, {}, nullptr, nullptr };
+    static Terminator ret() {
+        return { Return, Reg::undefined(), nullptr, nullptr };
     }
 
-    static Terminal retVal(RValue retValue) {
-        return { ReturnValue, retValue.tmp, nullptr, nullptr };
+    static Terminator retVal(RValue retValue) {
+        return { Return, retValue.reg, nullptr, nullptr };
     }
 
-    static Terminal throw_(RValue exception) {
-        return { Throw, exception.tmp, nullptr, nullptr };
+    static Terminator throw_(RValue exception) {
+        return { Throw, exception.reg, nullptr, nullptr };
     }
 
-    static Terminal none() {
+    static Terminator none() {
         return { None, {}, nullptr, nullptr };
     }
 };
 
 struct BasicBlock {
-    std::list<Statement> statements;
-    Terminal jump = Terminal::none();
+    std::list<Instruction> instructions;
+    Terminator jump = Terminator::none();
 };
 
 
 struct Scope {
-    std::map<Identifier, std::tuple<Temp, bool>> locals;
+    std::map<Identifier, std::tuple<Reg, bool>> locals;
 
     LVRef addLocal(Identifier name, ValueType type, bool isConst) {
-        auto tmp = Temp::create(type);
-        locals.emplace(name, std::forward_as_tuple(tmp, isConst));
-        return LVRef::direct(tmp, isConst);
+        auto reg = Reg::create(type);
+        locals.emplace(name, std::forward_as_tuple(reg, isConst));
+        return LVRef::direct(reg, isConst);
     }
     std::optional<LVRef> getLocal(Identifier name) {
         auto it = locals.find(name);
@@ -251,9 +250,9 @@ struct Scope {
         auto& [ self, isConst ] = it->second;
         return LVRef::direct(self, isConst);
     }
-    LVRef insertLocal(Identifier name, Temp tmp, bool isConst) {
-        locals.emplace(name, std::forward_as_tuple(tmp, isConst));
-        return LVRef::direct(tmp, isConst);
+    LVRef insertLocal(Identifier name, Reg reg, bool isConst) {
+        locals.emplace(name, std::forward_as_tuple(reg, isConst));
+        return LVRef::direct(reg, isConst);
     }
 };
 
@@ -282,8 +281,8 @@ using SignaturePtr = std::shared_ptr<Signature>;
 
 struct Function {
     BasicBlockPtr entry;
-    std::vector<std::unique_ptr<BasicBlock>> blocks;
-    std::vector<Temp> args;
+    std::list<std::unique_ptr<BasicBlock>> blocks;
+    std::vector<Reg> args;
     ValueType ret;
     std::string _name;
     std::set<Identifier> requiredFunctions;
@@ -291,40 +290,24 @@ struct Function {
     std::string name() const { return _name; }
 };
 
-struct FunctionEmitter {  // TODO: make members private, think about lists once again
+struct FunctionEmitter {
     const std::map<Identifier, SignaturePtr>& _otherSignatures;
 
     SignaturePtr signature;
     std::forward_list<Scope> scopes;
-    std::list<std::pair<Identifier, Temp>> undefined;
+    std::list<std::pair<Identifier, Reg>> undefined;
     BasicBlockPtr activeBlock;
-    BasicBlockPtr entry;
     std::forward_list<BasicBlockPtr> breakTargets;
     std::forward_list<BasicBlockPtr> continueTargets;
-    std::list<std::unique_ptr<BasicBlock>> blocks;
-    std::set<Identifier> requiredFunctions;
-    std::vector<Temp> args;
 
-    std::string _name;
+    Function data;
 
     FunctionEmitter(const std::map<Identifier, SignaturePtr>& otherSignatures):
         _otherSignatures(otherSignatures),
         scopes(1)
     {
-        entry = createBlock();
-        activeBlock = entry;
-    }
-
-    void reset() {
-        scopes = { Scope{} };
-        activeBlock = nullptr;
-        entry = nullptr;
-        breakTargets.clear();
-        continueTargets.clear();
-        blocks.clear();
-
-        entry = createBlock();
-        activeBlock = entry;
+        data.entry = createBlock();
+        activeBlock = data.entry;
     }
 
     void setSignature(SignaturePtr sig) {
@@ -332,27 +315,19 @@ struct FunctionEmitter {  // TODO: make members private, think about lists once 
             throw std::runtime_error("Signature already set");
         }
         signature = sig;
+        data.ret = sig->ret;
         for (const auto& [name, type] : sig->args) {
             auto ref = addLexical(name, type, false);
-            args.push_back(ref.self);
+            data.args.push_back(ref.self);
         }
     }
 
     auto pushScope() { scopes.emplace_front(); return ListPopper(scopes); }
     LVRef addLexical(Identifier name, ValueType type, bool isConst) { return scopes.front().addLocal(name, type, isConst); }
-    LVRef addVar(Identifier name, ValueType type) {
-        for (auto it = undefined.begin(); it != undefined.end(); ++it) {
-            if (it->first == name) {
-                it = undefined.erase(it);
-                return scopes.front().insertLocal(name, it->second, false);
-            }
-        }
-        return scopes.front().addLocal(name, type, false);
-    }
     LVRef addUndefined(Identifier name, ValueType type) {
-        auto tmp = Temp::create(type);
-        undefined.emplace_back(name, tmp);
-        return LVRef::direct(tmp, false);
+        auto reg = Reg::create(type);
+        undefined.emplace_back(name, reg);
+        return LVRef::direct(reg, false);
     }
     std::optional<LVRef> getLocal(Identifier name) {
         for (auto& scope : scopes) {
@@ -363,15 +338,15 @@ struct FunctionEmitter {  // TODO: make members private, think about lists once 
         return std::nullopt;
     }
 
-    void emitStatement(Statement statement) {
-        activeBlock->statements.push_back(statement);
+    void emitInstruction(Instruction instruction) {
+        activeBlock->instructions.push_back(instruction);
     }
-    void emitStatement(auto&& statement) {
-        emitStatement(Statement{ std::forward<decltype(statement)>(statement) });
+    void emitInstruction(auto&& instruction) {
+        emitInstruction(Instruction{ std::forward<decltype(instruction)>(instruction) });
     }
 
     void addRequiredFunction(Identifier name) {
-        requiredFunctions.emplace(name);
+        data.requiredFunctions.emplace(name);
     }
     SignaturePtr getSignature(Identifier name) {
         auto it = _otherSignatures.find(name);
@@ -383,8 +358,8 @@ struct FunctionEmitter {  // TODO: make members private, think about lists once 
 
     BasicBlockPtr createBlock() {
         auto block = std::make_unique<BasicBlock>();
-        blocks.push_back(std::move(block));
-        return blocks.back().get();
+        data.blocks.push_back(std::move(block));
+        return data.blocks.back().get();
     }
     BasicBlockPtr getActiveBlock() { return activeBlock; }
     void setActiveBlock(BasicBlockPtr block) { activeBlock = block; }
@@ -411,36 +386,17 @@ struct FunctionEmitter {  // TODO: make members private, think about lists once 
         return continueTargets.front();
     }
 
-    auto getEntry() const { return entry; }
-    auto getEntry() { return entry; }
+    auto getEntry() const { return data.entry; }
+    auto getEntry() { return data.entry; }
 
-    void setEntry(BasicBlockPtr block) { entry = block; }
+    void setEntry(BasicBlockPtr block) { data.entry = block; }
 
     Function output() {
-        std::vector<std::unique_ptr<BasicBlock>> blockPtrs;
-        blockPtrs.reserve(blocks.size());
-        for (auto& block : blocks) {
-            blockPtrs.emplace_back(std::move(block));
-        }
-
-        args.shrink_to_fit();
-
-        Function out = {  // FIXME: move to a single attribute
-            .entry = entry,
-            .blocks = std::move(blockPtrs),
-            .args = std::move(args),
-            .ret = signature->ret,
-            ._name = std::move(_name),
-            .requiredFunctions = std::move(requiredFunctions)
-        };
-
-        reset();
-
-        return out;
+        return std::move(data);
     }
 
     void setFunctionName(std::string name) {
-        _name = name;
+        data._name = std::move(name);
     }
 };
 

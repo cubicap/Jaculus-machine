@@ -14,7 +14,6 @@
 #include <jac/util.h>
 #include <mir.h>
 #include <quickjs.h>
-#include <sys/types.h>
 
 
 namespace jac::cfg::mir_emit {
@@ -188,9 +187,9 @@ struct CompileContext {
     MIR_item_t fun;
     MIR_func_t func;
 
-    std::map<TmpId, MIR_reg_t> regs;  // TODO: deduplicate information in MIR
+    std::map<RegId, MIR_reg_t> regs;
     std::map<BasicBlockPtr, MIR_label_t> labels;
-    std::map<TmpId, int> stackSlots;
+    std::map<RegId, int> stackSlots;
 
     MIR_reg_t allocaPtr;
     MIR_reg_t exceptionFlagAddr;
@@ -219,7 +218,7 @@ struct CompileContext {
         return MIR_new_label_op(ctx, label(block));
     }
 
-    auto reg(TmpId id, ValueType type) {
+    auto reg(RegId id, ValueType type) {
         auto it = regs.find(id);
         if (it == regs.end()) {
             std::string n = name(id);
@@ -230,7 +229,7 @@ struct CompileContext {
         return it->second;
     }
 
-    auto regOp(TmpId id) {
+    auto regOp(RegId id) {
         return MIR_new_reg_op(ctx, regs.at(id));
     }
 
@@ -245,7 +244,7 @@ struct CompileContext {
         return addr;
     }
 
-    MIR_reg_t jsValAddr(TmpId id) {
+    MIR_reg_t jsValAddr(RegId id) {
         auto it = stackSlots.find(id);
         if (it == stackSlots.end()) {
             return regs.at(id);
@@ -268,11 +267,11 @@ struct CompileContext {
         insert(MIR_new_insn(ctx, MIR_MOV, dstH, srcH));
     }
 
-    auto toJSVal(Temp a, MIR_reg_t dstAddr) {
+    auto toJSVal(Reg a, MIR_reg_t dstAddr) {
         generateConvertToJSVal(ctx, fun, builtins, regs.at(a.id), dstAddr, a.type);
     }
 
-    auto fromJSVal(MIR_reg_t srcAddr, Temp res) {
+    auto fromJSVal(MIR_reg_t srcAddr, Reg res) {
         generateConvertFromJSVal(ctx, fun, builtins, srcAddr, regs.at(res.id), res.type, invalidConversionLabel);
     }
 
@@ -284,7 +283,7 @@ struct CompileContext {
     }
 };
 
-void generateDup(CompileContext& cc, Temp a) {
+void generateDup(CompileContext& cc, Reg a) {
     if (a.type == ValueType::Any) {
         generateCall(cc.ctx, cc.fun, cc.builtins, "__dupVal", { cc.jsValAddr(a.id) }, false);
     }
@@ -296,7 +295,7 @@ void generateDup(CompileContext& cc, Temp a) {
     }
 }
 
-void generatePushFree(CompileContext& cc, Temp a) {
+void generatePushFree(CompileContext& cc, Reg a) {
     if (a.type == ValueType::Any) {
         generateCall(cc.ctx, cc.fun, cc.builtins, "__pushFreeVal", { cc.jsValAddr(a.id) }, false);
     }
@@ -308,7 +307,7 @@ void generatePushFree(CompileContext& cc, Temp a) {
     }
 }
 
-void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
+void generateArithmetic(CompileContext& cc, Opcode op, Reg a, Reg b, Reg res) {
     assert(a.type == b.type && a.type == res.type);
     if (a.type == ValueType::Any) {
         generateCall(cc.ctx, cc.fun, cc.builtins, chooseArithmeticBuiltin(op), { cc.jsValAddr(a.id), cc.jsValAddr(b.id), cc.jsValAddr(res.id) }, true);
@@ -356,12 +355,12 @@ void generateArithmetic(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res)
     cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
 }
 
-void generatePow(CompileContext& cc, Temp a, Temp b, Temp res) {
+void generatePow(CompileContext& cc, Reg a, Reg b, Reg res) {
     assert(a.type == ValueType::F64 && b.type == ValueType::F64 && res.type == ValueType::F64);
     generateCall(cc.ctx, cc.fun, cc.builtins, "__powF64", { cc.regs.at(a.id), cc.regs.at(b.id), cc.regs.at(res.id) }, false);
 }
 
-void generateBitwise(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
+void generateBitwise(CompileContext& cc, Opcode op, Reg a, Reg b, Reg res) {
     assert(a.type == ValueType::I32 && b.type == ValueType::I32 && res.type == ValueType::I32);
 
     MIR_insn_code_t code;
@@ -378,7 +377,7 @@ void generateBitwise(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
     cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id), cc.regOp(b.id)));
 }
 
-void generateRelational(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res) {
+void generateRelational(CompileContext& cc, Opcode op, Reg a, Reg b, Reg res) {
     assert(a.type == b.type && res.type == ValueType::Bool);
 
     if (isNumeric(a.type)) {
@@ -443,7 +442,7 @@ void generateRelational(CompileContext& cc, Opcode op, Temp a, Temp b, Temp res)
     }
 }
 
-void generateBoolConv(CompileContext cc, Temp a, Temp res, bool inverted) {
+void generateBoolConv(CompileContext cc, Reg a, Reg res, bool inverted) {
     if (a.type == ValueType::Bool && !inverted) {
         cc.insert(MIR_new_insn(cc.ctx, MIR_MOV, cc.regOp(res.id), cc.regOp(a.id)));
         return;
@@ -485,7 +484,7 @@ void generateBoolConv(CompileContext cc, Temp a, Temp res, bool inverted) {
     }
 }
 
-void generateSet(CompileContext& cc, Temp a, Temp res) {
+void generateSet(CompileContext& cc, Reg a, Reg res) {
     if (a.type == ValueType::Any && res.type == ValueType::Any) {
         auto baseSrc = cc.jsValAddr(a.id);
         auto baseDst = cc.jsValAddr(res.id);
@@ -538,7 +537,7 @@ void generateSet(CompileContext& cc, Temp a, Temp res) {
     cc.insert(MIR_new_insn(cc.ctx, code, cc.regOp(res.id), cc.regOp(a.id)));
 }
 
-void generateGetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
+void generateGetMember(CompileContext& cc, Reg a, Reg b, Reg res) {
     assert(res.type == ValueType::Any);
 
     switch (a.type) {
@@ -572,7 +571,7 @@ void generateGetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
     cc.checkException();
 }
 
-void generateSetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
+void generateSetMember(CompileContext& cc, Reg a, Reg b, Reg res) {
     MIR_reg_t srcAddr;
     std::optional<MIR_reg_t> startBlock;
     if (b.type == ValueType::Any) {
@@ -624,12 +623,12 @@ void generateSetMember(CompileContext& cc, Temp a, Temp b, Temp res) {
     }
 }
 
-void generateBitNot(CompileContext& cc, Temp a, Temp res) {
+void generateBitNot(CompileContext& cc, Reg a, Reg res) {
     assert(a.type == ValueType::I32 && res.type == ValueType::I32);
     cc.insert(MIR_new_insn(cc.ctx, MIR_XORS, cc.regOp(res.id), cc.regOp(a.id), MIR_new_int_op(cc.ctx, -1)));
 }
 
-void generateUnMinus(CompileContext& cc, Temp a, Temp res) {
+void generateUnMinus(CompileContext& cc, Reg a, Reg res) {
     assert(a.type == res.type);
 
     if (!isNumeric(a.type)) {
@@ -699,7 +698,7 @@ void generateInstruction(CompileContext& cc, Operation& insn) {
         case Opcode::Dup:
             generateDup(cc, insn.a);
             break;
-        case Opcode::PushFree:
+        case Opcode::PushUnref:
             generatePushFree(cc, insn.a);
             break;
         default:
@@ -784,7 +783,7 @@ void generateInstruction(CompileContext& cc, Call& call) {
             }
         }
 
-        auto funObj = std::get<Temp>(call.obj);
+        auto funObj = std::get<Reg>(call.obj);
         auto thisArg = call.args[0];
         if (!call.isConstructor) {
             if (funObj.type == ValueType::Any) {
@@ -840,40 +839,44 @@ void generateInstruction(CompileContext& cc, Call& call) {
     }
 }
 
-void generateTerminator(CompileContext& cc, Terminal& jump, Function& cfg) {
+void generateTerminator(CompileContext& cc, Terminator& jump, Function& cfg) {
     switch (jump.type) {
-        case Terminal::None:
+        case Terminator::None:
             assert(false && "Invalid terminator");
-        case Terminal::Branch: {
+        case Terminator::Branch: {
             auto cond = jump.value;
-            assert(cond->type == ValueType::Bool);
-            cc.insert(MIR_new_insn(cc.ctx, MIR_BTS, cc.labelOp(jump.target), cc.regOp(cond->id)));
+            assert(cond.type == ValueType::Bool);
+            cc.insert(MIR_new_insn(cc.ctx, MIR_BTS, cc.labelOp(jump.target), cc.regOp(cond.id)));
             cc.insert(MIR_new_insn(cc.ctx, MIR_JMP, cc.labelOp(jump.other)));
         } break;
-        case Terminal::Jump: {
+        case Terminator::Jump: {
             cc.insert(MIR_new_insn(cc.ctx, MIR_JMP, cc.labelOp(jump.target)));
         } break;
-        case Terminal::Return:
-            generateCall(cc.ctx, cc.fun, cc.builtins, "__exitStackFrame", {}, false);
-            cc.insert(MIR_new_ret_insn(cc.ctx, 0));
-            break;
-        case Terminal::ReturnValue:
-            generateCall(cc.ctx, cc.fun, cc.builtins, "__exitStackFrame", {}, false);
-            if (hasRetArg(cfg.ret)) {
-                auto res = jump.value;
-                assert(res->type == cfg.ret);
-                auto addr = cc.jsValAddr(res->id);
-                auto resReg = MIR_reg(cc.ctx, "res", cc.func);
-                cc.copyJSVal(addr, resReg);
+        case Terminator::Return:
+            if (cfg.ret == ValueType::Void) {
+
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__exitStackFrame", {}, false);
                 cc.insert(MIR_new_ret_insn(cc.ctx, 0));
+                break;
             }
             else {
-                cc.insert(MIR_new_ret_insn(cc.ctx, 1, cc.regOp(jump.value->id)));
+                generateCall(cc.ctx, cc.fun, cc.builtins, "__exitStackFrame", {}, false);
+                if (hasRetArg(cfg.ret)) {
+                    auto res = jump.value;
+                    assert(res.type == cfg.ret);
+                    auto addr = cc.jsValAddr(res.id);
+                    auto resReg = MIR_reg(cc.ctx, "res", cc.func);
+                    cc.copyJSVal(addr, resReg);
+                    cc.insert(MIR_new_ret_insn(cc.ctx, 0));
+                }
+                else {
+                    cc.insert(MIR_new_ret_insn(cc.ctx, 1, cc.regOp(jump.value.id)));
+                }
             }
             break;
-        case Terminal::Throw:
-            assert(jump.value->type == ValueType::Any);
-            generateCall(cc.ctx, cc.fun, cc.builtins, "__throwVal", { cc.jsValAddr(jump.value->id) }, true);
+        case Terminator::Throw:
+            assert(jump.value.type == ValueType::Any);
+            generateCall(cc.ctx, cc.fun, cc.builtins, "__throwVal", { cc.jsValAddr(jump.value.id) }, true);
             cc.checkException();
             break;
         default:
@@ -924,8 +927,8 @@ MIR_item_t compile(MIR_context_t ctx, const std::map<std::string, std::pair<MIR_
     for (auto& block : cfg.blocks) {
         MIR_append_insn(ctx, cc.fun, cc.label(block.get()));
 
-        for (auto statement : block->statements) {
-            std::visit([&](auto&& arg) { generateInstruction(cc, arg); }, statement.op);
+        for (auto instruction : block->instructions) {
+            std::visit([&](auto&& arg) { generateInstruction(cc, arg); }, instruction.op);
         }
 
         generateTerminator(cc, block->jump, cfg);

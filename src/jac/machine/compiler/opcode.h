@@ -92,7 +92,7 @@ enum class Opcode {
     UnPlus,     // a -> number
     UnMinus,    // a -> a
     Dup,        // a -> void
-    PushFree    // a -> void
+    PushUnref   // a -> void
 };
 constexpr Opcode MIN_UNARY_OP = Opcode::Set;
 
@@ -113,7 +113,7 @@ inline bool isComparison(Opcode op) {
 }
 
 inline bool hasResult(Opcode op) {
-    return op != Opcode::PushFree && op != Opcode::Dup;
+    return op != Opcode::PushUnref && op != Opcode::Dup;
 }
 
 

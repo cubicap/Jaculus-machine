@@ -40,7 +40,7 @@ inline void print(std::ostream& os, Opcode op) {
         case Opcode::UnPlus: os << "UnPlus"; break;
         case Opcode::UnMinus: os << "UnMinus"; break;
         case Opcode::Dup: os << "Dup"; break;
-        case Opcode::PushFree: os << "PushFree"; break;
+        case Opcode::PushUnref: os << "PushFree"; break;
         case Opcode::SetMember: os << "SetMember"; break;
         }
 }
@@ -58,7 +58,7 @@ inline void printShort(std::ostream& os, ValueType type) {
 }
 
 
-inline void print(std::ostream& os, const Temp& v) {
+inline void print(std::ostream& os, const Reg& v) {
     os << "_" << v.id << ":";
     printShort(os, v.type);
 }
@@ -110,7 +110,7 @@ inline void print(std::ostream& os, const Call& call) {
         void operator()(const Identifier& id) const {
             os << id;
         }
-        void operator()(const Temp& rvalue) const {
+        void operator()(const Reg& rvalue) const {
             os << "_" << rvalue.id;
         }
     };
@@ -129,10 +129,10 @@ inline void print(std::ostream& os, const Call& call) {
 }
 
 
-inline void print(std::ostream& os, const Statement& statement) {
+inline void print(std::ostream& os, const Instruction& instruction) {
     std::visit([&os](const auto& op) {
         print(os, op);
-    }, statement.op);
+    }, instruction.op);
 }
 
 
@@ -146,62 +146,60 @@ inline void print(std::ostream& os, const BasicBlock& block, std::set<const Basi
         os << "*";
     }
     os << &block;
-    if (!block.statements.empty()) {
+    if (!block.instructions.empty()) {
         os << "|";
     }
 
-    for (const auto& statement : block.statements) {
-        print(os, statement);
+    for (const auto& instruction : block.instructions) {
+        print(os, instruction);
         os << "\\l";
     }
     switch (block.jump.type) {
-        case Terminal::None:
+        case Terminator::None:
             os << "|<<none>>";
             break;
-        case Terminal::Branch:
-            os << "|if (_" << block.jump.value->id << ")";
+        case Terminator::Branch:
+            os << "|if (_" << block.jump.value.id << ")";
             break;
-        case Terminal::Jump:
+        case Terminator::Jump:
             break;
-        case Terminal::Return:
+        case Terminator::Return:
             os << "|return";
+            if (block.jump.value.type != ValueType::Void) {
+                os << " _" << block.jump.value.id;
+            }
             break;
-        case Terminal::ReturnValue:
-            os << "|return _" << block.jump.value->id << "";
-            break;
-        case Terminal::Throw:
-            os << "|throw _" << block.jump.value->id << "";
+        case Terminator::Throw:
+            os << "|throw _" << block.jump.value.id;
             break;
     }
     os << "}\"];\n";
 
     switch (block.jump.type) {
-        case Terminal::None:
+        case Terminator::None:
             break;
-        case Terminal::Branch:
+        case Terminator::Branch:
             os << "  block" << &block << " -> block" << block.jump.target << " [label=\"true\"];\n";
             os << "  block" << &block << " -> block" << block.jump.other << " [label=\"false\"];\n";
             break;
-        case Terminal::Jump:
+        case Terminator::Jump:
             os << "  block" << &block << " -> block" << block.jump.target << ";\n";
             break;
-        case Terminal::Return:
+        case Terminator::Return:
             break;
-        case Terminal::ReturnValue:
-            break;
-        case Terminal::Throw:
+        case Terminator::Throw:
             break;
     }
 }
 
-inline void print(std::ostream& os, const FunctionEmitter& emitter) {
+inline void print(std::ostream& os, const Function& fn) {
     std::set<const BasicBlock*> seen;
 
     os << "digraph {\n";
     os << "  node [shape=record fontname=\"consolas\"];\n";
     os << "  edge [fontname=\"consolas\"];\n";
-    print(os, *emitter.getEntry(), seen, true);
-    for (auto& block : emitter.blocks) {
+    print(os, *fn.entry, seen, true);
+    for (auto& block : fn.blocks) {
         print(os, *block, seen);
     }
     os << "}\n";

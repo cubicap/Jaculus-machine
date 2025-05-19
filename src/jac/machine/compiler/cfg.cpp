@@ -4,8 +4,8 @@
 namespace jac::cfg {
 
 
-TmpId newTmpId() {
-    static TmpId id = 1;
+RegId newRegId() {
+    static RegId id = 1;
     if (id == 0) {
         id = 1;
     }
