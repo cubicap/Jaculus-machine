@@ -13,6 +13,8 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(main main.cpp)
 target_link_libraries(main PUBLIC jac-machine)
+add_executable(mainCompFn mainCompFn.cpp)
+target_link_libraries(mainCompFn PUBLIC jac-machine)
 
 
 function(add_test_executable name)

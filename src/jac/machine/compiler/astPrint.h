@@ -45,7 +45,7 @@ struct NestOStream {
     }
 
     void terminalNode(std::string_view name) {
-        os << '\n' << std::string(nesting, ' ');
+        printIndent();
         os << "<" << name << "/>";
     }
 

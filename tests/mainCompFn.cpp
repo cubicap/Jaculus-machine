@@ -4,6 +4,7 @@
 #include <string>
 
 #include <jac/machine/compiler/ast.h>
+#include <jac/machine/compiler/astPrint.h>
 #include <jac/machine/compiler/cfg.h>
 #include <jac/machine/compiler/cfgDot.h>
 #include <jac/machine/compiler/cfgEmit.h>
@@ -14,6 +15,7 @@ int main(const int argc, const char* argv[]) {
     // --path <file>
 
     std::string path;
+    std::string mode;
 
     for (int i = 1; i < argc; ++i) {
         if (std::string_view(argv[i]) == "--path") {
@@ -23,10 +25,25 @@ int main(const int argc, const char* argv[]) {
             }
             path = argv[++i];
         }
+        else if(std::string_view(argv[i]) == "--mode") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing argument for --mode" << std::endl;
+                return 1;
+            }
+            mode = argv[++i];
+        }
+        else if (std::string_view(argv[i]) == "--help") {
+            std::cerr << "Usage: jac --path <file> --mode <cfg|ast>" << std::endl;
+            return 0;
+        }
+        else {
+            std::cerr << "Unknown argument: " << argv[i] << std::endl;
+            return 1;
+        }
     }
 
-    if (path.empty()) {
-        std::cerr << "Path is required" << std::endl;
+    if (mode != "cfg" && mode != "ast") {
+        std::cerr << "Invalid mode: " << mode << std::endl;
         return 1;
     }
 
@@ -52,8 +69,6 @@ int main(const int argc, const char* argv[]) {
             code += line + '\n';
         }
     }
-    std::cerr << "--- code ---\n" << code << "---" << std::endl;
-
 
     bool hadError = false;
     std::vector<std::string> reports;
@@ -73,7 +88,7 @@ int main(const int argc, const char* argv[]) {
 
     jac::ast::ParserState state(tokens);
 
-    auto fun = jac::ast::FunctionDeclaration<false, false, false>::parse(state);
+    auto fun = jac::ast::FunctionDeclaration::parse(state, false);
     if (!fun || !state.isEnd()) {
         jac::lex::Token errorToken = state.getErrorToken();
         std::cerr << "Parse error: " << state.getErrorMessage()
@@ -81,14 +96,14 @@ int main(const int argc, const char* argv[]) {
         throw std::runtime_error("Parse error");
     }
 
+    if (mode == "ast") {
+        jac::ast::print::NestOStream os(std::cout);
+        os << fun;
+        return 0;
+    }
+
     auto sig = jac::cfg::getSignature(*fun);
     auto cfg = jac::cfg::emit(*fun, sig, {});
-
-    // std::cerr << "--- cfg ---\n";
-
-    // jac::cfg::dotprint::print(std::cout, cfg);
-
-    std::cerr << "--- simplified cfg ---\n";
 
     jac::cfg::removeEmptyBlocks(cfg);
     jac::cfg::dotprint::print(std::cout, cfg);
