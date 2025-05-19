@@ -30,7 +30,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <sys/mman.h>
 #include <utility>
 #include <vector>
 
@@ -47,9 +46,10 @@ struct CompFn {
 
 namespace detail {
 
+using CompiledFnSignature = JSValue(*)(int64_t, JSValue*, JSValue*);
 
 struct CompiledCallable {
-    void* callerPtr;
+    CompiledFnSignature callerPtr;
 
     Value operator()(ContextRef ctx, ValueWeak /* this */, std::vector<ValueWeak> args) {
         std::vector<JSValue> jsArgs;
@@ -57,9 +57,8 @@ struct CompiledCallable {
             jsArgs.push_back(arg.getVal());
         }
 
-        auto fn = reinterpret_cast<JSValue(*)(int64_t, JSValue*, JSValue*)>(callerPtr); // NOLINT
         JSValue res;
-        fn(jsArgs.size(), jsArgs.data(), &res);
+        callerPtr(jsArgs.size(), jsArgs.data(), &res);
         return Value(ctx, res);
     }
 };
@@ -213,10 +212,17 @@ class AotEvalFeature : public EvalFeature<Next> {
             void* ptr = MIR_gen(ctx, 0, callers[i]);
             i++;
 
-            auto jsFn = detail::CompiledCallable{ ptr };
-            Value jsFnObj = ff.newFunctionThisVariadic(jsFn);
+            // the "value" of "undefined" is ignored by QuickJS so we can abuse it to pass arbitrary data
+            JSValue ptrWrap = JS_MKPTR(JS_TAG_UNDEFINED, ptr);
+            JSCFunctionData* funWrap = +[](JSContext *, JSValueConst, int argc, JSValueConst *argv, int magic, JSValue *func_data) -> JSValue {
+                auto caller = reinterpret_cast<detail::CompiledFnSignature>(func_data->u.ptr);  // NOLINT
+                JSValue res;
+                caller(argc, argv, &res);
+                return res;
+            };
+            JSValue jsFn = JS_NewCFunctionData(this->context(), funWrap, 0, 0, 1, &ptrWrap);
 
-            it->second.jsFn = jsFnObj.to<Function>();
+            it->second.jsFn = Function(this->context(), jsFn);
 
             results.push_back(&it->second);
         }
