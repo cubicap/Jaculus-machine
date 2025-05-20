@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cfg.h"
-#include "mirBuiltins.h"
+#include "mirUtil.h"
 
 #include <mir.h>
 
