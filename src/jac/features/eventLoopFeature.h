@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <noal_func.h>
+#include <optional>
 
 #include "eventLoopTerminal.h"
 
